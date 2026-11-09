@@ -1018,6 +1018,93 @@ describe('SaveResultService', () => {
     });
   });
 
+  describe('saveAllSections skipDuplicateValidation', () => {
+    const starExtraData = (counters = new CounterResults()) => ({
+      platformCode: ReportingPlatformEnum.STAR,
+      counters,
+      resultSaved: [] as number[],
+      currentCode: { current: 0 },
+      duplicateByTitle: true,
+    });
+
+    it('does not check the title or the public link and deletes nothing', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 1,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.title = 'Same title';
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, {
+        ...starExtraData(),
+        skipDuplicateValidation: true,
+      });
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledTimes(1);
+      expect(
+        resultRepoHandle.findOne.mock.calls[0][0].where,
+      ).not.toHaveProperty('title');
+      expect(resultRepoHandle.find).not.toHaveBeenCalled();
+      expect(queryService.deleteLogicalResultById).not.toHaveBeenCalled();
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
+    });
+
+    it('still skips a matching title when skipDuplicateValidation is false', async () => {
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ result_id: 77 });
+      const dto = minimalResultDto();
+      dto.createResult.title = 'Same title';
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, {
+        ...starExtraData(),
+        skipDuplicateValidation: false,
+      });
+
+      expect(resultsService.createResult).not.toHaveBeenCalled();
+      expect(resultRepoHandle.findOne).toHaveBeenLastCalledWith({
+        where: {
+          title: 'Same title',
+          is_active: true,
+          is_snapshot: false,
+        },
+        select: { result_id: true },
+      });
+      expect(queryService.deleteLogicalResultById).not.toHaveBeenCalled();
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+    });
+
+    it('still deletes a lower-priority public-link duplicate when the flag is omitted', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 88,
+          platform_code: ReportingPlatformEnum.PRMS,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 100,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, {
+        platformCode: ReportingPlatformEnum.TIP,
+        counters: new CounterResults(),
+        resultSaved: [],
+        currentCode: { current: 0 },
+      });
+
+      expect(queryService.deleteLogicalResultById).toHaveBeenCalledWith(88);
+    });
+  });
+
   describe('saveAllSections PRMS identifiers', () => {
     it('should write prms_result_code and prms_phase_id when present', async () => {
       resultRepoHandle.findOne.mockResolvedValue({

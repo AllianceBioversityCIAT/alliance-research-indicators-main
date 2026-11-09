@@ -28,10 +28,12 @@ import {
 // @sdd-spec docs/specs/changes/tip-prms-phase-2/prms-platform-identity — T-07
 //
 // Behavioural proof on a real MySQL schema (R-PPI-002, R-PPI-004, design §13):
-// one official code, one reporting year, a live STAR row and a live TIP row.
-// STAR owns a sync-log row and a history row. TIP's status, history and next
-// attempt do not see them. `TIP-<code>` correlates to the TIP live row; the
-// bare code correlates to STAR.
+// one official code, one reporting year, a live STAR row, its snapshot, and a
+// live TIP row. STAR owns a sync-log row and a history row. Status stays on
+// the live row. History is read from the snapshot: the live row returns an
+// empty timeline. TIP's status, history and next attempt do not see the STAR
+// rows. `TIP-<code>` correlates to the TIP live row; the bare code correlates
+// to STAR.
 //
 // The code is 917200, not the spec's illustrative 123. This file creates its
 // own rows and must not depend on whatever official code 123 the Dev dump
@@ -85,6 +87,7 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
   let correlator: DeliveryCorrelatorService;
   let userId: number;
   let starLiveId: number;
+  let starSnapshotId: number;
   let tipLiveId: number;
   let starOutboundId: number;
   let starDecisionId: number;
@@ -102,6 +105,14 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
       year: YEAR,
       platform: ReportingPlatformEnum.STAR,
       snapshot: false,
+    });
+    // History belongs to the version. R-PPI-002 reads the STAR timeline from
+    // this snapshot; the live row of the same code, year and platform is empty.
+    starSnapshotId = await insertResult({
+      code: CODE,
+      year: YEAR,
+      platform: ReportingPlatformEnum.STAR,
+      snapshot: true,
     });
     tipLiveId = await insertResult({
       code: CODE,
@@ -190,7 +201,8 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
     const tipStatus = await statusReader.getStatus(tipLiveId);
     const starStatus = await statusReader.getStatus(starLiveId);
     const tipHistory = await historyReader.getHistory(tipLiveId);
-    const starHistory = await historyReader.getHistory(starLiveId);
+    const starHistory = await historyReader.getHistory(starSnapshotId);
+    const starLiveHistory = await historyReader.getHistory(starLiveId);
 
     expect(tipStatus.last_attempt).toBeNull();
     expect(tipStatus.last_decision).toBeNull();
@@ -205,6 +217,10 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
     expect(starHistory.events.map((event) => event.id).sort()).toEqual(
       [starOutboundId, starDecisionId].sort(),
     );
+    expect({
+      events: starLiveHistory.events,
+      sync_count: starLiveHistory.sync_count,
+    }).toEqual({ events: [], sync_count: 0 });
 
     const claimed = await logRepository.claimAttempt(tipLiveId, {
       environment: 'TEST',
@@ -221,7 +237,7 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
     const starAfter = await statusReader.getStatus(starLiveId);
     expect(starAfter.last_attempt?.attempt_number).toBe(STAR_ATTEMPT);
     expect(starAfter.last_decision?.decision).toBe('APPROVE');
-    const starHistoryAfter = await historyReader.getHistory(starLiveId);
+    const starHistoryAfter = await historyReader.getHistory(starSnapshotId);
     expect(starHistoryAfter.events.map((event) => event.id).sort()).toEqual(
       [starOutboundId, starDecisionId].sort(),
     );
