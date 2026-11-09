@@ -1,5 +1,5 @@
 <section
-  class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
+  class="overflow-hidden rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
   data-testid="pfm-portfolio-projects"
   aria-labelledby="pfm-portfolio-projects-title">
   <div>
@@ -12,8 +12,20 @@
     </p>
   </div>
 
+  <!-- Same toolbar as the Results Center: the shared search with Clear Filters -->
+  <div class="mt-4 flex flex-wrap items-center gap-3" data-testid="pfm-projects-toolbar">
+    <app-search-export-controls
+      class="w-fit max-w-full"
+      [showApply]="false"
+      [showClear]="true"
+      [searchValue]="search()"
+      searchPlaceholder="Find a project by code, name or Principal Investigator"
+      (searchChange)="search.set($event)"
+      (clear)="clear()" />
+  </div>
+
   <!-- Quick views: one choice, drawn as the My PI Delegates segmented control -->
-  <div class="mt-4 flex w-full flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label="Quick views">
+  <div class="mt-3 mb-5 flex w-full flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label="Quick views">
     <span class="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]">Quick views</span>
     <div
       class="inline-flex h-8 items-center gap-0.5 rounded-full border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] p-[2px]"
@@ -39,20 +51,8 @@
     </div>
   </div>
 
-  <!-- Same toolbar as the Results Center: the shared search with Clear Filters -->
-  <div class="mt-3 flex flex-wrap items-center gap-3" data-testid="pfm-projects-toolbar">
-    <app-search-export-controls
-      class="w-fit max-w-full"
-      [showApply]="false"
-      [showClear]="true"
-      [searchValue]="search()"
-      searchPlaceholder="Find a project by code, name or Principal Investigator"
-      (searchChange)="search.set($event)"
-      (clear)="clear()" />
-  </div>
-
-  <!-- Inside the card padding, framed like the Results queue project tables -->
-  <div class="mt-4 w-full overflow-x-auto rounded-[10px] border border-solid border-[color:var(--ac-grey-200)]">
+  <!-- Edge to edge of the card, no padding of its own, like the Results Center table -->
+  <div class="-mx-5 -mb-5 mt-4 overflow-x-auto border-0 border-t border-solid border-[color:var(--ac-grey-200)] md:-mx-6 md:-mb-6">
     <p-table
       [value]="rows()"
       [scrollable]="true"
