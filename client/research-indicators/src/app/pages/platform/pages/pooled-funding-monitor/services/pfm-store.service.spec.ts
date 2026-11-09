@@ -369,7 +369,7 @@ describe('PfmStoreService', () => {
     expect(second.focusResult()).toBe('STAR-1');
   });
 
-  it('keeps the coverage stage and projects filter across a return, ignoring a stage out of range', () => {
+  it('keeps the coverage stage and projects filter across a return, ignoring a negative stage', () => {
     sessionStorage.clear();
     const first = build();
     first.coverageStage.set(2);
@@ -384,7 +384,7 @@ describe('PfmStoreService', () => {
     TestBed.resetTestingModule();
     sessionStorage.setItem(
       'pfm-monitor-return-state',
-      JSON.stringify({ v: 1, savedAt: Date.now(), scope: 'mine', tab: 'coverage', filters: {}, chip: null, openGroups: [], groupViews: {}, coverageStage: 9, resultCode: null })
+      JSON.stringify({ v: 1, savedAt: Date.now(), scope: 'mine', tab: 'coverage', filters: {}, chip: null, openGroups: [], groupViews: {}, coverageStage: -1, resultCode: null })
     );
     const third = build();
     third.init();
