@@ -87,7 +87,8 @@ export class PfmStoreService {
       this.groupViews.set(back.groupViews ?? {});
       this.openGroups.set(new Set(back.openGroups ?? []));
       this.focusResult.set(back.resultCode);
-      if (Number.isInteger(back.coverageStage) && back.coverageStage! >= 0 && back.coverageStage! <= 4) this.coverageStage.set(back.coverageStage!);
+      // Any stage index; the journey card clamps it to the stages it has.
+      if (Number.isInteger(back.coverageStage) && back.coverageStage! >= 0) this.coverageStage.set(back.coverageStage!);
       if (back.projectsFilter && ['all', 'with', 'without'].includes(back.projectsFilter)) this.coverageProjectsFilter.set(back.projectsFilter);
       this.syncUrl();
     }
