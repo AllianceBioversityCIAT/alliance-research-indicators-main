@@ -171,6 +171,8 @@ const laterOf = (candidate: Date | null, floor: Date): Date =>
 
 /** PRMS `result_type_id` of an Innovation Development result. */
 const PRMS_INNOVATION_DEVELOPMENT_TYPE_ID = 7;
+// L1..L8 map to the 2025 levers only (clarisa_levers ids 1-8, portfolio 1).
+const AS_STAR_CONTRACT_LEVER_MAX_YEAR = 2025;
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -1724,19 +1726,33 @@ export class PrmsOpenSearchService
         contract_id: primaryContract?.agreement_id,
       };
 
-      const prmsLever = await this.clarisaLeversService.findOne(
-        item?.result_level?.code,
-      );
-
-      const lever = await this.clarisaLeversService.homologatedData(
-        primaryContract?.departmentId,
-      );
       const contractsFromBilateralProjects =
         options.contractsFromBilateralProjects === true;
-      // As-STAR must not call findByShortName with an empty lever: that
-      // lookup returns the first clarisa_levers row.
+      const resolveAsStarContractLever =
+        contractsFromBilateralProjects &&
+        result.createResult.year <= AS_STAR_CONTRACT_LEVER_MAX_YEAR;
+      // `result_level` is the PRMS result level (Outcome is 3, Output is 4),
+      // not a lever. As-STAR does not pass it to findOne: that lookup reads
+      // clarisa_levers.id, so it assigned Lever 3 or 4 and overrode the lever
+      // taken from the primary contract department. fetch-prms-data still
+      // uses it. As-STAR reads that department only through
+      // AS_STAR_CONTRACT_LEVER_MAX_YEAR; a later year sends no primary lever.
+      // An empty homologated department also skips findByShortName, which
+      // would otherwise return the first clarisa_levers row.
+      const prmsLever = contractsFromBilateralProjects
+        ? null
+        : await this.clarisaLeversService.findOne(item?.result_level?.code);
+
+      const skipAsStarLeverLookup =
+        contractsFromBilateralProjects && !resolveAsStarContractLever;
+      const lever = skipAsStarLeverLookup
+        ? null
+        : await this.clarisaLeversService.homologatedData(
+            primaryContract?.departmentId,
+          );
       const clarisaLever =
-        contractsFromBilateralProjects && isEmpty(lever)
+        skipAsStarLeverLookup ||
+        (contractsFromBilateralProjects && isEmpty(lever))
           ? null
           : await this.clarisaLeversService.findByShortName(lever);
       const resolvedLeverId = prmsLever?.id ?? clarisaLever?.id;

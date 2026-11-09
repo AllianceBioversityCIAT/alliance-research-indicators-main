@@ -1864,6 +1864,42 @@ describe('PrmsOpenSearchService', () => {
       expect(out[0].alignments.primary_levers[0].lever_id).toBe(999);
     });
 
+    it('still lets the result_level lookup win on fetch-prms-data', async () => {
+      clarisaLeversService.findOne.mockResolvedValueOnce({ id: 3 } as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce({
+        id: 1,
+      } as any);
+      const out = await service.processData([
+        buildTemporalMapper({
+          result_level: { code: '3', name: 'Outcome', description: '' },
+        }),
+      ]);
+      expect(clarisaLeversService.findOne).toHaveBeenCalledWith('3');
+      expect(out[0].alignments.primary_levers).toEqual([
+        expect.objectContaining({ lever_id: 3 }),
+      ]);
+    });
+
+    it('still looks up the lever on fetch-prms-data when the year is after 2025', async () => {
+      clarisaLeversService.findOne.mockResolvedValueOnce({ id: 4 } as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce({
+        id: 1,
+      } as any);
+      const out = await service.processData([
+        buildTemporalMapper({
+          year: '2026',
+          result_level: { code: '4', name: 'Output', description: '' },
+        }),
+      ]);
+      expect(clarisaLeversService.findOne).toHaveBeenCalledWith('4');
+      expect(clarisaLeversService.homologatedData).toHaveBeenCalled();
+      expect(clarisaLeversService.findByShortName).toHaveBeenCalled();
+      expect(out[0].createResult.year).toBe(2026);
+      expect(out[0].alignments.primary_levers).toEqual([
+        expect.objectContaining({ lever_id: 4 }),
+      ]);
+    });
+
     it('should create user from alliance staff when STAR user is missing and creator email is empty', async () => {
       resultRepository.findUserByEmailOrCarnet.mockResolvedValue(null as any);
       allianceStaffRepoHandle.findOne.mockResolvedValue({
@@ -2757,10 +2793,10 @@ describe('PrmsOpenSearchService', () => {
       external_code,
     });
 
-    const contract = (agreement_id: string) =>
+    const contract = (agreement_id: string, departmentId = 'DEPT') =>
       ({
         agreement_id,
-        departmentId: 'DEPT',
+        departmentId,
       }) as AgressoContract;
 
     const runAsStar = async (
@@ -3081,7 +3117,7 @@ describe('PrmsOpenSearchService', () => {
       resultsService.findResultAlignment.mockResolvedValue({
         contributor_levers: [
           {
-            lever_id: 88,
+            lever_id: 77,
             custom_lever_name: 'overlaps primary',
             result_lever_sdg_targets: [{ sdg_target_id: 3 }],
           },
@@ -3114,12 +3150,13 @@ describe('PrmsOpenSearchService', () => {
         'is_primary',
       );
 
+      expect(clarisaLeversService.findOne).not.toHaveBeenCalled();
       expect(alignment.primary_levers).toEqual([
-        expect.objectContaining({ lever_id: 88 }),
+        expect.objectContaining({ lever_id: 77 }),
       ]);
       expect(merged).toEqual([
         expect.objectContaining({
-          lever_id: 88,
+          lever_id: 77,
           is_primary: true,
           custom_lever_name: undefined,
         }),
@@ -3159,11 +3196,118 @@ describe('PrmsOpenSearchService', () => {
     });
 
     it('does not look up a lever by an empty short name and sends no primary lever', async () => {
-      clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
       clarisaLeversService.homologatedData.mockReturnValueOnce(null as any);
 
       const [out] = await runAsStar({ bilateral_projects: [] });
 
+      expect(clarisaLeversService.findOne).not.toHaveBeenCalled();
+      expect(clarisaLeversService.findByShortName).not.toHaveBeenCalled();
+      expect(out.alignments.primary_levers).toEqual([]);
+    });
+
+    it('derives the as-STAR primary lever from department L1 and ignores result_level 3', async () => {
+      const lever1Id = 11;
+      clarisaLeversService.homologatedData.mockImplementation(
+        (departmentId: string) =>
+          departmentId?.toUpperCase?.().trim() === 'L1' ? 'Lever 1' : null,
+      );
+      clarisaLeversService.findByShortName.mockImplementation(
+        async (shortName: string) =>
+          shortName === 'Lever 1' ? ({ id: lever1Id } as any) : null,
+      );
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('A1616', 'L1'),
+      ]);
+
+      const [out] = await runAsStar({
+        result_level: {
+          code: 3 as unknown as string,
+          name: 'Outcome',
+          description: '',
+        },
+        bilateral_projects: [project('A1616')],
+      });
+
+      expect(clarisaLeversService.findOne).not.toHaveBeenCalled();
+      expect(clarisaLeversService.homologatedData).toHaveBeenCalledWith('L1');
+      expect(clarisaLeversService.findByShortName).toHaveBeenCalledWith(
+        'Lever 1',
+      );
+      expect(out.alignments.primary_levers).toEqual([{ lever_id: lever1Id }]);
+    });
+
+    it('resolves Lever 1 from department L1 when the as-STAR year is 2025', async () => {
+      const lever1Id = 11;
+      clarisaLeversService.homologatedData.mockImplementation(
+        (departmentId: string) =>
+          departmentId?.toUpperCase?.().trim() === 'L1' ? 'Lever 1' : null,
+      );
+      clarisaLeversService.findByShortName.mockImplementation(
+        async (shortName: string) =>
+          shortName === 'Lever 1' ? ({ id: lever1Id } as any) : null,
+      );
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('A1616', 'L1'),
+      ]);
+
+      const [out] = await runAsStar({
+        year: '2025',
+        bilateral_projects: [project('A1616')],
+      });
+
+      expect(out.createResult.year).toBe(2025);
+      expect(clarisaLeversService.findOne).not.toHaveBeenCalled();
+      expect(clarisaLeversService.homologatedData).toHaveBeenCalledWith('L1');
+      expect(clarisaLeversService.findByShortName).toHaveBeenCalledWith(
+        'Lever 1',
+      );
+      expect(out.alignments.primary_levers).toEqual([{ lever_id: lever1Id }]);
+    });
+
+    it('sends no primary lever for an as-STAR year after 2025 even when the department is L1', async () => {
+      clarisaLeversService.homologatedData.mockImplementation(
+        (departmentId: string) =>
+          departmentId?.toUpperCase?.().trim() === 'L1' ? 'Lever 1' : null,
+      );
+      clarisaLeversService.findByShortName.mockResolvedValue({
+        id: 11,
+      } as any);
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('A1616', 'L1'),
+      ]);
+
+      const [out] = await runAsStar({
+        year: '2026',
+        bilateral_projects: [project('A1616')],
+      });
+
+      expect(out.createResult.year).toBe(2026);
+      expect(clarisaLeversService.findOne).not.toHaveBeenCalled();
+      expect(clarisaLeversService.homologatedData).not.toHaveBeenCalled();
+      expect(clarisaLeversService.findByShortName).not.toHaveBeenCalled();
+      expect(out.alignments.primary_levers).toEqual([]);
+    });
+
+    it('sends no as-STAR primary lever for department PI and does not look up result_level 4', async () => {
+      clarisaLeversService.homologatedData.mockImplementation(
+        (departmentId: string) =>
+          departmentId?.toUpperCase?.().trim() === 'L1' ? 'Lever 1' : null,
+      );
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('A1616', 'PI'),
+      ]);
+
+      const [out] = await runAsStar({
+        result_level: {
+          code: 4 as unknown as string,
+          name: 'Output',
+          description: '',
+        },
+        bilateral_projects: [project('A1616')],
+      });
+
+      expect(clarisaLeversService.findOne).not.toHaveBeenCalled();
+      expect(clarisaLeversService.homologatedData).toHaveBeenCalledWith('PI');
       expect(clarisaLeversService.findByShortName).not.toHaveBeenCalled();
       expect(out.alignments.primary_levers).toEqual([]);
     });
