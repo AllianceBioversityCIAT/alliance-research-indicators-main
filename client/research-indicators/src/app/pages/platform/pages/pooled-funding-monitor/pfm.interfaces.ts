@@ -62,6 +62,31 @@ export interface PfmSyncedType {
   synced: number;
 }
 
+/** Coverage tab, "the journey of a result": five stages, each a subset of the one before. */
+export interface PfmJourney {
+  projects: { total: number; with_results: number; without_results: number };
+  /** Draft includes Returned; Submitted includes Under review. */
+  star: { draft: number; submitted: number; approved: number };
+  /** Approved results only. */
+  answer: { not_answered: number; contributes: number; no_sp: number };
+  /** Approved results that contribute. */
+  mapping: { incomplete: number; complete: number };
+  /** Approved, contributing, mapped. `rejected` is the part of `synced` PRMS rejected. */
+  sync: { ready: number; synced: number; rejected: number };
+}
+
+/** Which projects the coverage stage 1 table shows. */
+export type PfmProjectsFilter = 'all' | 'with' | 'without';
+
+/** A contributing project of the scope, with or without results. */
+export interface PfmPortfolioProject {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  delegates: string[];
+  results: number;
+}
+
 export interface PfmMonthly {
   /** 'YYYY-MM' */
   month: string;
@@ -104,6 +129,10 @@ export interface PfmSummary {
   synced_this_year: number;
   /** Results already in PRMS by result type, most first. Optional: older servers omit it. */
   synced_by_type?: PfmSyncedType[];
+  /** Coverage tab stages. Optional: older servers omit it. */
+  journey?: PfmJourney;
+  /** Contributing projects, most results first. Optional: older servers omit it. */
+  portfolio_projects?: PfmPortfolioProject[];
   /** Furthest behind (most remaining) first. Optional: absent from a server older than the coverage redesign. */
   project_progress?: PfmProjectProgress[];
   prms_rejection_reasons?: PfmRejectionReason[];
