@@ -103,9 +103,9 @@ describe('PfmCoverageTabComponent', () => {
         sync: { ready: 6, synced: 9, rejected: 3 }
       },
       portfolio_projects: [
-        { code: 'P-1', name: 'One', lead_pi: 'Lead One', delegates: [], results: 20 },
-        { code: 'P-2', name: 'Two', lead_pi: 'Lead Two', delegates: [], results: 11 },
-        { code: 'P-3', name: 'Three', lead_pi: 'Lead Three', delegates: [], results: 0 }
+        { code: 'P-1', name: 'One', lead_pi: 'Lead One', status: 'Ongoing', delegates: [], results: 20 },
+        { code: 'P-2', name: 'Two', lead_pi: 'Lead Two', status: 'Ongoing', delegates: [], results: 11 },
+        { code: 'P-3', name: 'Three', lead_pi: 'Lead Three', status: 'Ongoing', delegates: [], results: 0 }
       ]
     };
 
