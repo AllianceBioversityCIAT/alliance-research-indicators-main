@@ -130,6 +130,17 @@
           [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
           [serviceParams]="serviceParams" [optionFilter]="researchAreaOptionFilter"
           placeholder="Select the research areas">
+          <!-- Same look as Contribution to SDG, without an image. No description in the DB, so the name is not bold. -->
+          <ng-template #item let-area>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+            </p>
+          </ng-template>
+          <ng-template #rows let-area>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+            </p>
+          </ng-template>
         </app-multiselect>
 
         <app-multiselect label="Strategic Objectives" [signal]="body" optionLabel="name" optionValue="id"
