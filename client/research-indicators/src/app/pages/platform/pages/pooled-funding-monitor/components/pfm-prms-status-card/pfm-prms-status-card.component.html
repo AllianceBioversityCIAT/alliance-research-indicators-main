@@ -4,13 +4,13 @@
   aria-labelledby="pfm-prms-status-title">
   @let s = slices();
   <h2 id="pfm-prms-status-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">PRMS status</h2>
-  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Results in PRMS plus those with no SP contribution. Click a slice to see them.</p>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Results in PRMS, by review status. Click a slice to see them.</p>
 
   @if (s.total === 0) {
     <app-pfm-empty-state data-testid="pfm-prms-status-empty" />
   } @else {
     <div class="mt-4 flex justify-center">
-      <svg viewBox="0 0 120 120" class="h-[170px] w-[170px] -rotate-90" role="img" [attr.aria-label]="s.total + ' results in PRMS or with no SP contribution'" data-testid="pfm-prms-donut">
+      <svg viewBox="0 0 120 120" class="h-[170px] w-[170px] -rotate-90" role="img" [attr.aria-label]="s.total + ' results in PRMS'" data-testid="pfm-prms-donut">
         @for (it of s.items; track it.key) {
           @if (it.value > 0) {
             <circle

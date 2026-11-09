@@ -1,5 +1,5 @@
-// Coverage tab, "PRMS status": a donut of everything that already has a decision — in PRMS
-// (pending review / approved / rejected) plus no SP contribution — with the total in the middle.
+// Stats tab, "PRMS status": a donut of the results in PRMS (approved / pending review / rejected),
+// with the total in the middle. No SP contribution is not shown: those results never reach PRMS.
 // Each slice (and its legend row) opens the Results queue on exactly those results.
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
@@ -21,8 +21,7 @@ interface Slice {
 export const PFM_PRMS_SLICES: Slice[] = [
   { key: 'approved', label: 'Approved by PRMS', stage: 'approved', chip: 'prms_approved', status: { prms: 'Approved' } },
   { key: 'pending_review', label: 'Pending review in PRMS', stage: 'pending_review', chip: 'prms_pending', status: { prms: 'Pending Review' } },
-  { key: 'rejected', label: 'Rejected by PRMS', stage: 'rejected', chip: 'rejected', status: { prms: 'Rejected' } },
-  { key: 'no_sp', label: 'No SP contribution', stage: 'no_sp_contribution', chip: 'no_sp_contribution', status: { mapping: 'No SP contribution' } }
+  { key: 'rejected', label: 'Rejected by PRMS', stage: 'rejected', chip: 'rejected', status: { prms: 'Rejected' } }
 ];
 
 /** Donut geometry (SVG user units). */
