@@ -209,6 +209,8 @@ const RESULT_ROW = {
   prms_result_code: 452,
   prms_phase_id: 6,
   prms_sp_code: 'SP03',
+  platform_code: 'STAR',
+  is_snapshot: 1 as const,
 };
 
 describe('PrmsSyncHistoryReader', () => {
@@ -343,6 +345,7 @@ describe('PrmsSyncHistoryReader', () => {
           report_year_id: YEAR,
           prms_result_code: null,
           prms_phase_id: null,
+          is_snapshot: 1,
         },
       ],
     );
@@ -355,20 +358,116 @@ describe('PrmsSyncHistoryReader', () => {
     expect(history.prms_phase_id).toBeNull();
   });
 
-  it('reads the phase and the PRIMARY SP from the pushed version when the row has no phase', async () => {
+  it('reads a snapshot phase and PRIMARY SP from the row itself', async () => {
     installFixture(query, FIXTURE, [RESULT_ROW]);
 
     await reader.getHistory(RESULT_ID);
 
     const metaSql = issuedCall(query, /prms_phase_id/).sql;
-    expect(metaSql).toMatch(
+    expect(metaSql).toMatch(/r\.is_snapshot/);
+    expect(metaSql).toMatch(/r\.prms_phase_id/);
+    expect(metaSql).toMatch(/a\.result_id = r\.result_id/);
+    expect(metaSql).not.toMatch(
       /COALESCE\(r\.prms_phase_id, v\.prms_phase_id\) AS prms_phase_id/,
     );
-    expect(metaSql).toMatch(/pushed\.is_snapshot = TRUE/);
-    expect(metaSql).toMatch(/pushed\.prms_phase_id IS NOT NULL/);
-    expect(metaSql).toMatch(/pushed\.platform_code <=> r\.platform_code/);
+    expect(metaSql).not.toMatch(/pushed\.is_snapshot = TRUE/);
     expect(metaSql).toMatch(/sp\.sp_role = 'PRIMARY'/);
     expect(metaSql).toMatch(/AS prms_sp_code/);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([0, false])(
+    'live row (is_snapshot %p) returns its own code and phase and does not read history',
+    async (isSnapshot) => {
+      installFixture(query, FIXTURE, [
+        {
+          result_official_code: OFFICIAL_CODE,
+          report_year_id: YEAR,
+          prms_result_code: 452,
+          prms_phase_id: null,
+          prms_sp_code: 'SP03',
+          is_snapshot: isSnapshot,
+        },
+      ]);
+
+      const history = await reader.getHistory(RESULT_ID);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(
+        query.mock.calls.some((call) =>
+          /result_prms_sync_history/.test(call[0] as string),
+        ),
+      ).toBe(false);
+      expect(
+        query.mock.calls.some((call) => /COUNT\(\*\)/.test(call[0] as string)),
+      ).toBe(false);
+      expect(history).toEqual({
+        prms_result_code: 452,
+        prms_phase_id: null,
+        prms_sp_code: null,
+        sync_count: 0,
+        events: [],
+      });
+    },
+  );
+
+  it.each([1, true])(
+    'snapshot row (is_snapshot %p) reads events and count and keeps its own phase and SP',
+    async (isSnapshot) => {
+      installFixture(query, FIXTURE, [
+        { ...RESULT_ROW, is_snapshot: isSnapshot },
+      ]);
+
+      const history = await reader.getHistory(RESULT_ID);
+
+      expect(query).toHaveBeenCalledTimes(3);
+      expect(history.prms_result_code).toBe(452);
+      expect(history.prms_phase_id).toBe(6);
+      expect(history.prms_sp_code).toBe('SP03');
+      expect(history.sync_count).toBe(2);
+      expect(history.events.map((event) => event.id)).toEqual([
+        103, 102, 104, 101,
+      ]);
+    },
+  );
+
+  it('a snapshot with no phase of its own still borrows phase and SP from the latest phased snapshot', async () => {
+    query.mockImplementation((sql: string, params: unknown[] = []) => {
+      if (/pushed\.is_snapshot = TRUE/.test(sql)) {
+        return Promise.resolve([{ prms_phase_id: 9, prms_sp_code: 'SP07' }]);
+      }
+      if (/prms_phase_id/.test(sql)) {
+        return Promise.resolve([
+          {
+            result_official_code: OFFICIAL_CODE,
+            report_year_id: YEAR,
+            prms_result_code: 452,
+            prms_phase_id: null,
+            prms_sp_code: 'SP-OWN',
+            platform_code: 'STAR',
+            is_snapshot: 1,
+          },
+        ]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve(projectHistory(sql, params, FIXTURE));
+      }
+      return Promise.resolve([]);
+    });
+
+    const history = await reader.getHistory(RESULT_ID);
+
+    const phaseSqls = query.mock.calls
+      .map((call) => call[0] as string)
+      .filter((sql) => /prms_phase_id/.test(sql));
+    expect(phaseSqls).toHaveLength(2);
+    expect(phaseSqls[0]).not.toMatch(/pushed\.is_snapshot = TRUE/);
+    expect(phaseSqls[1]).toMatch(/pushed\.is_snapshot = TRUE/);
+    expect(history.prms_phase_id).toBe(9);
+    expect(history.prms_sp_code).toBe('SP07');
+    expect(history.prms_result_code).toBe(452);
+    expect(history.sync_count).toBe(2);
+    expect(history.events).toHaveLength(4);
   });
 
   it('carries a null prms_sp_code when the result has no PRIMARY SP', async () => {
@@ -389,6 +488,7 @@ describe('PrmsSyncHistoryReader', () => {
           report_year_id: YEAR,
           prms_result_code: 452,
           prms_phase_id: null,
+          is_snapshot: 1,
         },
       ],
     );

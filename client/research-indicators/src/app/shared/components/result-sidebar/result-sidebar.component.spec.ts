@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResultSidebarComponent } from './result-sidebar.component';
-import { ActivatedRoute, Router, NavigationEnd, ParamMap } from '@angular/router';
+import { ActivatedRoute, Router, NavigationEnd, ParamMap, Params } from '@angular/router';
 import { computed, signal, WritableSignal } from '@angular/core';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -36,6 +36,7 @@ describe('ResultSidebarComponent', () => {
   let bilateralService: Partial<BilateralService>;
   let sectionEnabled: WritableSignal<boolean>;
   let prmsSyncButtonEnabled: WritableSignal<boolean>;
+  let versionQueryParams$: Subject<Params>;
 
   beforeEach(async () => {
     cacheService = {
@@ -110,11 +111,13 @@ describe('ResultSidebarComponent', () => {
       keys: []
     };
 
+    versionQueryParams$ = new Subject<Params>();
     route = {
       snapshot: {
         paramMap: paramMapMock,
         queryParamMap: paramMapMock
-      } as any
+      } as any,
+      queryParams: versionQueryParams$.asObservable()
     };
 
     rolesService = {
@@ -2821,6 +2824,14 @@ describe('ResultSidebarComponent', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(value);
     }
 
+    function currentNumericResultId(): number {
+      const read = cacheService.getCurrentNumericResultId;
+      if (!read) {
+        throw new Error('getCurrentNumericResultId is not stubbed');
+      }
+      return read();
+    }
+
     function historyPayload(partial: Partial<PrmsSyncHistoryResponse> = {}): { successfulRequest: boolean; data: PrmsSyncHistoryResponse } {
       return {
         successfulRequest: true,
@@ -2936,6 +2947,118 @@ describe('ResultSidebarComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).not.toBeNull();
+    });
+
+    it('refetches PRMS history when the version query param changes for the same result id', async () => {
+      setAlignment(panelAlignment);
+      const history = apiService.GET_PrmsSyncHistory as jest.Mock;
+      const callsAtStart = history.mock.calls.length;
+      expect(currentNumericResultId()).toBe(123);
+
+      let releaseVersion!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      const versionResponse = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseVersion = resolve;
+      });
+      history.mockImplementationOnce(() => versionResponse);
+
+      versionQueryParams$.next({ version: '2024' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(history.mock.calls.length).toBe(callsAtStart + 1);
+      expect(history.mock.calls.at(-1)?.[0]).toBe(123);
+      expect(component.prmsHistoryPhase()).toBe('loading');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(component.showPrmsSyncCard()).toBe(false);
+
+      releaseVersion(historyPayload({ events: [starEvent] }));
+      await versionResponse;
+      fixture.detectChanges();
+
+      expect(component.showPrmsSyncCard()).toBe(true);
+      expect(component.showLegacyPrmsCode()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+
+      let releaseLive!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      const liveResponse = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseLive = resolve;
+      });
+      history.mockImplementationOnce(() => liveResponse);
+
+      versionQueryParams$.next({});
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(history.mock.calls.length).toBe(callsAtStart + 2);
+      expect(history.mock.calls.at(-1)?.[0]).toBe(123);
+      expect(currentNumericResultId()).toBe(123);
+      expect(component.prmsHistoryPhase()).toBe('loading');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).not.toBeNull();
+      expect(component.showLegacyPrmsCode()).toBe(false);
+
+      releaseLive(historyPayload({ events: [], sync_count: 0 }));
+      await liveResponse;
+      fixture.detectChanges();
+
+      expect(component.showPrmsSyncCard()).toBe(false);
+      expect(component.showLegacyPrmsCode()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      const line = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]');
+      if (!line) {
+        throw new Error('legacy PRMS code line is missing');
+      }
+      const text = line.textContent;
+      if (text == null) {
+        throw new Error('legacy PRMS code line has no text');
+      }
+      expect(text.replace(/\s+/g, ' ').trim()).toBe('PRMS code #54321');
+    });
+
+    it('ignores a stale PRMS history response from the previous version', async () => {
+      setAlignment(panelAlignment);
+      const history = apiService.GET_PrmsSyncHistory as jest.Mock;
+
+      let releaseOlder!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      let releaseNewer!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      const older = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseOlder = resolve;
+      });
+      const newer = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseNewer = resolve;
+      });
+      history.mockImplementationOnce(() => older).mockImplementationOnce(() => newer);
+
+      versionQueryParams$.next({ version: '2024' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      versionQueryParams$.next({});
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(component.prmsHistoryPhase()).toBe('loading');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+
+      releaseNewer(historyPayload({ events: [], sync_count: 0 }));
+      await newer;
+      fixture.detectChanges();
+
+      expect(component.showLegacyPrmsCode()).toBe(true);
+      expect(component.showPrmsSyncCard()).toBe(false);
+
+      releaseOlder(historyPayload({ events: [starEvent] }));
+      await older;
+      await Promise.resolve();
+      fixture.detectChanges();
+
+      expect(component.prmsHistoryPhase()).toBe('loaded');
+      expect(component.showPrmsSyncCard()).toBe(false);
+      expect(component.showLegacyPrmsCode()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
       expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).not.toBeNull();
     });
 

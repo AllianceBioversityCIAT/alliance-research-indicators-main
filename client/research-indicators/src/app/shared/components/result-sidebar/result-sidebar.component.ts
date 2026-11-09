@@ -21,6 +21,7 @@ import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { CurrentResultService } from '@shared/services/cache/current-result.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { AlignmentResponse } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import {
   isHomeEntryFromUrl,
@@ -79,6 +80,7 @@ export class ResultSidebarComponent {
   currentResultService = inject(CurrentResultService);
   bilateralService = inject(BilateralService);
   poolFundingFlags = inject(PoolFundingFlagsService);
+  private readonly versionWatcher = inject(VersionWatcherService);
   private readonly publishedOicrStatusId = 14;
 
   allOptionsWithGreenChecks = computed(() => {
@@ -122,7 +124,8 @@ export class ResultSidebarComponent {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
     const hiddenByYearWithoutData = alignment?.version_locked === true && alignment.has_pool_funding_data !== true;
-    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || (alignment.eligible === false && alignment.display_only !== true) || hiddenByYearWithoutData;
+    const hiddenByExistingRules =
+      meta?.indicator_id === 5 || !alignment || (alignment.eligible === false && alignment.display_only !== true) || hiddenByYearWithoutData;
     return hiddenByExistingRules || !this.poolFundingFlags.sectionEnabled();
   }
 
@@ -198,6 +201,12 @@ export class ResultSidebarComponent {
 
   private readonly prmsHistoryEffect = effect(() => {
     const resultCode = this.cache.getCurrentNumericResultId();
+    // The version selector changes only the `version` query param; the result
+    // id stays put. ResultComponent reloads metadata and alignment from this
+    // same signal. The interceptor reads the param off the URL when the
+    // request is made, and `prmsHistoryFetchGen` drops a slower response from
+    // the selection just left.
+    this.versionWatcher.version();
     untracked(() => {
       void this.fetchPrmsSyncHistory(resultCode);
     });

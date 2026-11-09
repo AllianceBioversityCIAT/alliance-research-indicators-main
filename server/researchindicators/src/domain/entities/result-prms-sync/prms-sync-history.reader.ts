@@ -13,21 +13,51 @@ import {
  * Q1 — result metadata. The reporting year is resolved here, never from
  * the client. Flat predicates only: no OR (design §5, KZ-017).
  * `platform_code` is selected so the history key can bind it (design §7.5).
+ * `is_snapshot` chooses the version path.
  *
- * The phase and the PRIMARY Science Program live on the pushed row: the
- * version of this code, year and platform that holds `prms_phase_id`. The
- * live row stores only `prms_result_code`, and its pool-funding alignment can
- * be inactive once a version exists, so both are read from that version when
- * the row itself has no phase. The client builds the PRMS review link from
- * `prms_sp_code`, `prms_phase_id` and `prms_result_code`.
+ * Sync history belongs to the version. A live row returns its own
+ * `prms_result_code` and its own `prms_phase_id`, with `prms_sp_code` null
+ * and no timeline — it does not borrow a phase or a Science Program from a
+ * version. A snapshot reads its own phase and the PRIMARY Science Program
+ * of its own alignment. The client builds the PRMS review link from
+ * `prms_sp_code`, `prms_phase_id` and `prms_result_code`, and only renders
+ * it for a version.
  */
 const RESULT_METADATA_SQL = `
       SELECT
         r.result_official_code,
         r.report_year_id,
         r.prms_result_code,
-        COALESCE(r.prms_phase_id, v.prms_phase_id) AS prms_phase_id,
+        r.prms_phase_id,
         r.platform_code,
+        r.is_snapshot,
+        (
+          SELECT sp.sp_code
+          FROM result_pool_funding_alignment a
+          INNER JOIN result_pool_funding_alignment_sp sp
+            ON sp.alignment_id = a.id
+            AND sp.is_active = TRUE
+            AND sp.sp_role = 'PRIMARY'
+          WHERE a.result_id = r.result_id
+            AND a.is_active = TRUE
+          ORDER BY sp.id DESC
+          LIMIT 1
+        ) AS prms_sp_code
+      FROM results r
+      WHERE r.result_id = ?
+    `;
+
+/**
+ * A snapshot whose own `prms_phase_id` is null still inherits the phase and
+ * the PRIMARY Science Program of the latest active snapshot of the same
+ * code, year and platform that holds a phase. That join never changes a
+ * snapshot that already has a phase — `COALESCE` and the `CASE` both prefer
+ * the row itself — so it is not part of `RESULT_METADATA_SQL`. It is also
+ * not used for a live row.
+ */
+const SNAPSHOT_BORROW_SQL = `
+      SELECT
+        COALESCE(r.prms_phase_id, v.prms_phase_id) AS prms_phase_id,
         (
           SELECT sp.sp_code
           FROM result_pool_funding_alignment a
@@ -104,6 +134,13 @@ const platformCodeOf = (row: { platform_code?: unknown }): string => {
 
 const asNullableNumber = (value: unknown): number | null =>
   value == null || value === '' ? null : Number(value);
+
+/**
+ * `results.is_snapshot` is a MySQL TINYINT. The driver returns `1`/`0`
+ * or, when the connection casts booleans, `true`/`false`.
+ */
+const isSnapshotFlag = (value: unknown): boolean =>
+  value === true || value === 1;
 
 const asTimestamp = (value: unknown): string | null => {
   if (value == null) {
@@ -229,10 +266,21 @@ export class PrmsSyncHistoryReader {
           prms_phase_id?: unknown;
           platform_code?: unknown;
           prms_sp_code?: unknown;
+          is_snapshot?: unknown;
         }
       | undefined;
     if (!resultRow) {
       throw new NotFoundException(PRMS_SYNC_HTTP_DESCRIPTIONS.notFound);
+    }
+
+    if (!isSnapshotFlag(resultRow.is_snapshot)) {
+      return {
+        prms_result_code: asNullableNumber(resultRow.prms_result_code),
+        prms_phase_id: asNullableNumber(resultRow.prms_phase_id),
+        prms_sp_code: null,
+        sync_count: 0,
+        events: [],
+      };
     }
 
     const officialCode = resultRow.result_official_code;
@@ -240,6 +288,25 @@ export class PrmsSyncHistoryReader {
     const platform = platformCodeOf(resultRow);
 
     try {
+      let prmsPhaseId = asNullableNumber(resultRow.prms_phase_id);
+      let prmsSpCode = asNullableString(resultRow.prms_sp_code);
+      if (prmsPhaseId == null) {
+        const borrowedRows: unknown[] = await this.dataSource.query(
+          SNAPSHOT_BORROW_SQL,
+          [resultId],
+        );
+        const borrowed = borrowedRows[0] as
+          | {
+              prms_phase_id?: unknown;
+              prms_sp_code?: unknown;
+            }
+          | undefined;
+        if (borrowed) {
+          prmsPhaseId = asNullableNumber(borrowed.prms_phase_id);
+          prmsSpCode = asNullableString(borrowed.prms_sp_code);
+        }
+      }
+
       const eventRows: unknown[] = await this.dataSource.query(EVENTS_SQL, [
         officialCode,
         year,
@@ -255,8 +322,8 @@ export class PrmsSyncHistoryReader {
 
       return {
         prms_result_code: asNullableNumber(resultRow.prms_result_code),
-        prms_phase_id: asNullableNumber(resultRow.prms_phase_id),
-        prms_sp_code: asNullableString(resultRow.prms_sp_code),
+        prms_phase_id: prmsPhaseId,
+        prms_sp_code: prmsSpCode,
         sync_count: syncCount,
         events: (eventRows as Record<string, unknown>[]).map(mapHistoryEvent),
       };

@@ -127,19 +127,27 @@ export class SaveResultService {
       // Matching is done exclusively on `public_link` (official publication URL).
       // `external_link` is platform-specific (TIP/AICCRA/PRMS portal) and must
       // never be used for deduplication.
-      const duplicateValidation = extraData?.duplicateByTitle
-        ? await this.duplicateTitleValidation(
-            result.createResult.title,
-            findResult?.result_id,
-          )
-        : await this.duplicateResultValidation({
-            platformCode: extraData.platformCode,
-            publicLink: result.public_link,
-            indicatorId: result.createResult.indicator_id,
-            reportYearId: result.createResult.year,
-            // When updating an existing row, exclude it from the duplicate set.
-            excludeResultId: findResult?.result_id,
-          });
+      // skipDuplicateValidation is the no-duplicate result: no skip, nothing deleted.
+      const noDuplicate: DuplicateResultValidationResult = {
+        shouldOmit: false,
+        resultsToDelete: [],
+        protectedFromDeletion: [],
+      };
+      const duplicateValidation = extraData?.skipDuplicateValidation
+        ? noDuplicate
+        : extraData?.duplicateByTitle
+          ? await this.duplicateTitleValidation(
+              result.createResult.title,
+              findResult?.result_id,
+            )
+          : await this.duplicateResultValidation({
+              platformCode: extraData.platformCode,
+              publicLink: result.public_link,
+              indicatorId: result.createResult.indicator_id,
+              reportYearId: result.createResult.year,
+              // When updating an existing row, exclude it from the duplicate set.
+              excludeResultId: findResult?.result_id,
+            });
 
       // Rule 1 & 2: skip creation/update when a higher-priority duplicate exists.
       if (duplicateValidation.shouldOmit) {
@@ -579,6 +587,11 @@ export type ExtraData<T extends object> = {
   findOptions?: FindOptionsKeyMap<T>;
   manageOfficialCode?: boolean;
   duplicateByTitle?: boolean;
+  /**
+   * Skip the title check and the public-link duplicate check. The save is
+   * never omitted and no other row is deleted. Default false.
+   */
+  skipDuplicateValidation?: boolean;
   target?: SaveSectionTarget;
 };
 
