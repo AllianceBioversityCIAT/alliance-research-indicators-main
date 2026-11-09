@@ -148,6 +148,23 @@
           [disabledSelectedScroll]="true" [filterBy]="'name,description'" serviceName="strategicObjectives"
           [serviceParams]="serviceParams" [enableVirtualScroll]="false" scrollHeight="205px"
           placeholder="Select the strategic objectives">
+          <!-- Same look as Contribution to SDG, without an image: bold name, then ": description" -->
+          <ng-template #item let-objective>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ objective?.name }}</span>
+              @if (objective?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ objective.description }}</span>
+              }
+            </p>
+          </ng-template>
+          <ng-template #rows let-objective>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ objective?.name }}</span>
+              @if (objective?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ objective.description }}</span>
+              }
+            </p>
+          </ng-template>
         </app-multiselect>
 
         @if (shouldShowImpactOutcomes()) {
