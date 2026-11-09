@@ -1,7 +1,9 @@
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmPrmsStatusEnum } from '../enum/pfm-prms-status.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
+import { PfmStarLabelEnum } from '../enum/pfm-star-label.enum';
 import type {
+  PfmContributingProjectRow,
   PfmMonitoredRow,
   PfmMonthlySync,
 } from '../repositories/pooled-funding-monitor.repository';
@@ -162,6 +164,105 @@ export const buildSyncedByType = (
   );
 };
 
+/** A contributing project of the scope and how many monitored results it has (coverage stage 1). */
+export interface PfmPortfolioProject {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  delegates: string[];
+  results: number;
+}
+
+/** Most results first, then by code; projects without results last. */
+export const buildPortfolioProjects = (
+  projects: PfmContributingProjectRow[],
+  rows: PfmDerivedMonitoredRow[],
+): PfmPortfolioProject[] => {
+  const perProject = new Map<string, number>();
+  for (const { row } of rows) {
+    perProject.set(
+      row.project_code,
+      (perProject.get(row.project_code) ?? 0) + 1,
+    );
+  }
+  return projects
+    .map((p) => ({ ...p, results: perProject.get(p.code) ?? 0 }))
+    .sort(
+      (a, b) =>
+        b.results - a.results ||
+        (a.code < b.code ? -1 : a.code > b.code ? 1 : 0),
+    );
+};
+
+/**
+ * Coverage tab, "the journey of a result": five stages, each a subset of the one before.
+ * 1 projects with / without results; 2 every result by STAR status; 3 approved results by
+ * their CGIAR Portfolio answer; 4 contributing results by mapping; 5 mapped results by PRMS.
+ */
+export interface PfmJourney {
+  projects: { total: number; with_results: number; without_results: number };
+  /** Draft includes Returned; Submitted includes Under review. */
+  star: { draft: number; submitted: number; approved: number };
+  /** Approved results only. */
+  answer: { not_answered: number; contributes: number; no_sp: number };
+  /** Approved results that contribute. */
+  mapping: { incomplete: number; complete: number };
+  /** Approved, contributing, mapped. `rejected` is the part of `synced` PRMS rejected. */
+  sync: { ready: number; synced: number; rejected: number };
+}
+
+export const buildJourney = (
+  rows: PfmDerivedMonitoredRow[],
+  projects: PfmPortfolioProject[],
+): PfmJourney => {
+  const j: PfmJourney = {
+    projects: {
+      total: projects.length,
+      with_results: projects.filter((p) => p.results > 0).length,
+      without_results: projects.filter((p) => p.results === 0).length,
+    },
+    star: { draft: 0, submitted: 0, approved: 0 },
+    answer: { not_answered: 0, contributes: 0, no_sp: 0 },
+    mapping: { incomplete: 0, complete: 0 },
+    sync: { ready: 0, synced: 0, rejected: 0 },
+  };
+  for (const { row, d } of rows) {
+    if (d.starLabel === PfmStarLabelEnum.APPROVED) {
+      j.star.approved += 1;
+    } else if (
+      d.starLabel === PfmStarLabelEnum.SUBMITTED ||
+      d.starLabel === PfmStarLabelEnum.UNDER_REVIEW
+    ) {
+      j.star.submitted += 1;
+      continue;
+    } else {
+      j.star.draft += 1;
+      continue;
+    }
+    if (!row.has_alignment || row.has_contribution == null) {
+      j.answer.not_answered += 1;
+      continue;
+    }
+    if (!row.has_contribution) {
+      j.answer.no_sp += 1;
+      continue;
+    }
+    j.answer.contributes += 1;
+    if (!row.mapping_complete) {
+      j.mapping.incomplete += 1;
+      continue;
+    }
+    j.mapping.complete += 1;
+    if (d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT) {
+      j.sync.ready += 1;
+    } else {
+      j.sync.synced += 1;
+      if (d.prmsStatus === PfmPrmsStatusEnum.REJECTED) j.sync.rejected += 1;
+    }
+  }
+  return j;
+};
+
 /** R-PFM-008: last six UTC calendar months incl. current, oldest first, zero-filled. */
 export const buildMonthlySeries = (
   sparse: PfmMonthlySync[],
@@ -292,6 +393,8 @@ export interface PfmSummaryInput {
   projectsTotal: number;
   /** findMonthlySyncs() output (sparse). */
   monthlySyncs: PfmMonthlySync[];
+  /** findContributingProjects(): the scope's contributing projects, with or without results. */
+  contributingProjects?: PfmContributingProjectRow[];
   /** DISTINCT results accepted this calendar year (cannot be summed from months). */
   syncedThisYear: number;
   isPiOfAny: boolean;
@@ -321,34 +424,45 @@ export interface PfmSummary {
   monthly: PfmMonthlySync[];
   synced_this_year: number;
   synced_by_type: PfmSyncedType[];
+  journey: PfmJourney;
+  portfolio_projects: PfmPortfolioProject[];
   project_progress: PfmProjectProgress[];
   prms_rejection_reasons: PfmRejectionReason[];
   /** Quick-view counts of the whole scope (no filters), so the coverage tab and the queue agree. */
   chip_counts: PfmChipCounts;
 }
 
-export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
-  scope: i.scope,
-  is_pi_of_any: i.isPiOfAny,
-  manages_any_project: i.managesAnyProject ?? i.isPiOfAny,
-  kpis: {
-    projects: new Set(i.rows.map(({ row }) => row.project_code)).size,
-    projects_total: i.projectsTotal,
-    monitored: i.rows.length,
-    need_attention: i.rows.filter(({ d }) => d.needsAttention).length,
-    // Same rule as the Synced quick view: in PRMS and not rejected.
-    synced: i.rows.filter(({ d }) => matchesChip(d, PfmChipEnum.SYNCED)).length,
-    in_prms_scope: i.rows.filter(({ d }) => !d.isOutOfScope).length,
-  },
-  pipeline: buildPfmPipeline(i.rows),
-  sp_coverage: buildSpCoverage(i.rows),
-  monthly: buildMonthlySeries(i.monthlySyncs, i.now),
-  synced_this_year: i.syncedThisYear,
-  synced_by_type: buildSyncedByType(i.rows),
-  project_progress: buildProjectProgress(i.rows),
-  prms_rejection_reasons: buildRejectionReasons(i.rows),
-  chip_counts: countPfmChips(i.rows),
-});
+export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => {
+  const portfolioProjects = buildPortfolioProjects(
+    i.contributingProjects ?? [],
+    i.rows,
+  );
+  return {
+    scope: i.scope,
+    is_pi_of_any: i.isPiOfAny,
+    manages_any_project: i.managesAnyProject ?? i.isPiOfAny,
+    kpis: {
+      projects: new Set(i.rows.map(({ row }) => row.project_code)).size,
+      projects_total: i.projectsTotal,
+      monitored: i.rows.length,
+      need_attention: i.rows.filter(({ d }) => d.needsAttention).length,
+      // Same rule as the Synced quick view: in PRMS and not rejected.
+      synced: i.rows.filter(({ d }) => matchesChip(d, PfmChipEnum.SYNCED))
+        .length,
+      in_prms_scope: i.rows.filter(({ d }) => !d.isOutOfScope).length,
+    },
+    pipeline: buildPfmPipeline(i.rows),
+    sp_coverage: buildSpCoverage(i.rows),
+    monthly: buildMonthlySeries(i.monthlySyncs, i.now),
+    synced_this_year: i.syncedThisYear,
+    synced_by_type: buildSyncedByType(i.rows),
+    journey: buildJourney(i.rows, portfolioProjects),
+    portfolio_projects: portfolioProjects,
+    project_progress: buildProjectProgress(i.rows),
+    prms_rejection_reasons: buildRejectionReasons(i.rows),
+    chip_counts: countPfmChips(i.rows),
+  };
+};
 
 // ------------------------------------------------------------------ queue
 
