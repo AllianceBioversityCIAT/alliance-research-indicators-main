@@ -419,6 +419,56 @@ describe('PooledFundingMonitorComponent', () => {
     expect(el.querySelectorAll('[role="tab"]')).toHaveLength(3);
   });
 
+  // Owner 2026-11-09: a stage action opens the Results queue; coming back must keep the stage.
+  describe('Portfolio coverage keeps its stage', () => {
+    const journey = {
+      projects: { total: 3, with_results: 2, without_results: 1 },
+      star: { draft: 4, submitted: 5, approved: 22 },
+      answer: { not_answered: 2, contributes: 18, no_sp: 2 },
+      mapping: { incomplete: 3, complete: 15 },
+      sync: { ready: 6, synced: 9, rejected: 3 }
+    };
+    beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok({ ...summary(scope), journey, portfolio_projects: [] }))));
+
+    it('a stage action opens the Results queue and coming back shows the same stage', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      q('pfm-journey-stage-2')!.click();
+      await flush();
+      q('pfm-journey-cta')!.click();
+      await flush();
+      expect(fixture.componentInstance.store.tab()).toBe('queue');
+      expect(fixture.componentInstance.store.chip()).toBe('awaiting_pi');
+
+      fixture.componentInstance.selectTab('coverage');
+      await flush();
+      expect(q('pfm-journey-kicker')?.textContent?.trim()).toBe('Stage 2 of 5');
+      expect(q('pfm-journey-stage-2')?.getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('leaving for a result saves the stage, and coming back restores it', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      q('pfm-journey-stage-4')!.click();
+      await flush();
+      routerEvents.next(new NavigationStart(1, '/result/STAR-629/general-information?from=pfm-monitor'));
+      expect(JSON.parse(sessionStorage.getItem('pfm-monitor-return-state') ?? 'null')).toEqual(
+        expect.objectContaining({ coverageStage: 3, projectsFilter: 'without' })
+      );
+
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      await create();
+      fixture.detectChanges();
+      await flush();
+      fixture.componentInstance.selectTab('coverage');
+      await flush();
+      expect(q('pfm-journey-kicker')?.textContent?.trim()).toBe('Stage 4 of 5');
+    });
+  });
+
   // Owner 2026-10-22: back from a result (breadcrumb or browser Back) = the same place in the queue.
   describe('return from a result', () => {
     beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
