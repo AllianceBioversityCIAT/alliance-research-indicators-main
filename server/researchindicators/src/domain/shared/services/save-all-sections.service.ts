@@ -183,7 +183,11 @@ export class SaveResultService {
         });
       }
 
-      if (extraData?.duplicateByTitle) {
+      if (extraData?.skipDuplicateValidation) {
+        // No title check and no public-link duplicate check: the incoming row
+        // is never omitted and no duplicate group is built, so nothing is
+        // submitted for deletion (`resolution` stays null).
+      } else if (extraData?.duplicateByTitle) {
         // Title-only rule (PRMS-as-STAR import): skip the incoming row when
         // another live result already uses its title. No duplicate group is
         // built, so nothing is ever submitted for deletion.
@@ -749,6 +753,11 @@ export type ExtraData<T extends object> = {
   runId?: string;
   /** Dedupe by title only (PRMS-as-STAR import); never deletes. */
   duplicateByTitle?: boolean;
+  /**
+   * Skip the title check and the public-link duplicate check. The save is
+   * never omitted and no other row is deleted. Default false.
+   */
+  skipDuplicateValidation?: boolean;
   target?: SaveSectionTarget;
 };
 

@@ -204,6 +204,12 @@ export class CreatedByMapper {
   public email: string;
 }
 
+export class PrmsBilateralProjectMapper {
+  public short_name: string | null;
+  public organization_code: string | null;
+  public external_code: string | null;
+}
+
 export class ResultResponseMapper {
   public created_date: Date;
   public last_updated_date: Date;
@@ -235,6 +241,7 @@ export class ResultResponseMapper {
   public capacity_development_summary: CapacityDevelopmentSummaryMapper;
   public innovation_development_summary: InnovationDevelopmentSummaryMapper;
   public innovation_use_summary?: InnovationUseSummaryMapper | null;
+  public bilateral_projects?: PrmsBilateralProjectMapper[];
 }
 
 export class PolicyChangeSummaryMapper {

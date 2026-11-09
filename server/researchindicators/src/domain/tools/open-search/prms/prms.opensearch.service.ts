@@ -20,9 +20,10 @@ import {
 } from '../../../shared/global-dto/external-mappers.dto';
 import { IndicatorHomologation } from './homologation/indicator.homologation';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
+import { AgressoContract } from '../../../entities/agresso-contract/entities/agresso-contract.entity';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { isEmpty } from '../../../shared/utils/object.utils';
-import { DataSource, Like } from 'typeorm';
+import { DataSource, In, Like } from 'typeorm';
 import { ResultEvidence } from '../../../entities/result-evidences/entities/result-evidence.entity';
 import { ResultKnowledgeProduct } from '../../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
 import {
@@ -59,6 +60,7 @@ import { TocLevel } from '../../toc-integration/dto/toc-integration.types';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
+import { ContractRolesEnum } from '../../../entities/result-contracts/enum/contract-roles.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { firstValueFrom } from 'rxjs';
 import { CounterResults } from '../../tip-integration/dto/response-year-tip.dto';
@@ -172,6 +174,8 @@ const laterOf = (candidate: Date | null, floor: Date): Date =>
 
 /** PRMS `result_type_id` of an Innovation Development result. */
 const PRMS_INNOVATION_DEVELOPMENT_TYPE_ID = 7;
+// L1..L8 map to the 2025 levers only (clarisa_levers ids 1-8, portfolio 1).
+const AS_STAR_CONTRACT_LEVER_MAX_YEAR = 2025;
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -375,10 +379,16 @@ export class PrmsOpenSearchService
   }
 
   /**
-   * Imports PRMS results as STAR results. STAR assigns the official code; the
-   * PRMS `result_code` is kept in `prms_result_code` and is the key a re-run
-   * uses to update instead of creating again. A result that lands as APPROVED
-   * is versioned right away, without checking completeness.
+   * Imports PRMS results as STAR results. The PRMS `result_code` is kept in
+   * `prms_result_code`. Each object is matched to live STAR rows with that
+   * code (platform STAR, not a snapshot, active).
+   *
+   * No live row: STAR assigns the official code, the live row is created, and
+   * a result that lands as Approved is versioned right away, without checking
+   * completeness. Exactly one live row: that official code gets a snapshot for
+   * the PRMS year, built from the PRMS payload, and the live row is not
+   * modified. More than one live row: the object is skipped and counted as an
+   * error.
    */
   async getDataAsStar(params: PrmsSearchParams) {
     const executionCode = uuidv4();
@@ -397,8 +407,49 @@ export class PrmsOpenSearchService
 
       const { results: dataProcessed, sources } =
         await this.processDataAsStar(prmsResults);
+      const resultsToCreate: ExternalMappersDto[] = [];
+      for (const result of dataProcessed) {
+        let liveRows: Pick<Result, 'result_id' | 'result_official_code'>[];
+        try {
+          liveRows = await this.findLiveStarRows(result.prms_result_code);
+        } catch (error) {
+          counters.errorRecords += 1;
+          const errorMessage = (error as Error).message ?? 'Unknown error';
+          this.logger.error(
+            `Skipping PRMS result ${result.prms_result_code}: live STAR results could not be read. ${errorMessage}`,
+          );
+          continue;
+        }
+        if (liveRows.length > 1) {
+          counters.errorRecords += 1;
+          const officialCodes = liveRows
+            .map((row) => row.result_official_code)
+            .join(', ');
+          this.logger.error(
+            `Skipping PRMS result ${result.prms_result_code}: more than one live STAR result (${officialCodes}).`,
+          );
+          continue;
+        }
+        if (liveRows.length === 1) {
+          await this.saveExistingStarVersion(
+            result,
+            liveRows[0],
+            sources.get(result.prms_result_code),
+            counters,
+            resultSaved,
+            currentCode,
+          );
+          continue;
+        }
+        resultsToCreate.push(result);
+      }
 
-      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+      const resultsToSave = await this.preserveExistingAlignment(
+        resultsToCreate,
+        counters,
+      );
+
+      await this.saveResultService.bulkSaveAllSections(resultsToSave, {
         platformCode: ReportingPlatformEnum.STAR,
         resultSaved,
         currentCode,
@@ -410,7 +461,7 @@ export class PrmsOpenSearchService
           is_snapshot: 'is_version_applied',
         },
       });
-      await this.finalizeImportedResults(dataProcessed, sources);
+      await this.finalizeImportedResults(resultsToSave, sources);
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
@@ -418,6 +469,221 @@ export class PrmsOpenSearchService
       this.logger.error(`Error getting PRMS data as STAR: ${errorMessage}`);
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
+  }
+
+  /**
+   * Live STAR rows for a PRMS code. The year is not part of the key: a live
+   * result exists once, and the PRMS year becomes a snapshot of that code.
+   */
+  private findLiveStarRows(prmsResultCode: number) {
+    return this.dataSource.getRepository(Result).find({
+      where: {
+        prms_result_code: prmsResultCode,
+        platform_code: ReportingPlatformEnum.STAR,
+        is_snapshot: false,
+        is_active: true,
+      },
+      select: { result_id: true, result_official_code: true },
+    });
+  }
+
+  /**
+   * Builds the PRMS year as a snapshot of the live official code. The live
+   * row is not passed to the save.
+   *
+   * `results` has no unique key on (official code, snapshot, year), only the
+   * non-unique index `idx_results_official_code_snapshot_report_year`, so the
+   * new snapshot is created first. Previous snapshots for that code and year
+   * are removed only after the save succeeds. A failed save is compensated
+   * inside `saveAllSections`: the new row is a snapshot, and
+   * `deleteFullResultById` then deletes only that row, so `compensateRowOnly`
+   * is not used.
+   */
+  private async saveExistingStarVersion(
+    result: ExternalMappersDto,
+    live: Pick<Result, 'result_id' | 'result_official_code'>,
+    source: ResultResponseMapper | undefined,
+    counters: CounterResults,
+    resultSaved: number[],
+    currentCode: { current: number },
+  ): Promise<void> {
+    const officialCode = live.result_official_code;
+    const year = result.createResult.year;
+    let previousIds: number[] = [];
+    try {
+      const previous = await this.dataSource.getRepository(Result).find({
+        where: {
+          result_official_code: officialCode,
+          report_year_id: year,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: true,
+        },
+        select: { result_id: true },
+      });
+      previousIds = previous.map((row) => row.result_id);
+    } catch (error) {
+      counters.errorRecords += 1;
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Skipping PRMS result ${result.prms_result_code}: the existing version of STAR result ${officialCode} year ${year} could not be read. ${errorMessage}`,
+      );
+      return;
+    }
+
+    const payload: ExternalMappersDto = {
+      ...result,
+      status_id: ResultStatusEnum.APPROVED,
+    };
+    if (isEmpty(source?.phase_id)) {
+      this.logger.warn(
+        `PRMS result ${result.prms_result_code} has no phase_id; STAR result ${officialCode} year ${year} is versioned without one.`,
+      );
+    } else {
+      payload.prms_phase_id = source.phase_id;
+    }
+
+    const saved = await this.saveResultService.saveAllSections(payload, {
+      platformCode: ReportingPlatformEnum.STAR,
+      resultSaved,
+      currentCode,
+      counters,
+      skipDuplicateValidation: true,
+      target: {
+        officialCode,
+        isSnapshot: true,
+      },
+    });
+    if (saved.outcome !== 'created' || saved.resultId == null) {
+      if (saved.outcome === 'skipped') {
+        counters.errorRecords += 1;
+        this.logger.error(
+          `Skipping PRMS result ${result.prms_result_code}: the version of STAR result ${officialCode} year ${year} was not saved.`,
+        );
+      }
+      return;
+    }
+
+    const failedIds: number[] = [];
+    for (const resultId of previousIds) {
+      try {
+        await this._queryService.deleteFullResultById(resultId);
+      } catch (error) {
+        failedIds.push(resultId);
+        const errorMessage = (error as Error).message ?? 'Unknown error';
+        this.logger.error(
+          `Error removing previous version ${resultId} of STAR result ${officialCode} year ${year} after creating version ${saved.resultId}: ${errorMessage}`,
+        );
+      }
+    }
+
+    // saveAllSections counts every new row as created. Replacing a version
+    // that was already stored for this year is an update, but only when every
+    // previous snapshot is gone. Two snapshots for the same code and year
+    // break SP_delete_result_version and createSnapshot later.
+    if (failedIds.length > 0) {
+      counters.errorRecords += 1;
+      this.logger.error(
+        `STAR result ${officialCode} year ${year} kept previous version(s) ${failedIds.join(', ')} beside the new version ${saved.resultId}.`,
+      );
+    } else if (previousIds.length > 0) {
+      counters.createdRecords -= 1;
+      counters.updatedRecords += 1;
+    }
+
+    await this.importAlignment(result, source, saved.resultId);
+    await this.recordImportedHistory(result, source, officialCode);
+  }
+
+  /**
+   * As-STAR only. One live-row lookup per result (`prms_result_code`, platform
+   * STAR, report year, not a snapshot). The alignment save deactivates every
+   * active contract or lever missing from the payload, so a re-import must
+   * send back what STAR already stores.
+   *
+   * Contracts are copied back only when the resolved PRMS list is empty, so a
+   * list PRMS did resolve still replaces the stored one. Contributor levers
+   * are copied whenever the row exists, including their SDG targets, because
+   * the save rewrites targets from the payload. A result that is not in STAR
+   * yet keeps both lists empty. If the lookup fails, that result is left out
+   * of the save so the empty lists cannot wipe what is stored.
+   */
+  private async preserveExistingAlignment(
+    results: ExternalMappersDto[],
+    counters: CounterResults,
+  ): Promise<ExternalMappersDto[]> {
+    const ready: ExternalMappersDto[] = [];
+    for (const result of results) {
+      const kept = await this.copyExistingAlignment(result, counters);
+      if (kept) ready.push(result);
+    }
+    return ready;
+  }
+
+  /**
+   * @returns false when the lookup failed and the result must not be saved.
+   */
+  private async copyExistingAlignment(
+    result: ExternalMappersDto,
+    counters: CounterResults,
+  ): Promise<boolean> {
+    try {
+      const existing = await this.dataSource.getRepository(Result).findOne({
+        where: {
+          prms_result_code: result.prms_result_code,
+          platform_code: ReportingPlatformEnum.STAR,
+          report_year_id: result.createResult.year,
+          is_snapshot: false,
+        },
+        select: { result_id: true, result_official_code: true },
+      });
+      if (!existing) return true;
+
+      if (isEmpty(result.alignments?.contracts)) {
+        const stored = await this.dataSource
+          .getRepository(ResultContract)
+          .find({
+            where: {
+              result_id: existing.result_id,
+              contract_role_id: ContractRolesEnum.ALIGNMENT,
+              is_active: true,
+            },
+          });
+        result.alignments.contracts = stored.map(
+          (row) =>
+            ({
+              contract_id: row.contract_id,
+              is_primary: row.is_primary,
+            }) as ResultContract,
+        );
+        if (stored.length > 0) {
+          this.logger.warn(
+            `Keeping existing contracts for PRMS result ${result.prms_result_code}.`,
+          );
+        }
+      }
+
+      const storedAlignment = await this.resultsService.findResultAlignment(
+        existing.result_id,
+      );
+      result.alignments.contributor_levers = (
+        storedAlignment?.contributor_levers ?? []
+      ).map(
+        (lever) =>
+          ({
+            lever_id: lever.lever_id,
+            custom_lever_name: lever.custom_lever_name,
+            result_lever_sdg_targets: lever.result_lever_sdg_targets ?? [],
+          }) as ResultLever,
+      );
+      return true;
+    } catch (error) {
+      counters.errorRecords += 1;
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Skipping PRMS result ${result.prms_result_code}: stored contracts and contributor levers could not be read, so they were not replaced. ${errorMessage}`,
+      );
+      return false;
     }
   }
 
@@ -493,7 +759,9 @@ export class PrmsOpenSearchService
       return true;
     });
 
-    const results = await this.processData(importable);
+    const results = await this.processData(importable, {
+      contractsFromBilateralProjects: true,
+    });
     for (const result of results) {
       const source = sources.get(result.official_code);
       result.status_id = ResultPrmsToStarStatusMapper[Number(source.status_id)];
@@ -1308,8 +1576,98 @@ export class PrmsOpenSearchService
     return mapped ? ipRights : undefined;
   }
 
+  /**
+   * External codes on `bilateral_projects`, trimmed, blank-dropped and
+   * de-duplicated in payload order. A leading `B-` (any case) is removed
+   * after trimming, and de-duplication uses that code, so `B-A1616` and
+   * `A1616` are one contract and the first one keeps its place.
+   * `external_code` is `agreement_id`.
+   */
+  private bilateralExternalCodes(item: ResultResponseMapper): string[] {
+    const codes: string[] = [];
+    const seen = new Set<string>();
+    for (const project of item.bilateral_projects ?? []) {
+      const code = (project?.external_code?.trim() ?? '').replace(/^b-/i, '');
+      if (code === '' || seen.has(code)) continue;
+      seen.add(code);
+      codes.push(code);
+    }
+    return codes;
+  }
+
+  /**
+   * As-STAR contracts come from `bilateral_projects`, not pooled funding.
+   * A code with no `agresso_contracts` row is dropped so the result alignment
+   * is not rejected by the contract foreign key. Payload order picks the primary.
+   */
+  private async resolveContractsFromBilateralProjects(
+    item: ResultResponseMapper,
+  ): Promise<{
+    primaryContract?: AgressoContract;
+    contributingContracts: AgressoContract[];
+  }> {
+    const codes = this.bilateralExternalCodes(item);
+    if (codes.length === 0) {
+      return { contributingContracts: [] };
+    }
+
+    const found = await this.dataSource.getRepository(AgressoContract).find({
+      where: { agreement_id: In(codes) },
+    });
+    const byAgreement = new Map(
+      found.map((contract) => [contract.agreement_id, contract]),
+    );
+
+    const ordered: AgressoContract[] = [];
+    for (const code of codes) {
+      const contract = byAgreement.get(code);
+      if (!contract) {
+        this.logger.warn(
+          `Dropping bilateral external code ${code} on PRMS result ${item.result_code}: no agresso_contracts row.`,
+        );
+        continue;
+      }
+      ordered.push(contract);
+    }
+
+    const [primaryContract, ...contributingContracts] = ordered;
+    return { primaryContract, contributingContracts };
+  }
+
+  /** Default contract mapping for `fetch-prms-data` (`getData`). */
+  private async resolveContractsFromPooledFunding(
+    item: ResultResponseMapper,
+  ): Promise<{
+    primaryContract?: AgressoContract;
+    contributingContracts: AgressoContract[];
+  }> {
+    const leadCenterAcronym: string = item?.contributing_centers?.find(
+      (center) => center.is_lead,
+    )?.acronym;
+
+    const contracts =
+      await this.pooledFundingContractsService.findMappingPooledFundingContracts(
+        item?.primary_entity?.official_code,
+      );
+
+    const primaryContract = contracts.find(
+      (contract) =>
+        contract?.ubwClientDescription?.toUpperCase()?.trim() ===
+        AcronymExContractEnum[leadCenterAcronym],
+    );
+
+    const contributingContracts = contracts.filter(
+      (contract) =>
+        contract?.ubwClientDescription?.toUpperCase()?.trim() !==
+        AcronymExContractEnum[leadCenterAcronym],
+    );
+
+    return { primaryContract, contributingContracts };
+  }
+
   async processData(
     prmsData: PrmsTemporalResponseMapper[],
+    options: { contractsFromBilateralProjects?: boolean } = {},
   ): Promise<ExternalMappersDto[]> {
     const results: ExternalMappersDto[] = [];
     for (const data of prmsData) {
@@ -1331,26 +1689,10 @@ export class PrmsOpenSearchService
       result.created_at = item?.created_date;
       result.status_id = ResultPrmsStatusMapper?.[item?.status_id];
 
-      const leadCenterAcronym: string = item?.contributing_centers?.find(
-        (center) => center.is_lead,
-      )?.acronym;
-
-      const contracts =
-        await this.pooledFundingContractsService.findMappingPooledFundingContracts(
-          item?.primary_entity?.official_code,
-        );
-
-      const primaryContract = contracts.find(
-        (contract) =>
-          contract?.ubwClientDescription?.toUpperCase()?.trim() ===
-          AcronymExContractEnum[leadCenterAcronym],
-      );
-
-      const contributingContracts = contracts.filter(
-        (contract) =>
-          contract?.ubwClientDescription?.toUpperCase()?.trim() !==
-          AcronymExContractEnum[leadCenterAcronym],
-      );
+      const { primaryContract, contributingContracts } =
+        options.contractsFromBilateralProjects
+          ? await this.resolveContractsFromBilateralProjects(item)
+          : await this.resolveContractsFromPooledFunding(item);
 
       if (!isEmpty(item?.created_by)) {
         const existsUser = await this.resultRepository.findUserByEmailOrCarnet(
@@ -1429,15 +1771,36 @@ export class PrmsOpenSearchService
         contract_id: primaryContract?.agreement_id,
       };
 
-      const prmsLever = await this.clarisaLeversService.findOne(
-        item?.result_level?.code,
-      );
+      const contractsFromBilateralProjects =
+        options.contractsFromBilateralProjects === true;
+      const resolveAsStarContractLever =
+        contractsFromBilateralProjects &&
+        result.createResult.year <= AS_STAR_CONTRACT_LEVER_MAX_YEAR;
+      // `result_level` is the PRMS result level (Outcome is 3, Output is 4),
+      // not a lever. As-STAR does not pass it to findOne: that lookup reads
+      // clarisa_levers.id, so it assigned Lever 3 or 4 and overrode the lever
+      // taken from the primary contract department. fetch-prms-data still
+      // uses it. As-STAR reads that department only through
+      // AS_STAR_CONTRACT_LEVER_MAX_YEAR; a later year sends no primary lever.
+      // An empty homologated department also skips findByShortName, which
+      // would otherwise return the first clarisa_levers row.
+      const prmsLever = contractsFromBilateralProjects
+        ? null
+        : await this.clarisaLeversService.findOne(item?.result_level?.code);
 
-      const lever = await this.clarisaLeversService.homologatedData(
-        primaryContract?.departmentId,
-      );
+      const skipAsStarLeverLookup =
+        contractsFromBilateralProjects && !resolveAsStarContractLever;
+      const lever = skipAsStarLeverLookup
+        ? null
+        : await this.clarisaLeversService.homologatedData(
+            primaryContract?.departmentId,
+          );
       const clarisaLever =
-        await this.clarisaLeversService.findByShortName(lever);
+        skipAsStarLeverLookup ||
+        (contractsFromBilateralProjects && isEmpty(lever))
+          ? null
+          : await this.clarisaLeversService.findByShortName(lever);
+      const resolvedLeverId = prmsLever?.id ?? clarisaLever?.id;
 
       const savedPrimaryContract = [
         ...contributingContracts
@@ -1459,11 +1822,14 @@ export class PrmsOpenSearchService
       }
 
       result.alignments = {
-        primary_levers: [
-          {
-            lever_id: prmsLever?.id ?? clarisaLever?.id,
-          } as unknown as ResultLever,
-        ],
+        primary_levers:
+          contractsFromBilateralProjects && isEmpty(resolvedLeverId)
+            ? []
+            : [
+                {
+                  lever_id: resolvedLeverId,
+                } as unknown as ResultLever,
+              ],
         contracts: savedPrimaryContract,
         contributor_levers: [],
         result_sdgs: [],

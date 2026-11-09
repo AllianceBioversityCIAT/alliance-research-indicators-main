@@ -1566,6 +1566,129 @@ describe('SaveResultService', () => {
     });
   });
 
+  describe('saveAllSections skipDuplicateValidation', () => {
+    const starExtraData = (counters = new CounterResults()) => ({
+      platformCode: ReportingPlatformEnum.STAR,
+      counters,
+      resultSaved: [] as number[],
+      currentCode: { current: 0 },
+      duplicateByTitle: true,
+    });
+
+    // A stored PRMS row that loses to an incoming TIP row on the same link
+    // (Rule 1). Shared by the flag-on and flag-omitted cases so the omitted
+    // case is what proves the flag is what disables resolution.
+    const losingPrmsCandidate = {
+      resultId: 88,
+      resultOfficialCode: 880,
+      platformCode: ReportingPlatformEnum.PRMS,
+      indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      reportYearId: 2024,
+      rawIdentity: 'https://example.org/doc',
+      identitySource: PublicationIdentitySource.HANDLE_EVIDENCE,
+      normalizedPublicLink: 'example.org/doc',
+      identityCount: 1,
+    };
+
+    it('does not check the title or build a duplicate group when the flag is true', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 1,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.title = 'Same title';
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, {
+        ...starExtraData(),
+        skipDuplicateValidation: true,
+      });
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledTimes(1);
+      expect(
+        resultRepoHandle.findOne.mock.calls[0][0].where,
+      ).not.toHaveProperty('title');
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
+    });
+
+    it('does not resolve a public-link loser when the flag is true on a non-title platform', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 100,
+        result_official_code: 7001,
+      } as any);
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        losingPrmsCandidate,
+      ]);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, {
+        ...tipExtraData(),
+        skipDuplicateValidation: true,
+      });
+
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+      expect(resultsService.createResult).toHaveBeenCalled();
+    });
+
+    it('still skips a matching title when skipDuplicateValidation is false', async () => {
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ result_id: 77 });
+      const dto = minimalResultDto();
+      dto.createResult.title = 'Same title';
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, {
+        ...starExtraData(),
+        skipDuplicateValidation: false,
+      });
+
+      expect(resultsService.createResult).not.toHaveBeenCalled();
+      expect(resultRepoHandle.findOne).toHaveBeenLastCalledWith({
+        where: {
+          title: 'Same title',
+          is_active: true,
+          is_snapshot: false,
+        },
+        select: { result_id: true },
+      });
+      expect(queryService.deleteLogicalResultById).not.toHaveBeenCalled();
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+    });
+
+    it('resolves a lower-priority public-link duplicate when the flag is omitted', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 100,
+        result_official_code: 7001,
+      } as any);
+      duplicateCandidates.findCandidatesForIncoming.mockResolvedValue([
+        losingPrmsCandidate,
+      ]);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData());
+
+      expect(duplicateCandidates.findCandidatesForIncoming).toHaveBeenCalled();
+      expect(resolutionRunner.applyGroup).toHaveBeenCalledTimes(1);
+      const applied = resolutionRunner.applyGroup.mock.calls[0][0];
+      expect(
+        applied.resolution.losers.map((loser: any) => loser.resultId),
+      ).toEqual([88]);
+    });
+  });
+
   describe('saveAllSections PRMS identifiers', () => {
     it('should write prms_result_code and prms_phase_id when present', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
