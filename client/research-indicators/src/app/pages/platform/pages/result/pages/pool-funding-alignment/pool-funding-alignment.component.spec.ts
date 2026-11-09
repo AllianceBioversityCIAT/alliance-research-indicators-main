@@ -3456,3 +3456,546 @@ describe('PoolFundingAlignmentComponent', () => {
   });
 
 });
+
+describe('PoolFundingAlignmentComponent - defensive branches', () => {
+  interface Ctx {
+    component: PoolFundingAlignmentComponent;
+    currentAlignment: ReturnType<typeof signal<AlignmentResponse | null>>;
+    editable: ReturnType<typeof signal<boolean>>;
+    sciencePrograms: ReturnType<typeof signal<PoolFundingScienceProgram[]>>;
+    mappingStatus: ReturnType<typeof signal<PoolFundingMappingStatus | null>>;
+    tocCatalog: ReturnType<typeof signal<BilateralTocCatalogResponse | null>>;
+    loadingTocCatalog: ReturnType<typeof signal<boolean>>;
+    tocCatalogError: ReturnType<typeof signal<boolean>>;
+    getAlignment: jest.Mock;
+    getTocCatalog: jest.Mock;
+    patchAlignment: jest.Mock;
+    showToast: jest.Mock;
+    showGlobalAlert: jest.Mock;
+    trackEvent: jest.Mock;
+    listen: jest.Mock;
+    socketEvents$: Subject<unknown>;
+  }
+
+  const base: AlignmentResponse = {
+    result_code: 'RES-001',
+    eligible: true,
+    has_pool_funding_alignment_eligible: true,
+    has_contribution: null,
+    selected_science_programs: [],
+    selected_levers: [],
+    is_synced_to_prms: false,
+    is_read_only: false
+  };
+
+  const flushMicrotasks = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  async function setup(
+    opts: {
+      routeId?: string | null;
+      numericId?: number;
+      websocket?: 'throw';
+      clarity?: 'throw';
+      allModals?: unknown;
+    } = {}
+  ): Promise<Ctx> {
+    const currentAlignment = signal<AlignmentResponse | null>(null);
+    const editable = signal(true);
+    const sciencePrograms = signal<PoolFundingScienceProgram[]>([]);
+    const mappingStatus = signal<PoolFundingMappingStatus | null>(null);
+    const tocCatalog = signal<BilateralTocCatalogResponse | null>(null);
+    const loadingTocCatalog = signal(false);
+    const tocCatalogError = signal(false);
+    const getAlignment = jest.fn().mockResolvedValue(null);
+    const getTocCatalog = jest.fn().mockResolvedValue(null);
+    const patchAlignment = jest.fn();
+    const showToast = jest.fn();
+    const showGlobalAlert = jest.fn();
+    const trackEvent = jest.fn();
+    const socketEvents$ = new Subject<unknown>();
+    const listen = jest.fn().mockReturnValue(socketEvents$.asObservable());
+
+    const bilateralServiceMock = {
+      currentAlignment,
+      loadingAlignment: signal(false),
+      savingAlignment: signal(false),
+      editable,
+      sciencePrograms,
+      mappingStatus,
+      loadingSciencePrograms: signal(false),
+      tocCatalog,
+      loadingTocCatalog,
+      tocCatalogError,
+      getAlignment,
+      getSciencePrograms: jest.fn().mockResolvedValue([]),
+      getTocCatalog,
+      patchAlignment,
+      catalogForSp: (spCode: string) => tocCatalog()?.catalogs?.find(c => c.sp_code === spCode) ?? null,
+      draftsFromSaved,
+      writeDtoFromDrafts
+    };
+
+    const providers: unknown[] = [
+      { provide: BilateralService, useValue: bilateralServiceMock },
+      {
+        provide: CacheService,
+        useValue: {
+          currentResultId: signal(123),
+          getCurrentNumericResultId: () => opts.numericId ?? 123,
+          currentMetadata: signal({ result_title: 'Test Title' }),
+          currentResultIsLoading: signal(false),
+          isSidebarCollapsed: () => false,
+          hasSmallScreen: () => false,
+          showSectionHeaderActions: () => false,
+          isExternalResult: () => false
+        }
+      },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: {
+            paramMap: { get: (k: string) => (k === 'id' ? (opts.routeId === undefined ? 'RES-001' : opts.routeId) : null) },
+            queryParamMap: { get: (_k: string) => null as string | null }
+          }
+        }
+      },
+      { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+      { provide: ActionsService, useValue: { showToast, showGlobalAlert } },
+      { provide: SubmissionService, useValue: { isEditableStatus: signal(true) } },
+      opts.websocket === 'throw'
+        ? {
+            provide: WebsocketService,
+            useFactory: () => {
+              throw new Error('no socket');
+            }
+          }
+        : { provide: WebsocketService, useValue: { listen } },
+      opts.clarity === 'throw'
+        ? {
+            provide: ClarityService,
+            useFactory: () => {
+              throw new Error('no clarity');
+            }
+          }
+        : { provide: ClarityService, useValue: { trackEvent } },
+      {
+        provide: VersionWatcherService,
+        useValue: { version: signal<string | null>(null), onVersionChange: jest.fn((cb: () => void) => cb()) }
+      }
+    ];
+    if (opts.allModals) providers.push({ provide: AllModalsService, useValue: opts.allModals });
+
+    await TestBed.configureTestingModule({
+      imports: [PoolFundingAlignmentComponent, HttpClientTestingModule],
+      providers: providers as never[],
+      schemas: [NO_ERRORS_SCHEMA]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(PoolFundingAlignmentComponent);
+    return {
+      component: fixture.componentInstance,
+      currentAlignment,
+      editable,
+      sciencePrograms,
+      mappingStatus,
+      tocCatalog,
+      loadingTocCatalog,
+      tocCatalogError,
+      getAlignment,
+      getTocCatalog,
+      patchAlignment,
+      showToast,
+      showGlobalAlert,
+      trackEvent,
+      listen,
+      socketEvents$
+    };
+  }
+
+  const form = (over: Record<string, unknown> = {}) => ({
+    has_contribution: true as boolean | null,
+    selected_sps: [] as any[],
+    primary_sp_code: null as string | null,
+    toc_drafts: [] as SpAlignmentDraft[],
+    ...over
+  });
+  const draft = (sp_code: string, over: Partial<SpAlignmentDraft> = {}): SpAlignmentDraft => ({
+    sp_code,
+    aligns_with_toc: null,
+    level: null,
+    toc_result_id: null,
+    indicator_id: null,
+    quantitative_contribution: null,
+    ...over
+  });
+  const poolSp = (code: string, over: Record<string, unknown> = {}) => ({ code, name: `Name ${code}`, allocation: 10, color: '#111', icon_key: 'k', ...over }) as never as PoolFundingScienceProgram;
+
+  describe('construction and simple computeds', () => {
+    it('help modal state falls back to closed when the modal is unknown', async () => {
+      const { component } = await setup({ allModals: { isModalOpen: () => undefined, openModal: jest.fn() } });
+      expect(component.showHelpModal()).toBe(false);
+    });
+
+    it('survives WebsocketService and ClarityService failing to construct', async () => {
+      const ctx = await setup({ websocket: 'throw', clarity: 'throw' });
+      expect(ctx.component).toBeTruthy();
+      expect((ctx.component as any).websocketService).toBeNull();
+      expect((ctx.component as any).clarityService).toBeNull();
+      expect(ctx.getAlignment).toHaveBeenCalledWith('RES-001');
+    });
+
+    it('eligible reflects the loaded alignment', async () => {
+      const { component, currentAlignment } = await setup();
+      expect(component.eligible()).toBe(false);
+      currentAlignment.set({ ...base, eligible: true });
+      expect(component.eligible()).toBe(true);
+      currentAlignment.set({ ...base, eligible: false });
+      expect(component.eligible()).toBe(false);
+    });
+
+    it('singleSp is only set for a mapped project with exactly one SP', async () => {
+      const { component, mappingStatus, sciencePrograms } = await setup();
+      expect(component.singleSp()).toBeNull();
+      mappingStatus.set('mapped');
+      sciencePrograms.set([poolSp('SP01')]);
+      expect(component.singleSp()?.code).toBe('SP01');
+      sciencePrograms.set([poolSp('SP01'), poolSp('SP02')]);
+      expect(component.singleSp()).toBeNull();
+    });
+
+    it('hloSectionVisible stays true while the catalog failed to load', async () => {
+      const { component, tocCatalogError } = await setup();
+      expect(component.hloSectionVisible()).toBe(false);
+      tocCatalogError.set(true);
+      expect(component.hloSectionVisible()).toBe(true);
+    });
+
+    it('resolves official_code or code when listing contributing and primary SPs', async () => {
+      const { component } = await setup();
+      component.formData.set(
+        form({
+          primary_sp_code: 'SP01',
+          selected_sps: [{ official_code: '', code: 'SP01' }, { official_code: 'SP02' }, { official_code: '', code: 'SP03' }]
+        })
+      );
+      expect(component.contributingSps().map(sp => sp.official_code || sp.code)).toEqual(['SP02', 'SP03']);
+      expect(component.primarySelectedSp()?.code).toBe('SP01');
+
+      component.formData.update(f => ({ ...f, primary_sp_code: 'SP99' }));
+      expect(component.primarySelectedSp()).toBeNull();
+    });
+
+    it('spRequiredMessage is null until the user answered Yes', async () => {
+      const { component } = await setup();
+      component.formData.set(form({ has_contribution: false }));
+      expect(component.spRequiredMessage()).toBeNull();
+      component.formData.set(form({ has_contribution: true }));
+      expect(component.spRequiredMessage()).toBe(component.SP_REQUIRED_MESSAGE);
+    });
+
+    it('resultCode falls back to the numeric id when the route has no id', async () => {
+      expect((await setup({ routeId: null, numericId: 77 })).component.resultCode()).toBe('77');
+    });
+
+    it('resultCode is empty when neither the route nor the cache has an id', async () => {
+      expect((await setup({ routeId: null, numericId: 0 })).component.resultCode()).toBe('');
+    });
+
+    it('readOnlyTocSummaries matches selected SPs by code when official_code is blank', async () => {
+      const { component, currentAlignment } = await setup();
+      currentAlignment.set({
+        ...base,
+        toc_alignments: [{ sp_code: 'SP05', aligns_with_toc: false } as SavedTocAlignment]
+      });
+      component.formData.set(form({ primary_sp_code: 'SP01', selected_sps: [{ official_code: '', code: 'SP05' }] }));
+      expect(component.readOnlyTocSummaries().map(r => r.alignment.sp_code)).toEqual(['SP05']);
+    });
+
+    it('findScienceProgram and isRejectedSp ignore empty codes', async () => {
+      const { component, sciencePrograms } = await setup();
+      sciencePrograms.set([poolSp('SP01')]);
+      expect(component.findScienceProgram('')).toBeUndefined();
+      expect(component.findScienceProgram(null)).toBeUndefined();
+      expect(component.findScienceProgram('SP01')?.code).toBe('SP01');
+      expect(component.findScienceProgram('SP77')).toBeUndefined();
+    });
+
+    it('draftForSp builds an empty draft when none exists', async () => {
+      const { component } = await setup();
+      expect(component.draftForSp('SPZ')).toEqual(draft('SPZ'));
+    });
+
+    it('retryCatalog refetches the ToC catalog for the current result', async () => {
+      const { component, getTocCatalog } = await setup();
+      component.retryCatalog();
+      expect(getTocCatalog).toHaveBeenCalledWith('RES-001');
+    });
+  });
+
+  describe('remote change', () => {
+    it('reseeds the form from the server when nothing is dirty', async () => {
+      const { component, getAlignment } = await setup();
+      getAlignment.mockResolvedValue({ ...base, has_contribution: false });
+      component.handleRemoteChange();
+      await flushMicrotasks();
+      expect(component.formData().has_contribution).toBe(false);
+    });
+
+    it('keeps the form when the refetch returns nothing', async () => {
+      const { component, getAlignment } = await setup();
+      component.formData.set(form({ has_contribution: true }));
+      getAlignment.mockResolvedValue(null);
+      component.handleRemoteChange();
+      await flushMicrotasks();
+      expect(component.formData().has_contribution).toBe(true);
+    });
+  });
+
+  describe('inline error clearing', () => {
+    it('onContributionChange(true) removes only the has_contribution error', async () => {
+      const { component } = await setup();
+      component.inlineErrors.set({ has_contribution: 'x', other: 'y' });
+      component.onContributionChange(true);
+      expect(component.inlineErrors()).toEqual({ other: 'y' });
+
+      component.inlineErrors.set({ has_contribution: 'x' });
+      component.onContributionChange(true);
+      expect(component.inlineErrors()).toBeNull();
+    });
+
+    it('onPrimaryChange removes only the primary_sp_code error', async () => {
+      const { component } = await setup();
+      component.inlineErrors.set({ primary_sp_code: 'x', other: 'y' });
+      component.onPrimaryChange('SP01');
+      expect(component.inlineErrors()).toEqual({ other: 'y' });
+
+      component.inlineErrors.set({ primary_sp_code: 'x' });
+      component.onPrimaryChange('SP02');
+      expect(component.inlineErrors()).toBeNull();
+      expect(component.formData().primary_sp_code).toBe('SP02');
+    });
+
+    it('clearRejectedSpError drops the sp_codes error and the rejected chips', async () => {
+      const { component } = await setup();
+      component.rejectedSpCodes.set(['SP9']);
+      component.inlineErrors.set({ sp_codes: 'bad', other: 'y' });
+      (component as any).clearRejectedSpError();
+      expect(component.rejectedSpCodes()).toEqual([]);
+      expect(component.inlineErrors()).toEqual({ other: 'y' });
+
+      component.inlineErrors.set({ sp_codes: 'bad' });
+      (component as any).clearRejectedSpError();
+      expect(component.inlineErrors()).toBeNull();
+    });
+  });
+
+  describe('SP toggling', () => {
+    it('toggleSp and setPrimarySp are inert when not editable or read-only', async () => {
+      const { component, editable, currentAlignment } = await setup();
+      component.formData.set(form({ selected_sps: [{ official_code: 'SP01' }], primary_sp_code: 'SP01' }));
+      editable.set(false);
+      component.toggleSp(poolSp('SP01'));
+      component.setPrimarySp('SP02');
+      expect(component.formData().selected_sps).toHaveLength(1);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+
+      editable.set(true);
+      currentAlignment.set({ ...base, is_read_only: true });
+      component.toggleSp(poolSp('SP01'));
+      component.setPrimarySp('SP02');
+      expect(component.formData().selected_sps).toHaveLength(1);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+    });
+
+    it('setPrimarySp stops event propagation and sets the primary', async () => {
+      const { component } = await setup();
+      const event = { stopPropagation: jest.fn() } as unknown as Event;
+      component.setPrimarySp('SP03', event);
+      expect(event.stopPropagation).toHaveBeenCalled();
+      expect(component.formData().primary_sp_code).toBe('SP03');
+    });
+
+    it.each([
+      ['one remaining with official_code', [{ official_code: 'B' }], 'B'],
+      ['one remaining with only code', [{ official_code: '', code: 'B' }], 'B'],
+      ['one remaining without any code', [{ official_code: '', code: '' }], null],
+      ['two remaining, first has official_code', [{ official_code: 'B' }, { official_code: 'C' }], 'B'],
+      ['two remaining, first has only code', [{ official_code: '', code: 'B' }, { official_code: 'C' }], 'B'],
+      ['two remaining, first has no code', [{ official_code: '', code: '' }, { official_code: 'C' }], null],
+      ['nothing remaining', [], null]
+    ])('removing the primary SP re-assigns the primary: %s', async (_label, remaining, expected) => {
+      const { component } = await setup();
+      component.formData.set(
+        form({ primary_sp_code: 'A', selected_sps: [{ official_code: '', code: 'A' }, ...(remaining as any[])], toc_drafts: [draft('A')] })
+      );
+      component.toggleSp(poolSp('A'));
+      expect(component.formData().primary_sp_code).toBe(expected);
+      expect(component.formData().toc_drafts).toEqual([]);
+      expect(component.formData().selected_sps).toHaveLength((remaining as any[]).length);
+    });
+
+    it('removing a non-primary SP keeps the primary', async () => {
+      const { component } = await setup();
+      component.formData.set(form({ primary_sp_code: 'A', selected_sps: [{ official_code: 'A' }, { official_code: 'B' }] }));
+      component.toggleSp(poolSp('B'));
+      expect(component.formData().primary_sp_code).toBe('A');
+    });
+
+    it('selecting an SP that already has a draft keeps that draft and loads the catalog', async () => {
+      const { component, getTocCatalog } = await setup();
+      const existing = draft('SP02', { aligns_with_toc: true });
+      component.formData.set(form({ toc_drafts: [existing] }));
+      component.toggleSp(poolSp('SP02'));
+      expect(component.formData().toc_drafts).toEqual([existing]);
+      expect(component.formData().primary_sp_code).toBe('SP02');
+      expect(getTocCatalog).toHaveBeenCalledWith('RES-001');
+    });
+
+    it('does not refetch the catalog when it is already loaded or loading', async () => {
+      const { component, getTocCatalog, loadingTocCatalog } = await setup();
+      loadingTocCatalog.set(true);
+      component.toggleSp(poolSp('SP02'));
+      expect(getTocCatalog).not.toHaveBeenCalled();
+    });
+
+    it('asks for confirmation instead of removing an SP that holds a saved alignment', async () => {
+      const { component, currentAlignment, showGlobalAlert } = await setup();
+      currentAlignment.set({
+        ...base,
+        toc_alignments: [{ sp_code: 'SP01', aligns_with_toc: false } as SavedTocAlignment]
+      });
+      component.formData.set(form({ selected_sps: [{ official_code: 'SP01' }], primary_sp_code: 'SP01', toc_drafts: [draft('SP01')] }));
+      component.toggleSp(poolSp('SP01'));
+      expect(showGlobalAlert).toHaveBeenCalledWith(expect.objectContaining({ summary: component.DESELECT_CONFIRM_SUMMARY }));
+      expect(component.formData().selected_sps).toHaveLength(1);
+    });
+  });
+
+  describe('destructive removal confirm', () => {
+    it('confirming removes the SP and its block errors; cancelling keeps it', async () => {
+      const { component, currentAlignment, showGlobalAlert } = await setup();
+      currentAlignment.set({ ...base, toc_alignments: [{ sp_code: 'SP01', aligns_with_toc: false } as SavedTocAlignment] });
+      component.formData.set(form({ selected_sps: [{ official_code: 'SP01' }, { official_code: 'SP02' }], primary_sp_code: 'SP01', toc_drafts: [draft('SP01')] }));
+      component.blockErrors.set({ SP01: { _: 'e' }, SP02: { _: 'f' } });
+
+      component.toggleSp(poolSp('SP01'));
+      const alert = showGlobalAlert.mock.calls[0][0];
+
+      alert.cancelCallback.event();
+      expect(component.formData().selected_sps).toHaveLength(2);
+
+      alert.confirmCallback.event();
+      expect(component.formData().selected_sps.map(sp => sp.official_code)).toEqual(['SP02']);
+      expect(component.formData().primary_sp_code).toBeNull();
+      expect(component.blockErrors()).toEqual({ SP02: { _: 'f' } });
+    });
+
+    it('confirming leaves block errors untouched when the SP had none', async () => {
+      const { component, currentAlignment, showGlobalAlert } = await setup();
+      currentAlignment.set({ ...base, toc_alignments: [{ sp_code: 'SP01', aligns_with_toc: false } as SavedTocAlignment] });
+      component.formData.set(form({ selected_sps: [{ official_code: 'SP01' }], primary_sp_code: 'SP02' }));
+      component.blockErrors.set({ SP02: { _: 'f' } });
+      component.toggleSp(poolSp('SP01'));
+      showGlobalAlert.mock.calls[0][0].confirmCallback.event();
+      expect(component.formData().primary_sp_code).toBe('SP02');
+      expect(component.blockErrors()).toEqual({ SP02: { _: 'f' } });
+    });
+
+    it('selection reconcile restores a removed SP from the catalog or a bare code and asks to confirm', async () => {
+      const { component, sciencePrograms, showGlobalAlert } = await setup();
+      sciencePrograms.set([poolSp('SPX', { category: 'Cat', color: '#abc' }), poolSp('SPN', { category: undefined, color: undefined })]);
+
+      const reconcile = async (code: string) => {
+        component.formData.set(form({ selected_sps: [], toc_drafts: [draft(code, { aligns_with_toc: true })] }));
+        component.onSpSelectionChange();
+        await flushMicrotasks();
+        return component.formData().selected_sps[0];
+      };
+
+      expect(await reconcile('SPX')).toEqual({ official_code: 'SPX', name: 'Name SPX', category: 'Cat', color: '#abc' });
+      expect(await reconcile('SPN')).toEqual({ official_code: 'SPN', name: 'Name SPN', category: null, color: null });
+      expect(await reconcile('SPQ')).toEqual({ official_code: 'SPQ' });
+      expect(showGlobalAlert).toHaveBeenCalledTimes(3);
+    });
+
+    it('selection change without any selected SP does not fetch the catalog', async () => {
+      const { component, getTocCatalog } = await setup();
+      component.formData.set(form({ selected_sps: [] }));
+      component.onSpSelectionChange();
+      await flushMicrotasks();
+      expect(getTocCatalog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('save', () => {
+    const dirtyNo = async () => {
+      const ctx = await setup();
+      ctx.currentAlignment.set({ ...base });
+      ctx.component.seedFromServer({ ...base });
+      ctx.component.onContributionChange(false);
+      return ctx;
+    };
+
+    it('onSave does nothing when the form cannot be saved', async () => {
+      const { component, patchAlignment } = await setup();
+      await component.onSave();
+      expect(patchAlignment).not.toHaveBeenCalled();
+    });
+
+    it('tracks a save whose response carries no science programs', async () => {
+      const ctx = await dirtyNo();
+      ctx.patchAlignment.mockResolvedValue({ ok: true, data: { ...base, has_contribution: false, selected_science_programs: undefined } });
+      await ctx.component.onSave();
+      expect(ctx.trackEvent).toHaveBeenCalledWith('bilateral.alignment.saved', expect.objectContaining({ sp_count: 0, toc_alignment_count: 0 }));
+    });
+
+    it('falls back to a global validation message on a 400 without field errors', async () => {
+      const ctx = await dirtyNo();
+      ctx.patchAlignment.mockResolvedValue({ ok: false, status: 400, description: 'Bad thing' });
+      await ctx.component.onSave();
+      expect(ctx.component.inlineErrors()).toEqual({ _global: 'Bad thing' });
+
+      ctx.patchAlignment.mockResolvedValue({ ok: false, status: 400 });
+      await ctx.component.onSave();
+      expect(ctx.component.inlineErrors()).toEqual({ _global: 'Validation failed' });
+    });
+
+    it('treats a 409 without description as a plain synced conflict', async () => {
+      const ctx = await dirtyNo();
+      ctx.patchAlignment.mockResolvedValue({ ok: false, status: 409 });
+      await ctx.component.onSave();
+      expect(ctx.showToast).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Synced to PRMS' }));
+      expect(ctx.component.versionLockedFrom409()).toBe(false);
+    });
+  });
+
+  describe('private helpers', () => {
+    it('isStaleSaved is false for non-aligned or id-less rows', async () => {
+      const { component } = await setup();
+      expect((component as any).isStaleSaved({ sp_code: 'SP01', aligns_with_toc: false, toc_result_id: 5 })).toBe(false);
+      expect((component as any).isStaleSaved({ sp_code: 'SP01', aligns_with_toc: true, toc_result_id: null })).toBe(false);
+      expect((component as any).isStaleSaved({ sp_code: 'SP01', aligns_with_toc: true, toc_result_id: 5 })).toBe(true);
+    });
+
+    it('isDirty detects draft sets of different size or different SP codes', async () => {
+      const { component, currentAlignment } = await setup();
+      currentAlignment.set({
+        ...base,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'One', role: 'CONTRIBUTING' } as never]
+      });
+      component.seedFromServer(currentAlignment()!);
+      expect(component.isDirty()).toBe(false);
+
+      component.formData.update(f => ({ ...f, toc_drafts: [] }));
+      expect(component.isDirty()).toBe(true);
+
+      component.formData.update(f => ({ ...f, toc_drafts: [draft('SPZZ')] }));
+      expect(component.isDirty()).toBe(true);
+    });
+  });
+});

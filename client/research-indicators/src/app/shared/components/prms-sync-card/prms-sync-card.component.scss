@@ -20,13 +20,13 @@
 }
 
 .prms-sync-section--approved {
-  border: 1px solid color-mix(in srgb, var(--ac-green-300) 38%, transparent);
-  background: color-mix(in srgb, var(--ac-green-300) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac-status-prms-approved) 38%, transparent);
+  background: color-mix(in srgb, var(--ac-status-prms-approved) 6%, transparent);
 }
 
 .prms-sync-section--rejected {
-  border: 1px solid color-mix(in srgb, var(--ac-red-1) 34%, transparent);
-  background: color-mix(in srgb, var(--ac-red-1) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac-status-prms-rejected) 34%, transparent);
+  background: color-mix(in srgb, var(--ac-status-prms-rejected) 6%, transparent);
 }
 
 .prms-sync-section__tag {

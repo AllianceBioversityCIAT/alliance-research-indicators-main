@@ -25,6 +25,7 @@ import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 import { TooltipModule } from 'primeng/tooltip';
 import { openPublicLink } from '@shared/utils/public-link.util';
+import { buildResultLink, ResultLink } from '@shared/utils/result-link.util';
 import {
   getStarReportViewerUrl,
   isStarInnDevPdfTemporarilyDisabled,
@@ -280,15 +281,8 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
 
   openResult(result: Result) {
     this.closeResultInformationModal();
-    const resultCode = `${result.platform_code}-${result.result_official_code}`;
-    if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
-      const latestYear = Math.max(...result.snapshot_years);
-      this.router.navigate(['/result', resultCode, 'general-information'], {
-        queryParams: this.resultEntryQueryParamsForNavigation({ version: latestYear })
-      });
-    } else {
-      this.router.navigate(['/result', resultCode], { queryParams: this.resultEntryQueryParamsForNavigation() });
-    }
+    const link = this.resultLink(result);
+    this.router.navigate(link.commands, { queryParams: this.resultEntryQueryParamsForNavigation(link.queryParams) });
   }
 
   openResultByYear(result: number, year: string | number, platformCode: string) {
@@ -300,24 +294,21 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   getResultHref(result: Result): string {
-    const resultCode = `${result.platform_code}-${result.result_official_code}`;
-    if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
-      const latestYear = Math.max(...result.snapshot_years);
-      return this.router
-        .createUrlTree(['/result', resultCode, 'general-information'], {
-          queryParams: this.resultEntryQueryParamsForNavigation({ version: latestYear })
-        })
-        .toString();
-    }
-    return this.router.createUrlTree(['/result', resultCode], { queryParams: this.resultEntryQueryParamsForNavigation() }).toString();
+    const link = this.resultLink(result);
+    return this.router.createUrlTree(link.commands, { queryParams: this.resultEntryQueryParamsForNavigation(link.queryParams) }).toString();
   }
 
   getResultRouteArray(result: Result): string | string[] {
-    const resultCode = `${result.platform_code}-${result.result_official_code}`;
-    if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
-      return ['/result', resultCode, 'general-information'];
-    }
-    return ['/result', resultCode];
+    return this.resultLink(result).commands;
+  }
+
+  private resultLink(result: Result): ResultLink {
+    return buildResultLink({
+      platform_code: result.platform_code,
+      result_official_code: result.result_official_code,
+      result_status_id: result.result_status?.result_status_id,
+      snapshot_years: result.snapshot_years
+    });
   }
 
   @HostListener('click', ['$event'])
@@ -327,11 +318,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   getResultQueryParams(result: Result): Record<string, string | number> {
-    if (result.result_status?.result_status_id === 6 && Array.isArray(result.snapshot_years) && result.snapshot_years.length > 0) {
-      const latestYear = Math.max(...result.snapshot_years);
-      return this.resultEntryQueryParamsForNavigation({ version: latestYear });
-    }
-    return this.resultEntryQueryParamsForNavigation();
+    return this.resultEntryQueryParamsForNavigation(this.resultLink(result).queryParams);
   }
 
   onResultLinkClick(result: Result): void {

@@ -24,6 +24,7 @@ describe('ReportingComponent', () => {
       expect(component.showQ2()).toBe(false);
       expect(component.showResult()).toBe(false);
       expect(component.showTrail()).toBe(false);
+      expect(component.stepLabel()).toBe('');
     });
   });
 
@@ -143,6 +144,84 @@ describe('ReportingComponent', () => {
 
       expect(component.funding()).toBeNull();
       expect(component.resultName()).toBe('TIP');
+    });
+  });
+
+  describe('why-reporting intro and platform cards', () => {
+    it('toggleWhy flips the expanded flag', () => {
+      expect(component.whyExpanded()).toBe(false);
+      component.toggleWhy();
+      expect(component.whyExpanded()).toBe(true);
+      component.toggleWhy();
+      expect(component.whyExpanded()).toBe(false);
+    });
+
+    it('togglePlatform expands and collapses each card independently', () => {
+      expect(component.isPlatformExpanded('TIP')).toBe(false);
+      component.togglePlatform('TIP');
+      component.togglePlatform('STAR');
+      expect(component.isPlatformExpanded('TIP')).toBe(true);
+      expect(component.isPlatformExpanded('STAR')).toBe(true);
+      component.togglePlatform('TIP');
+      expect(component.isPlatformExpanded('TIP')).toBe(false);
+      expect(component.isPlatformExpanded('STAR')).toBe(true);
+    });
+  });
+
+  describe('faqs and responsibility per step', () => {
+    it('shows the landing FAQs on Q1', () => {
+      expect(component.faqsTitle()).toBe('Common questions');
+      expect(component.faqs()[0].q).toBe('Who is responsible for reporting?');
+    });
+
+    it('shows the funding FAQs on Q2', () => {
+      component.setIndicator('cap');
+      expect(component.faqsTitle()).toBe('Common questions — funding sources');
+      expect(component.faqs()[0].q).toBe('What are the CGIAR funding streams and what do they mean?');
+    });
+
+    it('shows the platform FAQs on the result screen', () => {
+      component.setIndicator('kp');
+      expect(component.faqsTitle()).toBe('Common questions — reporting platforms');
+      expect(component.faqs()[0].q).toBe('How does reporting contribute to performance monitoring?');
+    });
+
+    it('names the responsible team by platform', () => {
+      component.setIndicator('kp');
+      expect(component.resultResponsibility()).toBe('PI and research team');
+      component.setIndicator('cap');
+      component.setFunding('program');
+      expect(component.resultResponsibility()).toBe('PI and the Science Program/Accelerator team');
+    });
+
+    it('exposes result details of the chosen platform and indicator', () => {
+      component.setIndicator('kp');
+      expect(component.resultWhy()).toContain('TIP');
+      expect(component.resultLogo()).toBe('images/tracking.svg');
+      expect(component.resultTopBorder()).toBe('border-t-[#E8862A]');
+      expect(component.resultInk()).toBe('text-[#94500F]');
+      expect(component.resultBtn()).toContain('bg-[#94500F]');
+      expect(component.resultEvidence()).toContain('DOI');
+      expect(component.resultPitfall()).toContain('Drafts');
+    });
+
+    it('returns empty/default result details before a result exists', () => {
+      expect(component.resultName()).toBe('');
+      expect(component.resultUrl()).toBe('#');
+      expect(component.resultSupport()).toBe('');
+      expect(component.resultWhy()).toBe('');
+      expect(component.resultLogo()).toBe('');
+      expect(component.resultTopBorder()).toBe('');
+      expect(component.resultInk()).toBe('');
+      expect(component.resultBtn()).toBe('');
+      expect(component.resultEvidence()).toBe('');
+      expect(component.resultPitfall()).toBe('');
+    });
+
+    it('yields no outcome for an unknown funding id', () => {
+      component.setIndicator('cap');
+      component.funding.set('unknown' as never);
+      expect(component.showResult()).toBe(false);
     });
   });
 });

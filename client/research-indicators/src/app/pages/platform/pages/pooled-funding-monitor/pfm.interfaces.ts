@@ -1,0 +1,302 @@
+import { StatusConfig } from '@shared/interfaces/result-config.interface';
+// @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-07
+// Wire types of design §4, mirrored from the server DTOs/enums in
+// server/researchindicators/src/domain/entities/pooled-funding-monitor/. Read-only feature.
+
+export const PFM_SCOPES = ['mine', 'all'] as const;
+export type PfmScope = (typeof PFM_SCOPES)[number];
+
+export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
+export type PfmTab = (typeof PFM_TABS)[number];
+
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved'] as const;
+export type PfmChip = (typeof PFM_CHIPS)[number];
+
+export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
+export type PfmStarLabel = (typeof PFM_STAR_LABELS)[number];
+
+export const PFM_MAPPING_STATES = ['Pending', 'Complete', 'No SP contribution'] as const;
+export type PfmMappingState = (typeof PFM_MAPPING_STATES)[number];
+
+export const PFM_PRMS_STATUSES = ['Not sent', 'Pending Review', 'Approved', 'Rejected'] as const;
+export type PfmPrmsStatus = (typeof PFM_PRMS_STATUSES)[number];
+
+export type PfmPipelineGroup = 'in_star' | 'in_prms' | 'out_of_scope';
+
+// ─── Summary ────────────────────────────────────────────────────────────────
+export interface PfmKpis {
+  projects: number;
+  projects_total: number;
+  monitored: number;
+  need_attention: number;
+  synced: number;
+  in_prms_scope: number;
+}
+
+export interface PfmPipelineStage {
+  key: string;
+  group: PfmPipelineGroup;
+  value: number;
+}
+
+export interface PfmPipeline {
+  total: number;
+  in_scope: number;
+  not_synced: number;
+  in_prms: number;
+  out_of_scope: number;
+  stages: PfmPipelineStage[];
+}
+
+export interface PfmSpCoverage {
+  code: string;
+  name: string;
+  synced: number;
+  total: number;
+}
+
+/** Results already in PRMS of one result type (indicator). */
+export interface PfmSyncedType {
+  id: number;
+  name: string;
+  synced: number;
+}
+
+/** Coverage tab, "the journey of a result": five stages, each a subset of the one before. */
+export interface PfmJourney {
+  projects: { total: number; with_results: number; without_results: number };
+  /** Draft includes Returned; Submitted includes Under review. */
+  star: { draft: number; submitted: number; approved: number };
+  /** Approved results only. */
+  answer: { not_answered: number; contributes: number; no_sp: number };
+  /** Approved results that contribute. */
+  mapping: { incomplete: number; complete: number };
+  /** Approved, contributing, mapped. `rejected` is the part of `synced` PRMS rejected. */
+  sync: { ready: number; synced: number; rejected: number };
+}
+
+/** Which projects the coverage stage 1 table shows. */
+export type PfmProjectsFilter = 'all' | 'with' | 'without';
+
+/** A contributing project of the scope, with or without results. */
+export interface PfmPortfolioProject {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  /** Contract status (Ongoing, Completed…), as My Projects shows it. */
+  status: string | null;
+  delegates: PfmProjectDelegate[];
+  results: number;
+}
+
+/** A PI delegate as My PI Delegates shows it. */
+export interface PfmProjectDelegate {
+  name: string;
+  email: string | null;
+  is_active: boolean;
+}
+
+export interface PfmMonthly {
+  /** 'YYYY-MM' */
+  month: string;
+  synced: number;
+}
+
+/** One contributing project's progress. `done` = in PRMS (any review status) or out of scope. */
+export interface PfmProjectProgress {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  total: number;
+  done: number;
+  remaining: number;
+  /** Mapping pending or incomplete. */
+  to_map: number;
+  /** Mapping complete, not in PRMS yet. */
+  ready: number;
+  in_prms: number;
+  out_of_scope: number;
+  pending_review: number;
+  approved: number;
+  rejected: number;
+}
+
+export interface PfmRejectionReason {
+  reason: string;
+  count: number;
+}
+
+export interface PfmSummary {
+  scope: PfmScope;
+  is_pi_of_any: boolean;
+  /** PI or delegate of at least one project, contributing or not. Optional: older servers omit it. */
+  manages_any_project?: boolean;
+  kpis: PfmKpis;
+  pipeline: PfmPipeline;
+  sp_coverage: PfmSpCoverage[];
+  monthly: PfmMonthly[];
+  synced_this_year: number;
+  /** Results already in PRMS by result type, most first. Optional: older servers omit it. */
+  synced_by_type?: PfmSyncedType[];
+  /** Coverage tab stages. Optional: older servers omit it. */
+  journey?: PfmJourney;
+  /** Contributing projects, most results first. Optional: older servers omit it. */
+  portfolio_projects?: PfmPortfolioProject[];
+  /** Furthest behind (most remaining) first. Optional: absent from a server older than the coverage redesign. */
+  project_progress?: PfmProjectProgress[];
+  prms_rejection_reasons?: PfmRejectionReason[];
+  /** Quick-view counts of the whole scope (no filters). Optional: older servers omit it. */
+  chip_counts?: PfmChipCounts;
+}
+
+// ─── Queue ──────────────────────────────────────────────────────────────────
+export interface PfmCodeName {
+  code: string;
+  name: string;
+}
+
+export interface PfmSpGroupOption {
+  category: string;
+  items: PfmCodeName[];
+}
+
+export interface PfmTypeOption {
+  id: number;
+  name: string;
+}
+
+export interface PfmFilterOptions {
+  projects: PfmCodeName[];
+  science_programs: PfmSpGroupOption[];
+  types: PfmTypeOption[];
+}
+
+export interface PfmChipCounts {
+  all: number;
+  attention: number;
+  mapping: number;
+  ready: number;
+  prms_rejected: number;
+  synced: number;
+  /** Not approved by the PI in STAR yet (in scope, not in PRMS). Optional: older servers omit it. */
+  awaiting_pi?: number;
+  /** No SP contribution, not in PRMS. Optional: older servers omit it. */
+  no_sp?: number;
+  /** In PRMS, pending review / approved (Synced = both). Optional: older servers omit them. */
+  prms_pending?: number;
+  prms_approved?: number;
+}
+
+export interface PfmGroupCounts {
+  approved: number;
+  pending: number;
+  rejected: number;
+  out_of_scope: number;
+  not_sent: number;
+}
+
+export interface PfmGroup {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  donor: string | null;
+  result_count: number;
+  attention: number;
+  counts: PfmGroupCounts;
+}
+
+export interface PfmTotals {
+  results: number;
+  projects: number;
+  monitored_total: number;
+}
+
+export interface PfmQueue {
+  filter_options: PfmFilterOptions;
+  chip_counts: PfmChipCounts;
+  groups: PfmGroup[];
+  totals: PfmTotals;
+}
+
+export interface PfmSpRef {
+  code: string;
+  name: string;
+  color: string | null;
+}
+
+export interface PfmScienceProgram {
+  code: string;
+  name: string;
+  primary: boolean;
+  color: string | null;
+}
+
+export interface PfmResultRow {
+  /** Platform + official code, e.g. 'STAR-1234'. */
+  result_code: string;
+  platform_code: string;
+  official_code: number;
+  report_year: number;
+  /** Active snapshot years, newest first. */
+  snapshot_years: number[];
+  title: string | null;
+  type: string | null;
+  /** Creator display name; null when the server could not resolve one. */
+  creator: string | null;
+  star_label: PfmStarLabel;
+  star_status_id: number;
+  /** result_status.name: the text the Results Center shows for this status; null when unresolved. */
+  star_status_name: string | null;
+  /** result_status.config (same shape the Results Center colours its status tag from); null when unset. */
+  star_status_config: StatusConfig | null;
+  /** result_status.description: tooltip text of the STAR status tag; null when unset. */
+  star_status_description: string | null;
+  pi_line: string;
+  /** "Approved dd Mon yyyy" when approved with a date; null otherwise. */
+  star_approved_label: string | null;
+  /** Every active SP, primary first; `color` is the SP accent (null when unset). */
+  science_programs: PfmScienceProgram[];
+  mapping_state: PfmMappingState;
+  mapping_note: string;
+  sp_line: string;
+  primary_sp: PfmSpRef | null;
+  contributing: PfmSpRef[];
+  prms_status: PfmPrmsStatus;
+  prms_hint: string;
+  /**
+   * Server-formatted UTC display label ("dd Mon, HH:mm", or "—" when null) — NOT an
+   * ISO date. Render as-is; never parse or re-format it.
+   */
+  updated_at: string;
+  /** Same instant as ISO-8601 UTC, for sorting only; null when unknown. Optional: older servers omit it. */
+  updated_at_iso?: string | null;
+}
+
+// ─── Client-side state shapes ───────────────────────────────────────────────
+export interface PfmFilters {
+  project: string | null;
+  sp: string | null;
+  type: number | null;
+}
+
+/** Query accepted by /queue and /queue/projects/:projectCode/results. */
+export interface PfmQueueQuery {
+  scope: PfmScope;
+  project?: string | null;
+  sp?: string | null;
+  type?: number | null;
+  chip?: PfmChip | null;
+}
+
+export interface PfmSectionState {
+  loading: boolean;
+  error: boolean;
+}
+
+/** `?a=1&b=2` from the query, omitting null / undefined / '' values. '' when nothing remains. */
+export function pfmQueryString(query: PfmQueueQuery | { scope: PfmScope }): string {
+  const parts = Object.entries(query as Record<string, string | number | null | undefined>)
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => `${k}=${encodeURIComponent(v as string | number)}`);
+  return parts.length ? `?${parts.join('&')}` : '';
+}

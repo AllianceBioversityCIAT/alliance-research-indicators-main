@@ -181,3 +181,92 @@ describe('SimulationBannerComponent', () => {
     expect(document.activeElement).toBe(button);
   });
 });
+
+describe('SimulationBannerComponent edge cases', () => {
+  const build = (opts: { user?: unknown; actor?: unknown; session?: unknown; websocket?: 'missing-method' | 'throws' | 'ok'; endActor?: unknown }) => {
+    const cache = {
+      dataCache: signal({ user: opts.user }),
+      hasSmallScreen: jest.fn(() => false),
+      bumpContentReload: jest.fn()
+    };
+    const configUser = jest.fn().mockResolvedValue(undefined);
+    const impersonation = {
+      active: signal(false),
+      session: signal(opts.session ?? null),
+      actor: signal(opts.actor ?? null),
+      end: jest.fn().mockResolvedValue({ actor: opts.endActor ?? null })
+    };
+    const actions = { showToast: jest.fn() };
+    const websocketProvider =
+      opts.websocket === 'throws'
+        ? {
+            provide: WebsocketService,
+            useFactory: () => {
+              throw new Error('no socket');
+            }
+          }
+        : { provide: WebsocketService, useValue: opts.websocket === 'missing-method' ? {} : { configUser } };
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [SimulationBannerComponent],
+      providers: [
+        { provide: CacheService, useValue: cache },
+        { provide: ImpersonationService, useValue: impersonation },
+        { provide: ActionsService, useValue: actions },
+        websocketProvider
+      ]
+    });
+    const fixture = TestBed.createComponent(SimulationBannerComponent);
+    return { fixture, component: fixture.componentInstance, cache, impersonation, actions, configUser };
+  };
+
+  it('falls back to empty strings when the cached user is missing', () => {
+    const { component } = build({ user: undefined });
+    expect(component.targetName()).toBe('');
+    expect(component.targetEmail()).toBe('');
+    expect(component.targetRole()).toBe('');
+  });
+
+  it('falls back to empty strings when user fields are missing', () => {
+    const { component } = build({ user: {} });
+    expect(component.targetName()).toBe('');
+    expect(component.targetEmail()).toBe('');
+    expect(component.targetRole()).toBe('');
+  });
+
+  it('computes the admin name, tolerating missing actor names and no actor', () => {
+    const none = build({ user: {} });
+    expect(none.component.adminName()).toBe('');
+    const partial = build({ user: {}, actor: {} });
+    expect(partial.component.adminName()).toBe('');
+    const named = build({ user: {}, actor: { first_name: 'Ana', last_name: 'Sandoval' } });
+    expect(named.component.adminName()).toBe('Ana Sandoval');
+  });
+
+  it('returns an empty started time for an unparseable date', () => {
+    const { component } = build({ user: {}, session: { session_id: 's', started_at: 'garbage', expires_at: '' } });
+    expect(component.startedTime()).toBe('');
+  });
+
+  it('skips configUser when the websocket service lacks it, and falls back to an empty name without an actor', async () => {
+    const { component, cache, actions, configUser } = build({ user: {}, websocket: 'missing-method' });
+    await component.endSimulation();
+    expect(configUser).not.toHaveBeenCalled();
+    expect(cache.bumpContentReload).toHaveBeenCalled();
+    expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ detail: 'Simulation ended — you are back as ' }));
+  });
+
+  it('still ends the simulation when injecting the websocket service throws', async () => {
+    const { component, impersonation, actions } = build({ user: {}, websocket: 'throws', endActor: { first_name: 'Ana', sec_user_id: 1 } });
+    await component.endSimulation();
+    expect(impersonation.end).toHaveBeenCalledWith('manual');
+    expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ detail: 'Simulation ended — you are back as Ana' }));
+  });
+
+  it('skips configUser when end() returns no actor', async () => {
+    const { component, configUser } = build({ user: {}, websocket: 'ok' });
+    await component.endSimulation();
+    expect(configUser).not.toHaveBeenCalled();
+  });
+});

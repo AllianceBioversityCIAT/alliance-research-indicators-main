@@ -27,8 +27,7 @@ import {
   isHomeEntryFromUrl,
   isResultsCenterEntryFromUrl,
   RESULT_ENTRY_SOURCE_QUERY,
-  RESULT_ENTRY_SOURCE_VALUE_HOME,
-  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
+  isKnownResultEntrySource
 } from '@shared/constants/result-entry-source';
 
 interface SubmissionAlertData {
@@ -419,7 +418,7 @@ export class ResultSidebarComponent {
     const v = m.get('version');
     const f = m.get('from');
     if (v) o['version'] = v;
-    if (f === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || f === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(f)) {
       o[RESULT_ENTRY_SOURCE_QUERY] = f;
     }
     return o;
@@ -510,7 +509,7 @@ export class ResultSidebarComponent {
       greenCheckKey: 'ip_rights'
     },
     {
-      label: 'Pool funding alignment',
+      label: 'CGIAR Portfolio Contribution',
       path: 'pool-funding-alignment',
       greenCheckKey: 'pool_funding_alignment',
       optional: true
@@ -622,7 +621,7 @@ export class ResultSidebarComponent {
     if (version) {
       queryParams['version'] = version;
     }
-    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(from)) {
       queryParams[RESULT_ENTRY_SOURCE_QUERY] = from;
     }
 

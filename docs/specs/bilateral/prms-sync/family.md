@@ -38,6 +38,9 @@ Split rationale: (1) the server integration is the contract everything else cons
 | 4 | `prms-sync/pi-sync-panel` | PI project-level control panel: per-result sync pipeline (pending alignment / ready / synced / failed / future PRMS verdict) | `sync-engine` | `no` | `pending` | TBD |
 | 5 | `prms-sync/decision-webhook` | Server: register STAR's callback destination with PRMS, receive the Science Program APPROVE/REJECT callback, deduplicate it on `x-prms-delivery-id`, and record **every** delivery in an append-only history built to be displayed | `sync-engine` | `yes` | `active` | TBD |
 | 6 | `prms-sync/sync-status-panel` | Client + server: the result-sidebar **PRMS synchronization card** (state title, sync counter, formatted status, actor/reviewer name, deep link to PRMS) and the **full synchronization-history modal**, both read from `result_prms_sync_history`. Replaces today's bare `PRMS code #…` line | `decision-webhook` | `no` | `pending` | TBD |
+| 7 | `prms-sync/pooled-funding-monitor` | Client + server: standalone **Pooled Funding Contribution Monitor** page (PI navigation group) — *Portfolio coverage* + *Results queue* tabs, *Only my results as PI* / *Whole portfolio* scopes, read-only; the only row action is **View** (navigate to the result). Mockup: `pooled-funding-monitor/mockup/` | `sync-engine`, `decision-webhook` | `no` | `pending` | TBD |
+
+> **Child 7 added 2026-10-08 (HITL, Daniela Pino at `/akili-propose`).** The owner chose a **new child** over re-scoping child 4. Child 4 (`pi-sync-panel`, a `project-detail` section) stays `pending` as written; the owner confirmed on 2026-10-08 (D-1 in [`pooled-funding-monitor/proposal.md`](pooled-funding-monitor/proposal.md)) that child 7 is a **separate, new module** that neither replaces nor retires child 4.
 
 > **Child 5 status, 2026-09-23 (T-10).** The cell reads `active`, taken from the vocabulary in [`docs/specs/general-setup/family.md`](../../general-setup/family.md) (*Status Vocabulary*): `pending` (proposed, drafted, or waiting on a prerequisite), `active` (approved and in `/akili-execute`), `done` (implementation **and** `/akili-test` complete and verified), `blocked` (the child cannot proceed). `pending` is no longer true — code tasks T-01–T-09, T-01b and T-11 are closed. `done` would be false: `/akili-test` has not run, and the rollout has not happened (Dev migration state and the TEST registration round-trip are both blocked; PROD is blocked on OQ-6 / R-1). `blocked` would describe the rollout, not the spec, whose code is written. The path `prms-sync/decision-webhook` is unchanged.
 
@@ -53,6 +56,8 @@ graph TD
     C1 --> C3["3. center-admin-resync"]
     C1 --> C4["4. pi-sync-panel"]
     C1 --> C5["5. decision-webhook (server)"]
+    C5 --> C7["7. pooled-funding-monitor"]
+    C1 --> C7
 ```
 
 ---

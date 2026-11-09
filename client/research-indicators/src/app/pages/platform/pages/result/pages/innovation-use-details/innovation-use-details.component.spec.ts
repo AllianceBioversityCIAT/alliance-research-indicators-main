@@ -23,7 +23,12 @@ import { InputComponent } from '@shared/components/custom-fields/input/input.com
 import { InputNumber } from 'primeng/inputnumber';
 import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
 import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
-import { formatInnovationDevLabel } from './innovation-use-details.component';
+import {
+  formatInnovationDevLabel,
+  formatInnovationDevCode,
+  formatInnovationDevReadiness,
+  formatInnovationDevUrl
+} from './innovation-use-details.component';
 import { InnovationUseLevelStepperComponent } from './components/innovation-use-level-stepper/innovation-use-level-stepper.component';
 
 /** Family D-1: `id = level + 1`. Levels 0-9 -> ids 1-10. */
@@ -5584,6 +5589,235 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
     // this block must be able to show — see the reverted-swap check run separately during verification.
     it('falsifying input: inherited UA black on --ac-grey-100 (dark theme removal falsifier) reports less than 4.5:1 and fails AA', () => {
       expect(contrastRatio([0, 0, 0], GREY_100_DARK)).toBeLessThan(4.5);
+    });
+  });
+});
+
+describe('InnovationUseDetailsComponent - defensive branches', () => {
+  let component: InnovationUseDetailsComponent;
+  let innoDevService: GetInnoDevOutputService;
+  const versionCallbacks: (() => void)[] = [];
+
+  const linked = (id: number) => ({
+    result_id: id,
+    result_official_code: id,
+    title: 'T',
+    platform_code: null
+  });
+  const listOption = (id: number, extra: Record<string, unknown> = {}) => ({
+    result_id: id,
+    result_official_code: String(id),
+    title: 'Option',
+    platform_code: 'P',
+    ...extra
+  });
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    versionCallbacks.length = 0;
+    versionWatcher.onVersionChange.mockImplementation((cb: () => void) => {
+      versionCallbacks.push(cb);
+    });
+    submission.isEditableStatus.mockReturnValue(true);
+    apiService.GET_InnovationUseDetails.mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true });
+    apiService.GET_InnovationUseLevels.mockResolvedValue({ data: LEVELS_FIXTURE, successfulRequest: true });
+    apiService.GET_InnovationDevCard.mockResolvedValue({ data: null, successfulRequest: true });
+
+    await TestBed.configureTestingModule({
+      imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+      providers: [
+        { provide: ApiService, useValue: apiService },
+        { provide: CacheService, useClass: CacheServiceMock },
+        { provide: ActionsService, useValue: actions },
+        { provide: Router, useValue: router },
+        { provide: SubmissionService, useValue: submission },
+        { provide: VersionWatcherService, useValue: versionWatcher },
+        { provide: ActivatedRoute, useValue: activatedRouteMock }
+      ]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+    component = fixture.componentInstance;
+    innoDevService = TestBed.inject(GetInnoDevOutputService);
+    await TestBed.inject(GetInnovationUseLevelsService).main();
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    versionWatcher.onVersionChange.mockReset();
+    jest.clearAllMocks();
+  });
+
+  describe('formatters', () => {
+    it('formatInnovationDevCode handles null input and a missing official code', () => {
+      expect(formatInnovationDevCode(null)).toBe('');
+      expect(formatInnovationDevCode({ platform_code: 'STAR', result_official_code: null })).toBe('STAR');
+      expect(formatInnovationDevCode({ platform_code: null, result_official_code: 12 })).toBe('12');
+    });
+
+    it('formatInnovationDevLabel falls back to the title alone or an empty title', () => {
+      expect(formatInnovationDevLabel({ platform_code: null, result_official_code: null, title: 'Only title' })).toBe('Only title');
+      expect(formatInnovationDevLabel({ platform_code: null, result_official_code: null, title: null })).toBe('');
+      expect(formatInnovationDevLabel({ platform_code: null, result_official_code: 5, title: null })).toBe('5 - ');
+    });
+
+    it('formatInnovationDevReadiness covers every level/name combination', () => {
+      expect(formatInnovationDevReadiness(null)).toBe('');
+      expect(formatInnovationDevReadiness({ level: 3, name: 'Pilot' })).toBe('Level 3 - Pilot');
+      expect(formatInnovationDevReadiness({ level: 3, name: null })).toBe('Level 3');
+      expect(formatInnovationDevReadiness({ level: null, name: 'Pilot' })).toBe('Pilot');
+      expect(formatInnovationDevReadiness({ level: null, name: null })).toBe('');
+    });
+
+    it('formatInnovationDevUrl builds the route with and without a platform code', () => {
+      expect(formatInnovationDevUrl(null)).toBe('');
+      expect(formatInnovationDevUrl({ platform_code: 'STAR', result_official_code: 9 })).toBe('/result/STAR-9/general-information');
+      expect(formatInnovationDevUrl({ platform_code: null, result_official_code: 9 })).toBe('/result/9/general-information');
+    });
+  });
+
+  it('refetches the data when the version changes', () => {
+    const getData = jest.spyOn(component, 'getData').mockResolvedValue();
+    expect(versionCallbacks.length).toBeGreaterThan(0);
+    versionCallbacks[0]();
+    expect(getData).toHaveBeenCalledTimes(1);
+  });
+
+  describe('onInnovationDevSelected edge cases', () => {
+    it('links null when the id is not in the picker list and still enriches', async () => {
+      jest.spyOn(innoDevService, 'list').mockReturnValue([]);
+      await component.onInnovationDevSelected(7);
+      expect(component.body().linked_innovation_dev).toBeNull();
+    });
+
+    it('defaults a missing title and platform code on the linked option', async () => {
+      jest.spyOn(innoDevService, 'list').mockReturnValue([listOption(7, { title: undefined, platform_code: undefined })] as never);
+      await component.onInnovationDevSelected(7);
+      expect(component.body().linked_innovation_dev).toMatchObject({ result_id: 7, title: '', platform_code: null });
+    });
+
+    it('clears enrichment state and skips the request when the selection is cleared', async () => {
+      component.enrichmentSuccessForId.set(4);
+      await component.onInnovationDevSelected(0);
+      expect(component.enrichmentSuccessForId()).toBeNull();
+      expect(apiService.GET_InnovationDevCard).not.toHaveBeenCalled();
+    });
+
+    it('keeps the current link when it is superseded between the check and the merge', async () => {
+      jest.spyOn(innoDevService, 'list').mockReturnValue([listOption(7)] as never);
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        get data() {
+          component.body.update(current => ({ ...current, linked_innovation_dev: linked(8) }));
+          return {};
+        }
+      });
+      await component.onInnovationDevSelected(7);
+      expect(component.body().linked_innovation_dev?.result_id).toBe(8);
+      expect(component.body().linked_innovation_dev?.description).toBeUndefined();
+    });
+
+    it('ignores a failed request when the selection changed while it was in flight', async () => {
+      jest.spyOn(innoDevService, 'list').mockReturnValue([listOption(7)] as never);
+      component.enrichmentSuccessForId.set(99);
+      apiService.GET_InnovationDevCard.mockImplementationOnce(async () => {
+        component.body.update(current => ({ ...current, linked_innovation_dev: linked(8) }));
+        throw new Error('boom');
+      });
+      await component.onInnovationDevSelected(7);
+      expect(component.enrichmentSuccessForId()).toBe(99);
+    });
+
+    it('resets enrichment state when the request fails for the current selection', async () => {
+      jest.spyOn(innoDevService, 'list').mockReturnValue([listOption(7)] as never);
+      component.enrichmentSuccessForId.set(99);
+      apiService.GET_InnovationDevCard.mockRejectedValueOnce(new Error('boom'));
+      await component.onInnovationDevSelected(7);
+      expect(component.enrichmentSuccessForId()).toBeNull();
+    });
+  });
+
+  describe('data shaping edge cases', () => {
+    it('duplicateActorTypeIndexes treats a missing OTHER custom name as empty', () => {
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 5, actor_type_custom_name: undefined },
+          { ...new InnovationUseActor(), actor_type_id: 5, actor_type_custom_name: '  ' }
+        ]
+      });
+      expect([...component.duplicateActorTypeIndexes()].sort()).toEqual([0, 1]);
+    });
+
+    it('getData seeds an empty record when the response has no data', async () => {
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({ data: undefined, successfulRequest: true });
+      await component.getData();
+      expect(component.body().actors).toEqual([]);
+      expect(component.body().organizations).toEqual([]);
+      expect(component.body().quantifications).toEqual([]);
+    });
+
+    it('getData normalizes non-array collections to empty arrays', async () => {
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({
+        data: { ...new GetInnovationUseDetails(), actors: null, organizations: null, quantifications: null },
+        successfulRequest: true
+      });
+      await component.getData();
+      expect(component.body().actors).toEqual([]);
+      expect(component.body().organizations).toEqual([]);
+      expect(component.body().quantifications).toEqual([]);
+    });
+
+    it('onQuantificationUpdate leaves other rows untouched', () => {
+      const rows = [
+        { id: 1, quantification_number: 1, unit: 'a', description: 'x' },
+        { id: 2, quantification_number: 2, unit: 'b', description: 'y' }
+      ];
+      component.body.set({ ...new GetInnovationUseDetails(), quantifications: rows });
+      component.onQuantificationUpdate(1, { number: 5, unit: 'kg', comments: 'c' } as never);
+      expect(component.body().quantifications[0]).toBe(rows[0]);
+      expect(component.body().quantifications[1]).toMatchObject({ quantification_number: 5, unit: 'kg' });
+    });
+
+    it('buildPayload converts a string quantification number to a number', () => {
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        quantifications: [{ id: 3, quantification_number: '12' as unknown as number, unit: 'kg', description: '' }]
+      });
+      expect(component.buildPayload().quantifications[0].quantification_number).toBe(12);
+    });
+  });
+
+  describe('error message extraction', () => {
+    const toastDetail = () => actions.showToast.mock.calls.at(-1)?.[0].detail;
+
+    it('flattens an array of strings and objects into the load error toast', async () => {
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({
+        successfulRequest: false,
+        errorDetail: { errors: ['first', { field: 'x' }] }
+      });
+      await component.getData();
+      expect(toastDetail()).toBe('first {"field":"x"}');
+    });
+
+    it('accepts a plain string and serializes any other shape', async () => {
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: 'plain' } });
+      await component.getData();
+      expect(toastDetail()).toBe('plain');
+
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: { a: 1 } } });
+      await component.getData();
+      expect(toastDetail()).toBe('{"a":1}');
+    });
+
+    it('falls back to the description and then to the default message on save failure', async () => {
+      apiService.PATCH_InnovationUseDetails.mockResolvedValueOnce({ successfulRequest: false, description: 'Server said no' });
+      await component.saveData();
+      expect(toastDetail()).toBe('Server said no');
+
+      apiService.PATCH_InnovationUseDetails.mockResolvedValueOnce({ successfulRequest: false });
+      await component.saveData();
+      expect(toastDetail()).toBe('Unable to save data, please try again');
     });
   });
 });

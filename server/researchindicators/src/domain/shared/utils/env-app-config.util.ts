@@ -7,6 +7,7 @@ import {
   AppConfigSubcategory,
 } from '../../entities/app-config/enum/app-config-catergory.enum';
 import { CgiarLogger } from './cgiar-logs/logs.util';
+import { AppConfigKey } from '../../entities/app-config/enum/app-config-key.enum';
 
 @Injectable()
 export class EnvAppConfigUtil {
@@ -151,6 +152,31 @@ export class EnvAppConfigUtil {
     }
 
     return { value: config.simple_value === 'true', defaulted: false };
+  }
+
+  /**
+   * Whether the CGIAR Portfolio / pool-funding section is open (`POOL_FUNDING.SECTION.ENABLED`),
+   * i.e. the bilateral reporting period is running. Same reading as the client's
+   * `isFeatureFlagEnabled`: on unless the stored value is `false` (trimmed, any case). An absent
+   * row or a failed read counts as on (fail-open, as the client does), so a config problem never
+   * locks people out of a section the client shows them; a failed read is logged as a warning so
+   * the open is never silent. Read on every call: no cache, so a change in the admin panel takes
+   * effect on the next request.
+   */
+  async POOL_FUNDING_SECTION_ENABLED(): Promise<boolean> {
+    try {
+      const config = await this.tryGetConfig({
+        key: AppConfigKey.POOL_FUNDING_SECTION_ENABLED,
+      });
+      return config?.simple_value?.trim().toLowerCase() !== 'false';
+    } catch (error) {
+      this.logger.warn(
+        `Could not read ${AppConfigKey.POOL_FUNDING_SECTION_ENABLED}, treating the section as open: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return true;
+    }
   }
 
   /**

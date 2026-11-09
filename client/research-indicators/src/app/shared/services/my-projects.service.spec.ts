@@ -2211,18 +2211,18 @@ describe('MyProjectsService', () => {
       service.appliedFilters.set({ ...new MyProjectsFilters(), poolFundingOnly: true });
 
       const chips = service.getActiveFilters();
-      const poolChips = chips.filter(c => c.label === 'CONTRIBUTING TO POOL FUNDING');
+      const poolChips = chips.filter(c => c.label === 'CONTRIBUTING TO CGIAR PORTFOLIO');
       expect(poolChips).toHaveLength(1);
       expect(poolChips[0]).toEqual({
-        label: 'CONTRIBUTING TO POOL FUNDING',
-        value: 'Contributing to Pool Funding'
+        label: 'CONTRIBUTING TO CGIAR PORTFOLIO',
+        value: 'Contributing to CGIAR Portfolio'
       });
     });
 
-    it('removeFilter("CONTRIBUTING TO POOL FUNDING") resets poolFundingOnly to false', () => {
+    it('removeFilter("CONTRIBUTING TO CGIAR PORTFOLIO") resets poolFundingOnly to false', () => {
       service.tableFilters.set({ ...new MyProjectsFilters(), poolFundingOnly: true });
 
-      service.removeFilter('CONTRIBUTING TO POOL FUNDING');
+      service.removeFilter('CONTRIBUTING TO CGIAR PORTFOLIO');
 
       expect(service.tableFilters().poolFundingOnly).toBe(false);
     });

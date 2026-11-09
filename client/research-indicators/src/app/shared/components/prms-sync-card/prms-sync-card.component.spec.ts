@@ -73,7 +73,7 @@ function expectBox(host: HTMLElement, modifier: 'neutral' | 'approved' | 'reject
   }
 }
 
-function expectTag(host: HTMLElement, label: string, color: string, card: ComponentFixture<PrmsSyncCardComponent>): void {
+function expectTag(host: HTMLElement, label: string, color: string, card: ComponentFixture<PrmsSyncCardComponent>, border = color): void {
   const tag = host.querySelector('[data-testid="prms-sync-status"]');
   expect(tag?.tagName).toBe('APP-CUSTOM-TAG');
   const chip = tag?.querySelector('div') as HTMLElement;
@@ -82,7 +82,7 @@ function expectTag(host: HTMLElement, label: string, color: string, card: Compon
   const debug = card.debugElement.query(By.directive(CustomTagComponent));
   expect(debug.componentInstance.statusName).toBe(label);
   expect(debug.componentInstance.statusColor).toBe(color);
-  expect(debug.componentInstance.statusBorder).toBe(color);
+  expect(debug.componentInstance.statusBorder).toBe(border);
 }
 
 describe('PrmsSyncCardComponent', () => {
@@ -111,7 +111,7 @@ describe('PrmsSyncCardComponent', () => {
       expectDeletedChrome(host);
       expectBox(host, 'neutral');
       expect(text(host.querySelector('[data-testid="prms-sync-eyebrow"]') as HTMLElement)).toBe('PRMS sync #1');
-      expectTag(host, 'Pending Review', 'var(--ac-warning-1)', fixture);
+      expectTag(host, 'Pending Review', 'var(--ac-status-prms-pending)', fixture);
 
       const actor = host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement;
       expect(text(actor)).toBe(`by David Casañas · ${when}`);
@@ -154,7 +154,8 @@ describe('PrmsSyncCardComponent', () => {
     expectDeletedChrome(host);
     expectBox(host, 'approved');
     expect(text(host.querySelector('[data-testid="prms-sync-eyebrow"]') as HTMLElement)).toBe('PRMS sync #2');
-    expectTag(host, 'Approved', 'var(--ac-green-300)', fixture);
+    // Owner: PRMS Approved looks like the STAR Approved tag (sage text, lighter sage outline).
+    expectTag(host, 'Approved', 'var(--ac-status-prms-approved)', fixture, 'var(--ac-status-prms-approved-border)');
     const actor = host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement;
     expect(text(actor)).toContain('by Daniel Okoth ·');
     expect(actor.getAttribute('title')).toBe('Daniel Okoth');
@@ -169,7 +170,7 @@ describe('PrmsSyncCardComponent', () => {
 
     expectDeletedChrome(host);
     expectBox(host, 'rejected');
-    expectTag(host, 'Rejected', 'var(--ac-red-1)', fixture);
+    expectTag(host, 'Rejected', 'var(--ac-status-prms-rejected)', fixture);
     expect(text(host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement)).toContain('by Lucía Fernández ·');
   });
 
@@ -178,7 +179,7 @@ describe('PrmsSyncCardComponent', () => {
 
     expectDeletedChrome(host);
     expectBox(host, 'neutral');
-    expectTag(host, 'Pending Review', 'var(--ac-warning-1)', fixture);
+    expectTag(host, 'Pending Review', 'var(--ac-status-prms-pending)', fixture);
     expect(host.textContent).not.toContain('WEIRD');
   });
 
@@ -277,5 +278,26 @@ describe('PrmsSyncCardComponent', () => {
     fixture.componentInstance.viewHistory.subscribe(() => emitted.push(undefined));
     (host.querySelector('[data-testid="prms-sync-history-link"]') as HTMLAnchorElement).click();
     expect(emitted).toHaveLength(1);
+  });
+
+  it('falls back to a neutral Pending Review state with no actor when there are no events', () => {
+    render(history({ events: [] }));
+    const cmp = fixture.componentInstance;
+
+    expect(cmp.latest()).toBeNull();
+    expect(cmp.status()).toEqual({ label: 'Pending Review', tone: 'warning' });
+    expect(cmp.actor()).toBeNull();
+    expect(cmp.boxModifier()).toBe('neutral');
+  });
+
+  it('focuses the history link on focusHistoryLink()', () => {
+    const host = render(history());
+    const link = host.querySelector('[data-testid="prms-sync-history-link"]') as HTMLAnchorElement;
+    fixture.componentInstance.focusHistoryLink();
+    expect(document.activeElement).toBe(link);
+  });
+
+  it('focusHistoryLink() does not throw when the link is not rendered', () => {
+    expect(() => fixture.componentInstance.focusHistoryLink()).not.toThrow();
   });
 });

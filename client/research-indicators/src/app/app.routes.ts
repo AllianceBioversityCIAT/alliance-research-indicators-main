@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { piDelegatesGuard } from '@guards/pi-delegates.guard';
+import { pooledFundingMonitorGuard } from '@guards/pooled-funding-monitor.guard';
 import { rolesGuard } from '@guards/roles.guard';
 import { centerAdminGuard } from '@guards/center-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
@@ -226,6 +227,18 @@ export const routes: Routes = [
           isLoggedIn: true
         }
       },
+      {
+        path: 'cgiar-portfolio-contribution-monitor',
+        loadComponent: () =>
+          import('@pages/platform/pages/pooled-funding-monitor/pooled-funding-monitor.component').then(m => m.default),
+        canMatch: [rolesGuard, pooledFundingMonitorGuard],
+        data: {
+          title: 'CGIAR Portfolio Contribution Monitor',
+          isLoggedIn: true
+        }
+      },
+      // Old URL of the monitor (renamed from Pooled Funding): keeps bookmarks and shared links working.
+      { path: 'pooled-funding-contribution-monitor', redirectTo: 'cgiar-portfolio-contribution-monitor' },
       {
         path: 'about',
         loadComponent: () => import('@platform/pages/about/about.component'),
