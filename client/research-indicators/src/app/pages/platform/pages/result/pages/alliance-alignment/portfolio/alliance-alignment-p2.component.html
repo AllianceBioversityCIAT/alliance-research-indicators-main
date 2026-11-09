@@ -173,6 +173,23 @@
           [disabledSelectedScroll]="true" [filterBy]="'name,description'" serviceName="impactOutcomes"
           [serviceParams]="serviceParams" [enableVirtualScroll]="false" scrollHeight="205px"
           placeholder="Select the impact outcomes">
+          <!-- Same look as Strategic Objectives: bold name, then ": description" (full, even when long) -->
+          <ng-template #item let-outcome>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ outcome?.name }}</span>
+              @if (outcome?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ outcome.description }}</span>
+              }
+            </p>
+          </ng-template>
+          <ng-template #rows let-outcome>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ outcome?.name }}</span>
+              @if (outcome?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ outcome.description }}</span>
+              }
+            </p>
+          </ng-template>
         </app-multiselect>
         }
 
