@@ -500,7 +500,7 @@ export class ResultSidebarComponent {
       greenCheckKey: 'ip_rights'
     },
     {
-      label: 'Pool funding alignment',
+      label: 'CGIAR Portfolio Contribution',
       path: 'pool-funding-alignment',
       greenCheckKey: 'pool_funding_alignment',
       optional: true
