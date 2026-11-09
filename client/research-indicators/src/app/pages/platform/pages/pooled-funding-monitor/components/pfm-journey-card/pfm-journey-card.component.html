@@ -17,14 +17,16 @@
         </p>
       </div>
       <div
-        class="flex items-center gap-4 rounded-[10px] border border-solid border-[color:var(--ac-pfm-success-bg)] bg-[var(--ac-pfm-success-bg)]/40 px-4 py-3"
+        class="flex overflow-hidden rounded-[10px] border border-solid border-[color:var(--ac-pfm-surface-border)]"
         data-testid="pfm-journey-totals">
-        <div class="flex flex-col justify-center gap-1.5">
+        <!-- Each half in its own tint: green for what is finished, the action panel's amber for what is not -->
+        <div class="flex flex-col justify-center gap-1.5 bg-[var(--ac-pfm-success-bg)]/40 px-4 py-3" data-testid="pfm-journey-done-box">
           <p class="m-0 text-[24px] font-semibold leading-none tabular-nums text-[var(--ac-pfm-success-fg)]" data-testid="pfm-journey-done">{{ doneTotal() | number }}</p>
           <p class="m-0 text-[12px] font-medium leading-4 text-[var(--ac-pfm-success-fg)]">results finished</p>
         </div>
-        <span class="w-px self-stretch bg-[var(--ac-pfm-surface-border)]" aria-hidden="true"></span>
-        <div class="flex flex-col justify-center gap-1.5">
+        <div
+          class="flex flex-col justify-center gap-1.5 border-0 border-l border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-warning-bg)]/30 px-4 py-3"
+          data-testid="pfm-journey-action-box">
           <p class="m-0 text-[24px] font-semibold leading-none tabular-nums text-[var(--ac-pfm-warning-fg)]" data-testid="pfm-journey-action">{{ actionTotal() | number }}</p>
           <p class="m-0 text-[12px] font-medium leading-4 text-[var(--ac-pfm-warning-fg)]">still need an action</p>
         </div>
