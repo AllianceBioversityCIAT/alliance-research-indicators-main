@@ -16,3 +16,13 @@ export const formatPersonName = (name?: string | null): string => {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 };
+
+/**
+ * Formats a "LAST, FIRST" name (as Agresso stores the project lead) in reading order.
+ * Example: "VAN ETTEN, JACOB" -> "Jacob Van Etten". A name without a comma is only title-cased.
+ */
+export const formatLastFirstName = (name?: string | null): string => {
+  const [last, ...rest] = String(name ?? '').split(',');
+  const first = rest.join(' ');
+  return formatPersonName(first.trim() ? `${first} ${last}` : last);
+};
