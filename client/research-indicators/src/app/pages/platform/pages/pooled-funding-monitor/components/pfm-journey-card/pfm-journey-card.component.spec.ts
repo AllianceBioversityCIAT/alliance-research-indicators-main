@@ -43,6 +43,12 @@ describe('PfmJourneyCardComponent', () => {
     expect(all('pfm-journey-stage-value')).toEqual(['10', '100', '50', '35', '30']);
   });
 
+  it('each stage caption starts with a capital letter', () => {
+    const { el } = render();
+    const captions = Array.from(el.querySelectorAll('[data-testid^="pfm-journey-stage-"][role="tab"] > span:last-child')).map(e => e.textContent?.trim() ?? '');
+    expect(captions).toEqual(['Bilateral projects', 'Results reported in STAR', 'Approved results to classify', 'Contributing results to map', 'Mapped results to sync']);
+  });
+
   it('each stage splits its results and says what to do', () => {
     const cases: [number, string[], string[], string][] = [
       [0, ['Projects with results', 'Projects without results'], ['7', '3'], '3'],
