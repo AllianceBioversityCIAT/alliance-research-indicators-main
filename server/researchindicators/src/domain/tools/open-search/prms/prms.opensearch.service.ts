@@ -1747,7 +1747,7 @@ export class PrmsOpenSearchService
         contractsFromBilateralProjects && !resolveAsStarContractLever;
       const lever = skipAsStarLeverLookup
         ? null
-        : await this.clarisaLeversService.homologatedData(
+        : this.clarisaLeversService.homologatedData(
             primaryContract?.departmentId,
           );
       const clarisaLever =

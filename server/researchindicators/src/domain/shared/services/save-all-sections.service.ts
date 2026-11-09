@@ -133,21 +133,24 @@ export class SaveResultService {
         resultsToDelete: [],
         protectedFromDeletion: [],
       };
-      const duplicateValidation = extraData?.skipDuplicateValidation
-        ? noDuplicate
-        : extraData?.duplicateByTitle
-          ? await this.duplicateTitleValidation(
-              result.createResult.title,
-              findResult?.result_id,
-            )
-          : await this.duplicateResultValidation({
-              platformCode: extraData.platformCode,
-              publicLink: result.public_link,
-              indicatorId: result.createResult.indicator_id,
-              reportYearId: result.createResult.year,
-              // When updating an existing row, exclude it from the duplicate set.
-              excludeResultId: findResult?.result_id,
-            });
+      let duplicateValidation: DuplicateResultValidationResult;
+      if (extraData?.skipDuplicateValidation) {
+        duplicateValidation = noDuplicate;
+      } else if (extraData?.duplicateByTitle) {
+        duplicateValidation = await this.duplicateTitleValidation(
+          result.createResult.title,
+          findResult?.result_id,
+        );
+      } else {
+        duplicateValidation = await this.duplicateResultValidation({
+          platformCode: extraData.platformCode,
+          publicLink: result.public_link,
+          indicatorId: result.createResult.indicator_id,
+          reportYearId: result.createResult.year,
+          // When updating an existing row, exclude it from the duplicate set.
+          excludeResultId: findResult?.result_id,
+        });
+      }
 
       // Rule 1 & 2: skip creation/update when a higher-priority duplicate exists.
       if (duplicateValidation.shouldOmit) {

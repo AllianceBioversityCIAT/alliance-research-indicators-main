@@ -252,7 +252,7 @@ describe('PrmsOpenSearchService', () => {
           provide: ClarisaLeversService,
           useValue: {
             findOne: jest.fn().mockResolvedValue({ id: 88 }),
-            homologatedData: jest.fn().mockResolvedValue('LEVER'),
+            homologatedData: jest.fn().mockReturnValue('LEVER'),
             findByShortName: jest.fn().mockResolvedValue({ id: 77 }),
           },
         },
