@@ -182,6 +182,8 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
         sec_user_id: 1,
         roles: rolesHeader ? JSON.parse(rolesHeader as string) : [],
       };
+      // T-13: `JwtMiddleware` sets `req.credential`; the stub mirrors it.
+      req.credential = (req.headers['x-test-credential'] as string) ?? 'jwt';
       next();
     });
     await instance.init();
@@ -707,6 +709,91 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
         else expect([name, status]).toEqual([name, 403]);
       }
       expect(await snapshot()).toBe(before);
+    });
+  });
+
+  // T-13: a machine (app-secret) token carries its responsible user's roles,
+  // here CENTER_ADMIN + SYSTEM_ADMIN, the worst case. Guards run before pipes,
+  // so an empty body still reaches the guard.
+  describe('NFR-ORG-004 — no write reachable by machine tokens (T-13)', () => {
+    const machineAdmin = {
+      'x-test-roles': JSON.stringify([
+        SecRolesEnum.CENTER_ADMIN,
+        SecRolesEnum.SYSTEM_ADMIN,
+      ]),
+      'x-test-credential': 'machine',
+    };
+
+    it('B9-B13 answer 403 to a machine token whose user is an admin, and leave every row as it was', async () => {
+      const ids = [u57, deptA, root];
+      const ph = ids.map(() => '?').join(',');
+      const snapshot = async () =>
+        JSON.stringify([
+          await query(
+            `SELECT * FROM org_units WHERE id IN (${ph}) ORDER BY id`,
+            ids,
+          ),
+          await query(
+            `SELECT * FROM org_unit_versions WHERE org_unit_id IN (${ph}) ORDER BY id`,
+            ids,
+          ),
+          await query(
+            `SELECT COUNT(*) AS n FROM org_unit_change_log WHERE org_unit_id IN (${ph})`,
+            ids,
+          ),
+        ]);
+      const before = await snapshot();
+
+      const writes: Array<[string, string]> = [
+        ['post', '/units'],
+        ['patch', `/units/${u57}`],
+        ['post', `/units/${u57}/inactivate`],
+        ['post', `/units/${u57}/reactivate`],
+        ['delete', `/units/${u57}?fromYear=2027`],
+      ];
+      const outcomes: Array<[string, number, string]> = [];
+      for (const [method, path] of writes) {
+        const res = await (http() as any)
+          [method](path)
+          .set(machineAdmin)
+          .send({});
+        outcomes.push([
+          `${method.toUpperCase()} ${path}`,
+          res.status,
+          res.body?.message,
+        ]);
+      }
+
+      expect(outcomes).toEqual(
+        writes.map(([method, path]) => [
+          `${method.toUpperCase()} ${path}`,
+          403,
+          'This action requires a signed-in user; machine credentials are not allowed.',
+        ]),
+      );
+      expect(await snapshot()).toBe(before);
+    });
+
+    it('reads stay open to the same machine token: B5 and C1-C3 answer 200', async () => {
+      const reads = [
+        `/units/${u57}`,
+        `/resolve?ids=${u57}&year=2026`,
+        `/units/${u57}/ancestors?year=2026`,
+        `/units/${u57}/successors`,
+      ];
+      for (const path of reads) {
+        const res = await http().get(path).set(machineAdmin);
+        expect([path, res.status]).toEqual([path, 200]);
+      }
+    });
+
+    it('the same admin with a JWT is not stopped by the guard (control)', async () => {
+      const res = await http()
+        .patch(`/units/${u57}`)
+        .set({ ...machineAdmin, 'x-test-credential': 'jwt' })
+        .send({ portfolioId: 1 });
+      // Past the guard, the pipe refuses `portfolioId` (R-ORG-001): 400, never a write.
+      expect(res.status).toBe(400);
     });
   });
 

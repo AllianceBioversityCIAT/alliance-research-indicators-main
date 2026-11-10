@@ -1,10 +1,15 @@
 import { HttpStatus, RequestMethod } from '@nestjs/common';
-import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import {
+  GUARDS_METADATA,
+  METHOD_METADATA,
+  PATH_METADATA,
+} from '@nestjs/common/constants';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { OrganizationalStructureController } from './organizational-structure.controller';
 import { OrgStructureReadService } from './org-structure-read.service';
 import { OrgStructureService } from './organizational-structure.service';
 import { ROLES_KEY } from '../../shared/guards/roles.guard';
+import { HumanCredentialGuard } from '../../shared/guards/human-credential.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9, B10; T-03: B6, B7, B11, B12, B13; T-04: B8, C1, C2, C3)', () => {
@@ -106,6 +111,53 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
         expect(roles).not.toContain(SecRolesEnum.TECHNICAL_SUPPORT);
         expect(roles).not.toContain(SecRolesEnum.CONTRIBUTOR);
       }
+    });
+  });
+
+  // T-13 (NFR-ORG-004, "no write reachable by machine tokens"): a machine token
+  // carries its responsible user's roles, so RolesGuard cannot refuse it. Write
+  // handlers are DISCOVERED by HTTP method, so a new write without the guard
+  // fails here by name.
+  describe('machine credentials (NFR-ORG-004, T-13)', () => {
+    const httpMethod = (name: string): RequestMethod =>
+      Reflect.getMetadata(METHOD_METADATA, proto[name]);
+    const writeHandlerNames = handlerNames.filter(
+      (name) => httpMethod(name) !== RequestMethod.GET,
+    );
+    const readHandlerNames = handlerNames.filter(
+      (name) => httpMethod(name) === RequestMethod.GET,
+    );
+    const handlerGuards = (name: string): unknown[] =>
+      Reflect.getMetadata(GUARDS_METADATA, proto[name]) ?? [];
+
+    it('discovers exactly the five writes B9-B13', () => {
+      expect(writeHandlerNames).toEqual([
+        'createUnit',
+        'updateUnit',
+        'inactivateUnit',
+        'reactivateUnit',
+        'deleteUnit',
+      ]);
+    });
+
+    it.each(writeHandlerNames)(
+      '%s declares HumanCredentialGuard',
+      (handlerName) => {
+        expect(handlerGuards(handlerName)).toContain(HumanCredentialGuard);
+      },
+    );
+
+    it.each(readHandlerNames)(
+      '%s (read) does not declare it, so consumer integrations keep C1-C3',
+      (handlerName) => {
+        expect(handlerGuards(handlerName)).not.toContain(HumanCredentialGuard);
+      },
+    );
+
+    it('is not declared at class level (that would close the reads too)', () => {
+      expect(
+        Reflect.getMetadata(GUARDS_METADATA, OrganizationalStructureController),
+      ).not.toContain(HumanCredentialGuard);
     });
   });
 

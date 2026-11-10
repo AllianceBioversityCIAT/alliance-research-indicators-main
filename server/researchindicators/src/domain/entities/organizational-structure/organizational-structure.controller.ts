@@ -41,6 +41,7 @@ import { ChangeLogQueryDto } from './dto/change-log-query.dto';
 import { ResolveQueryDto } from './dto/resolve-query.dto';
 import { AncestorsQueryDto } from './dto/ancestors-query.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
+import { HumanCredentialGuard } from '../../shared/guards/human-credential.guard';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { Roles } from '../../shared/decorators/roles.decorator';
@@ -60,6 +61,9 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 // authenticated user, R-ORG-012; `JwtMiddleware` still rejects anonymous calls).
 // There is NO write route under `change-log` (R-ORG-009 AC.2). No portfolio parameter
 // anywhere (R-ORG-001 AC.1); a write body that sends `portfolioId` is a 400.
+// T-13 (NFR-ORG-004): the writes B9-B13 also carry `HumanCredentialGuard`, so a
+// machine (app-secret) token is a 403 even when its responsible user is an
+// admin. Reads, C1-C3 included, stay open to machine tokens on purpose.
 @Controller()
 @ApiTags('Organizational Structure')
 @ApiBearerAuth()
@@ -404,6 +408,7 @@ export class OrganizationalStructureController {
     },
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UseGuards(HumanCredentialGuard)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -450,6 +455,7 @@ export class OrganizationalStructureController {
     },
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UseGuards(HumanCredentialGuard)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -489,6 +495,7 @@ export class OrganizationalStructureController {
       'data = the B5 shape (entry and its versions, each with its delegates)',
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UseGuards(HumanCredentialGuard)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -528,6 +535,7 @@ export class OrganizationalStructureController {
       'data = the B5 shape (entry and its versions, each with its delegates)',
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UseGuards(HumanCredentialGuard)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -579,6 +587,7 @@ export class OrganizationalStructureController {
       "data = { id, mode, fromYear }: mode is 'physical' or 'logical'; fromYear is the end year actually applied (null for a physical delete; the existing end year for an already-inactive entry)",
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UseGuards(HumanCredentialGuard)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
