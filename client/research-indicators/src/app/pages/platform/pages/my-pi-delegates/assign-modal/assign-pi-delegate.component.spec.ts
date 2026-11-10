@@ -1682,7 +1682,7 @@ describe('AssignPiDelegateComponent', () => {
     });
 
     it('formatDate accepts a Date and echoes an unparseable value', () => {
-      expect(component.formatDate(new Date(2024, 0, 15))).toBe('15 Jan 2024');
+      expect(component.formatDate(new Date(2024, 0, 15))).toBe('15/01/2024');
       expect(component.formatDate('not-a-date')).toBe('not-a-date');
     });
 

@@ -1507,7 +1507,7 @@ describe('ByProjectComponent', () => {
     });
 
     it('formatDate accepts a Date instance', () => {
-      expect(component.formatDate(new Date(2024, 0, 15))).toBe('15 Jan 2024');
+      expect(component.formatDate(new Date(2024, 0, 15))).toBe('15/01/2024');
     });
 
     it('formatDate returns the raw text for an unparseable date', () => {

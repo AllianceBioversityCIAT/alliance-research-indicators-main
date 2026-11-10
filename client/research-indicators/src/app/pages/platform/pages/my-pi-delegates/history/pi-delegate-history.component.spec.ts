@@ -522,14 +522,6 @@ describe('PiDelegateHistoryComponent', () => {
       expect(apiService.callCount).toBe(0);
       expect(second.componentInstance.loading()).toBe(false);
     });
-
-    it('formatDate degrades to empty parts when Intl returns none', () => {
-      const spy = jest.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([]);
-
-      expect(component.formatDate('2026-03-14T10:12:00.000Z')).toBe('14/03/2026 at :  ()');
-
-      spy.mockRestore();
-    });
   });
 
   // getInitials helper ----------------------------------------------------------

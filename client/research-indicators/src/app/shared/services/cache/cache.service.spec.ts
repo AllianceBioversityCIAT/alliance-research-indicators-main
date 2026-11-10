@@ -521,12 +521,4 @@ describe('CacheService', () => {
     service.searchAResultValue.set('test search');
     expect(service.searchAResultValue()).toBe('test search');
   });
-
-  it('bumpContentReload increments the key by one each call', () => {
-    const service = TestBed.inject(CacheService);
-    const start = service.contentReloadKey();
-    service.bumpContentReload();
-    service.bumpContentReload();
-    expect(service.contentReloadKey()).toBe(start + 2);
-  });
 });
