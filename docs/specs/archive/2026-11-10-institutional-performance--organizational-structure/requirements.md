@@ -5,7 +5,7 @@
 - **Status:** approved 2026-10-16 (requester; Phase 1 accepted at the resumed design gate) · **Pivot amendment 2026-10-22 (delegates versioned — R-ORG-017, R-ORG-010) approved by the requester 2026-10-22**
 - **Depth:** **Full** — new module with temporal (per-year) data, an append-only log, cross-module contracts (control lists in, future consumers out), migrations + seed. A wrong year resolution corrupts every later report silently
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
-- **Parent spec:** [`../family.md`](../family.md) — child 2 of 5. Shared rules **F-1, F-3 … F-9** apply and are cited, not restated. **F-2 does not apply** (family exception, 2026-10-08)
+- **Parent spec:** [`../family.md`](../../institutional-performance/family.md) — child 2 of 5. Shared rules **F-1, F-3 … F-9** apply and are cited, not restated. **F-2 does not apply** (family exception, 2026-10-08)
 - **Depends on:** `institutional-performance/control-lists` — `done`, archived at [`../../archive/2026-10-08-institutional-performance--control-lists/`](../../archive/2026-10-08-institutional-performance--control-lists/) · `changes/control-lists-global-scope` — `done`, archived at [`../../archive/2026-10-15-changes--control-lists-global-scope/`](../../archive/2026-10-15-changes--control-lists-global-scope/) (its RB-3 follow-up is applied here)
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — Center Admin tools
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
@@ -614,7 +614,7 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 | **Type/compile errors hidden by the runner** | `npm run build` (server), `ng build` (client) |
 | **Sidebar regression** | Existing `alliance-sidebar` suite + new assertion on order |
 | **Tree rendering, expand/collapse, column resize** (rendered geometry) | **No automated check in jsdom.** Substitute: manual check in a real browser at the HITL pause |
-| **Visual fidelity to the mockup** | **No automated check.** Substitute: human side-by-side review against `../mockup/OrgStructure.dc.html` at the HITL pause, accounting for the drift listed in the proposal §8 |
+| **Visual fidelity to the mockup** | **No automated check.** Substitute: human side-by-side review against `../../institutional-performance/mockup/OrgStructure.dc.html` at the HITL pause, accounting for the drift listed in the proposal §8 |
 | **Seed content matches the source sheet** (names, parents) | **No automated check against the sheet.** Substitute: requester review of the seeded tree at the HITL pause. Accepted risk otherwise; all seeded values are editable |
 
 ## 11. Assumptions, dependencies, risks

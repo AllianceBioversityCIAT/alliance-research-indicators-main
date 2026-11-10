@@ -90,7 +90,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 
 ## 8. Visual Reference
 - **Source:** generated mockup (claude.ai Design canvas), working prototype.
-- **Location:** https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP — artboard **2 · Organizational Structure** (`../mockup/OrgStructure.dc.html`). A sticky note on the canvas walks through a move.
+- **Location:** https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP — artboard **2 · Organizational Structure** (`../../institutional-performance/mockup/OrgStructure.dc.html`). A sticky note on the canvas walks through a move.
 - **Drift to fix during `/akili-specify`:** the mockup still shows a portfolio selector, the *Only KPI-managing entries* filter, a date-based as-of picker and an effective date in the form. This revision replaces them with no portfolio selector, no KPI filter, a year selector and *Applies from year*.
 
 ## 9. Requirement Delta Preview

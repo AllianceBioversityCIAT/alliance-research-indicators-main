@@ -2,11 +2,11 @@
 
 - **Module:** institutional-performance — server `domain/entities/organizational-structure/` + client Center admin page
 - **Spec id:** 2026-10-organizational-structure
-- **Status:** in-progress (T-01 started 2026-10-16)
+- **Status:** done (2026-11-10; T-01…T-15 done, validation 0 FAIL / 0 WARN; archived by `/akili-archive`). Started 2026-10-16.
 - **Owner:** Hector F. Tobón (requester); implementers assigned by `/akili-execute`
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked design:** [`./design.md`](design.md) — approved 2026-10-16 after the RB-3 update
-- **Parent spec:** [`../family.md`](../family.md) — child 2 of 5
+- **Parent spec:** [`../family.md`](../../institutional-performance/family.md) — child 2 of 5
 - **Branch:** `institutional-kpis`
 - **Jira:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258) — sub-tasks `<TO CONFIRM>`
 - **Last updated:** 2026-10-22 — **Pivot** (delegates versioned per year — D-ORG-24 supersedes D-ORG-15): new task **T-12** (todo, awaiting requester approval); T-06 paused until T-12; closed tasks' delegate clauses annotated as history; §1, §3, §4 (RB-7), §5 amended. Previous: 2026-10-16 (delegates added — R-ORG-017, D-ORG-15)
@@ -323,7 +323,7 @@ Every task depends on the one before it. They share the module's service, contro
   - R-ORG-015 — *Seed runs twice* (no entry, version or log row added); AC.1 counts; fixed ids; one version `[2026, open)` per entry; DT = Technology Integration; the three parentless units placed under the parent they appear with; director matching (email, else exact first + last name; no single match → empty) and the seed report; one `seed` log row per entry.
   - NFR-ORG-001 — year view of ≤ 500 entries p95 ≤ 300 ms; `resolve` of 100 ids ≤ 100 ms.
 - **Design refs:** §3.4, D-ORG-12, D-ORG-14, P-11
-- **First step (P-11):** list the mockup `TREE` (`../mockup/OrgStructure.dc.html:417` onward) per group, with the count per level. Send the requester the list and the 94 / 95 discrepancy, and record their answer in `execution.md` before writing the seed. The AC.1 counts are then the confirmed ones; "117" in requirements AC.1 is corrected if they differ (with a Correction Closure sweep).
+- **First step (P-11):** list the mockup `TREE` (`../../institutional-performance/mockup/OrgStructure.dc.html:417` onward) per group, with the count per level. Send the requester the list and the 94 / 95 discrepancy, and record their answer in `execution.md` before writing the seed. The AC.1 counts are then the confirmed ones; "117" in requirements AC.1 is corrected if they differ (with a Correction Closure sweep).
 - **Scope — database:** `src/db/seeds/org-structure.seed.ts` (data + insert functions returning `affectedRows`; no delegate rows; `INSERT … SELECT … WHERE NOT EXISTS` on fixed ids; `AUTO_INCREMENT` above N; director lookup by email, then by exact name; unmatched names logged with `LoggerUtil`). `src/db/migrations/1791000000004-seedOrgStructure.ts` imports it and exports only its class (D-ORG-14). Then `npm run migration:test:execute`.
 - **Scope — tests:** `test/org-structure-seed.integration-spec.ts`.
 - **Tests:**
@@ -366,7 +366,7 @@ Every task depends on the one before it. They share the module's service, contro
   2. Tree: expand and collapse with the mouse and with the arrow keys; indent per level; badges (*scheduled*, *inactive*, *deleted*, *Inactive staff*).
   3. Table: resize a column, sort, page through 10 / 25 / 50 / 100 rows, export 2026 and open the file.
   4. Create, move from next year, back-date (warning seen before *Save*), add and remove delegates from a year (director not offered; *Applies from year* asked; the previous year still shows its own delegates — D-ORG-24, T-12), inactivate with successor, delete; check History after each.
-  5. Compare side by side with `../mockup/OrgStructure.dc.html`; list differences as accepted or as rework. The *Delegates* field and table column were added to the mockup on 2026-10-16 (artifact version 25); compare them too.
+  5. Compare side by side with `../../institutional-performance/mockup/OrgStructure.dc.html`; list differences as accepted or as rework. The *Delegates* field and table column were added to the mockup on 2026-10-16 (artifact version 25); compare them too.
   6. Review the seeded tree against sheet *04. ORG structure*, and fill in the directors from the seed report.
 - **Falsifier:** n/a (human check). The requester's quoted words are what discharge each criterion (KZ-002).
 - **Disqualifier:** a check done with a System Admin user instead of a Center-Admin-only user; a criterion ticked on an observation that covers an adjacent property.
@@ -725,10 +725,10 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 
 ## 5. Done definition
 
-- [ ] T-01…T-12 are `done`, each with its Reviewer PASS in `execution.md` (T-06: the requester's quoted words); T-12 before T-06 resumes.
-- [ ] T-06 ran **before** `/akili-validate` (KZ-007).
-- [ ] Every row of §3 is closed by the owning task's evidence.
-- [ ] Server coverage ≥ 60 % and client floors still green.
-- [ ] Swagger documents B1–B13 and C1–C3.
-- [ ] RB-1…RB-3 and RB-7 closed; RB-4 filed or explicitly deferred.
-- [ ] Rollout note: merge order, migrations applied on `dev` deploy, backout = revert code, then `down` `…005` → `…000` while no consumer stores unit ids (`…005`'s `down` refuses while delegate rows exist — design §3.3).
+- [x] T-01…T-12 are `done`, each with its Reviewer PASS in `execution.md` (T-06: the requester's quoted words); T-12 before T-06 resumes. *(T-13…T-15 too. T-06 closed on a blanket statement; validation re-asked each criterion and quoted the per-item answers, execution.md 2026-11-10.)*
+- [x] T-06 ran **before** `/akili-validate` (KZ-007).
+- [x] Every row of §3 is closed by the owning task's evidence. *(After validation: NFR-ORG-004's machine-token clause was closed by ID only and was given T-13; R-ORG-015 directors and delegates went to T-14. validation-report.md: 0 FAIL · 31 PASS · 0 WARN.)*
+- [x] Server coverage ≥ 60 % and client floors still green. *(Server 90.76 % statements; client 96.98 / 92.42 / 95.87 / 97.47; validation-report.md §5.)*
+- [x] Swagger documents B1–B13 and C1–C3. *(Plus the 403 on B9–B13, T-15.)*
+- [ ] RB-1…RB-3 and RB-7 closed; RB-4 filed or explicitly deferred. *(RB-1, RB-2 and RB-7 are closed and RB-4 is deferred by the requester ("difierelo"). **RB-3 stays open by the requester's decision**: "no hagas paso a dev, seguimos trabajando en local". The merge to `dev` is a later, human-approved step. Accepted follow-up, archive-summary.md §9.)*
+- [x] Rollout note: merge order, migrations applied on `dev` deploy, backout = revert code, then `down` `…005` → `…000` while no consumer stores unit ids (`…005`'s `down` refuses while delegate rows exist — design §3.3). *(Written in archive-summary.md §10; the backout now starts at `…006`.)*
