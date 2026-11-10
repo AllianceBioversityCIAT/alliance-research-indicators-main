@@ -11,7 +11,7 @@
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
 - **Proposal:** [`proposal.md`](proposal.md) — approved 2026-10-08 with Q-1…Q-4 as recommended; this spec stays aligned with it
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-10-22 — **Pivot** (execution.md → *Pivot Record: delegates versioned per year*, requester 2026-10-22): delegates become a versioned field of each version, like the director (R-ORG-017 rewritten, D-ORG-24 supersedes D-ORG-15); `resolve` returns the delegates of the requested year (R-ORG-010); R-ORG-004 versioned-field list, R-ORG-009, R-ORG-013 form, R-ORG-014 column, glossary, §7 data, §10 and §11 rows amended; new task T-12. Previous: 2026-10-16 — requester: delegates per entry from Agresso staff, one current list, not versioned (R-ORG-017; superseded 2026-10-22). Also 2026-10-16 — RB-3 of `changes/control-lists-global-scope`: `org.level` is global and read by key (C-3, C-4, R-ORG-011, §11). Previous: 2026-10-08 (requester: director linked to the Agresso staff table — R-ORG-016)
+- **Last updated:** 2026-11-09 — `/akili-validate` amendments (validation-report.md R-2): R-ORG-004 *Applies from year* default (D-ORG-23), R-ORG-006 selectable years (D-ORG-20), R-ORG-015 directors and delegates (D-ORG-26). Earlier: 2026-10-22 — **Pivot** (execution.md → *Pivot Record: delegates versioned per year*, requester 2026-10-22): delegates become a versioned field of each version, like the director (R-ORG-017 rewritten, D-ORG-24 supersedes D-ORG-15); `resolve` returns the delegates of the requested year (R-ORG-010); R-ORG-004 versioned-field list, R-ORG-009, R-ORG-013 form, R-ORG-014 column, glossary, §7 data, §10 and §11 rows amended; new task T-12. Previous: 2026-10-16 — requester: delegates per entry from Agresso staff, one current list, not versioned (R-ORG-017; superseded 2026-10-22). Also 2026-10-16 — RB-3 of `changes/control-lists-global-scope`: `org.level` is global and read by key (C-3, C-4, R-ORG-011, §11). Previous: 2026-10-08 (requester: director linked to the Agresso staff table — R-ORG-016)
 
 ---
 
@@ -166,7 +166,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 **Details**
 - An entry has **at most one version per year**. Versions are contiguous: an entry has no gap between its first year and its end year, **except an inactive period**: a reactivation from a year later than the year the entry ended (R-ORG-007) leaves the years in between with no version, and the entry is absent from those year views (requester, 2026-10-19 — D-ORG-17).
 - **A version is created only when that entry changes.** If nothing changes for several years, the entry keeps one open-ended version. Other entries are never touched by a change to one entry.
-- Every save carries **Applies from year** (default: the current year). Let *Y* be that year:
+- Every save carries **Applies from year** (default: the *Structure year* selected at the top of the page when it is the current year or later; for a past Structure year, the current year — D-ORG-23, amended 2026-11-09). Let *Y* be that year:
   - a version of the entry **starts in *Y*** → that version is updated in place (this is how typos are fixed);
   - otherwise the version that covers *Y* is **split at *Y***: the old values keep `[start, Y)` and the new values get `[Y, old end)`;
   - **later versions:** each changed field is also changed in every later version **only where that later version still holds the value being replaced**. A value changed on purpose in a later version is kept.
@@ -239,7 +239,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - Inputs: a year (default: the current year).
 - Behavior: returns every entry that has a version covering that year, with that version's values, including entries that were **inactivated or deleted in a later year**. Entries not yet created, or already ended, in that year are excluded unless *Show inactive / deleted* is on; with it on they appear with their status and the year it took effect.
 - Entries with a version that starts after the viewed year are badged *Change scheduled in <year>*.
-- Selectable years: from the earliest version year to the latest year that has a version start, at least the current year.
+- Selectable years: from the earliest version year to the latest year that has a version start, and always at least the current year **and the next one** (D-ORG-20, amended 2026-11-09).
 
 #### Scenario: Deleted later, visible before
 - GIVEN unit `ORG-090` was deleted from 2027
@@ -453,8 +453,8 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 **Details**
 - 3 divisions · 19 departments/regions · 1 office · 94 units from Master Monitoring Framework sheet *04. ORG structure*; DT = Technology Integration; the three units with no parent in the sheet are placed under the parent they appear with. Every entry has one version `[2026, open)`. Seeded entries carry fixed IDs, so they are the same in every environment.
-- Directors are matched to `alliance_user_staff` by email, else by exact first + last name. With no single match the director stays empty and the entry is listed in a seed report for the requester to complete.
-- No delegates are seeded; the requester adds them after review.
+- Directors come from the requester's sheet *ORGANIZATIONAL STRUCTURE - Alliance Bioversity-CIAT* (Organizational-Structure-June-2026, received 2026-10-28): the *Department director* of each department/region and the *Unit director* of each unit — **83** in all; divisions and the office have none (amended 2026-11-09, D-ORG-26; the tree itself still comes from sheet *04*). They are matched to `alliance_user_staff` by email, else by exact first + last name, active staff only. With no single match the director stays empty and the entry is listed in a seed report for the requester to complete.
+- Two cells of the sheet name two people. Requester decision 2026-11-09: **Climate Readiness** → Deissy Martinez Baron is the director; **Biodiversity and Restoration for Livelihoods and Resilience** → Louis Verchot stays director and **Christopher Kettle is seeded as its delegate** (on the `[2026, open)` version, migration `…006`). No other delegates are seeded; the requester adds them after review.
 - The seed is idempotent and logged as one *seed* entry per entry in the change log.
 - The module also works with no entries (R-ORG-013 *Empty module*).
 

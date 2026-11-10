@@ -84,7 +84,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 ## 7. Affected Users, Systems, And Specs
 | Area | Impact |
 | --- | --- |
-| Server | `org_units` (permanent id, code, status, status_from_year, successor_id; **no portfolio_id**), `org_unit_versions` (unit id, valid_from_year, valid_to_year, name, acronym, level value id, parent unit id, director staff id → `alliance_user_staff.carnet`; unique `(unit_id, valid_from_year)`), `org_unit_change_log` (append-only); read service with `year`; roll-up helper; `.xlsx` export; migrations + seed. The per-portfolio KPI flag moves to `institutional-indicators` |
+| Server | *(Amended later: delegates added a 4th table, `org_unit_delegates` — requirements R-ORG-017, design §3.1.)* `org_units` (permanent id, code, status, status_from_year, successor_id; **no portfolio_id**), `org_unit_versions` (unit id, valid_from_year, valid_to_year, name, acronym, level value id, parent unit id, director staff id → `alliance_user_staff.carnet`; unique `(unit_id, valid_from_year)`), `org_unit_change_log` (append-only); read service with `year`; roll-up helper; `.xlsx` export; migrations + seed. The per-portfolio KPI flag moves to `institutional-indicators` |
 | Client | new page with tree/table, year selector, versioned form with *Applies from year*, change-log history and dialogs; no portfolio selector |
 | Specs | `control-lists` (levels, Q-1), `strategy-framework` (portfolio-scoped elements refer to owner units by permanent ID), `institutional-indicators` (owns the KPI-managing flag), the future mapping module |
 

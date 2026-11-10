@@ -69,7 +69,7 @@ Every task depends on the one before it. They share the module's service, contro
   - R-ORG-016 — read half of AC.1 (B1 returns director name and email joined from staff; `isActiveStaff` drives the *Inactive staff* mark).
   - R-ORG-017 — read half: AC.1 (B1/B5 return current delegates joined from staff); *Delegates shown in a past year* first clause (a past year view shows the **current** list, labelled *current*) on fixture rows; table *Delegates* column and its export. *(History — the "current list in every year" rule is superseded by D-ORG-24 (2026-10-22); re-proved per year by T-12.)*
   - NFR-ORG-002 (index half), NFR-ORG-004 (B1, B2, B5), NFR-ORG-005 (tree keyboard, `aria-label`, `aria-sort`), NFR-ORG-006 (B1, B2, B5).
-- **Design refs:** §2.1 (module, controller, read service, constants, entities, repositories; client page, `org-tree`, `org-tree.util`, interface, sidebar, route), §3.1, §3.3 (`…000–…002`), §4 B1, B2, B5, §5.1, §5.7, §6.1–6.4, §6.8, §8, D-ORG-1, 5, 6, 7, P-6, P-8, P-12
+- **Design refs:** §2.1 (module, controller, read service, constants, entities, repositories; client page, `org-tree`, `org-tree.util`, interface, sidebar, route), §3.1, §3.3 (`…000–…003`), §4 B1, B2, B5, §5.1, §5.7, §6.1–6.4, §6.8, §8, D-ORG-1, 5, 6, 7, P-6, P-8, P-12
 - **Scope — database:** `src/db/migrations/1791000000000-createOrgUnits.ts`, `…001-createOrgUnitVersions.ts`, `…002-createOrgUnitChangeLog.ts`, `…003-createOrgUnitDelegates.ts`, with tables, FKs, indexes and collation exactly as design §3.1. This includes `level_value_id` → `control_list_values.id` RESTRICT, `director_carnet` → `alliance_user_staff.carnet` RESTRICT and `org_unit_delegates.staff_carnet` → `alliance_user_staff.carnet` RESTRICT, with `uq_org_unit_delegates_unit_staff` *(re-keyed to the version by `…005` in T-12, D-ORG-24; `…003` itself stays as written)*. No FK on the log. Each file exports only its class. Then `npm run migration:test:execute` on the local DB.
 - **Scope — server:** entities, repositories, `org-structure.constants.ts`, clock provider, `OrgStructureReadService` (singleton: `getYearView`, year range), controller with B1, B2, B5 (class-level `RolesGuard`, `SetUpInterceptor`, Swagger; literal routes before `:id`), module registered in `entities.module.ts` and `main.routes.ts` at `organizational-structure`. The read service imports nothing request-scoped.
 - **Scope — screen:** page shell (header, *Structure year* `p-select` from B2, *Tree / Table* toggle, *Show inactive / deleted*, count chips, split layout with an empty right panel, *+ New entry* button wired to an empty form placeholder), `org-tree` on `p-treeTable`, `org-tree.util`, `DataTable` view with the R-ORG-014 columns and file name `organizational-structure_<year>.xlsx`, interface file, `ApiService` methods for B1, B2, B5, sidebar item, lazy route with `canMatch: [centerAdminGuard]`.
@@ -565,6 +565,41 @@ Every task depends on the one before it. They share the module's service, contro
   - [x] Every consumer test listed above rewritten (not deleted) and listed in `execution.md` with old → new assertion.
   - [x] B1, B5, B6, B10, C1 Swagger texts updated and seen in `/swagger`, observation quoted. *(the live `/swagger-json` of the requester's running server — the JSON document, not the rendered page)*
 
+
+---
+
+### T-13 — Validation fix: no write reachable by machine tokens
+
+- **Status:** done (2026-11-09, Reviewer PASS on round 1 — execution.md; found by `/akili-validate` as the only FAIL — `validation-report.md` §6; requester: "haz la correccion") · **Size:** XS · **Dependencies:** T-12 · **Added:** 2026-11-09
+- **Requirements covered:** NFR-ORG-004, clause "no write reachable by machine tokens". No task owned it; `tasks.md` §3 had closed the NFR by ID only.
+- **Design refs:** §8 (premise corrected 2026-11-09)
+- **Scope:** new shared `HumanCredentialGuard` (403 when `req.credential === 'machine'`) with its own spec; `@UseGuards(HumanCredentialGuard)` on B9–B13 only (not at class level, so reads and C1–C3 stay open to integrations); controller spec discovers the writes by HTTP method; `org-structure-consumers` integration: the stub middleware mirrors `req.credential`, and a new block proves B9–B13 → 403 with rows unchanged for a machine token whose user is CENTER_ADMIN + SYSTEM_ADMIN, B5 + C1–C3 → 200 for the same token, and a JWT control past the guard.
+- **Falsifier:** remove the guard from one write and see the integration test turn red (seen: B9 → `400` instead of `403`).
+- **Disqualifier:** a test that sets the guard's input directly without going through the controller's guard chain; a check that could not tell a 403 from `RolesGuard` from a 403 from this guard (the integration test asserts the guard's own message).
+- **Done criteria:**
+  - [x] Unit specs red first (5 writes without the guard), then green.
+  - [x] Integration falsifier seen red, guard restored, green.
+  - [x] `tsc`, `npx eslint` on the changed files, server unit suite and `test:integration "org-structure|control-lists"` quoted.
+  - [x] Independent Reviewer PASS (author ≠ auditor).
+
+
+---
+
+### T-14 — Seed directors and delegates from the June 2026 sheet
+
+- **Status:** done (2026-11-10, Reviewer PASS on round 1 — execution.md; `…006` verified by a CLI revert + run, K-006) · **Size:** S · **Dependencies:** T-05, T-12 · **Added:** 2026-11-09 to own the seed edits made after T-05 (validation-report.md R-4)
+- **Requirements covered:** R-ORG-015 directors and delegates (amended 2026-11-09, D-ORG-26).
+- **Design refs:** §3.3 (`…006`), §3.4
+- **Scope:** `org-structure.seed.ts` (data of `…004`): 83 directors from the requester's sheet (2026-10-28); ORG-047 `j.vanoosten@cgiar.org` (2026-11-06); Climate Readiness → Deissy Martinez Baron, and `SEED_DELEGATES` + `seedOrgDelegates` / `removeOrgDelegatesSeed` for Christopher Kettle on ORG-032 (2026-11-09). New migration `1791000000006-seedOrgDelegates.ts` (exports only its class). `org-structure-seed` integration: director and delegate checks with literals written in the test, idempotent re-run, I-6, a down/up round trip inside a rolled-back transaction, migration file shape.
+- **Falsifier:** the new checks run before the local re-seed are red (Deissy: `e.girvetz` received; no delegate on ORG-032).
+- **Disqualifier:** expected people read back from the seed module (circular); a delegate seeded in `…004` (it would make `…005` refuse on a fresh database).
+- **Requester acceptance:** "Ya veo bien la informacion de los cambios del Seed" (2026-11-09) for the 2026-10-28 and 2026-11-06 edits.
+- **Done criteria:**
+  - [x] New checks seen red before the re-seed, green after.
+  - [x] Local re-seed (`…004` down/up) and `migration:dev:execute` (`…006`) output quoted.
+  - [x] `tsc`, `npx eslint` on the changed files, `test:integration "org-structure|control-lists"` and server unit suite quoted.
+  - [x] Independent Reviewer PASS (author ≠ auditor).
+
 ---
 
 ## 3. Coverage closure (scenario and clause level)
@@ -634,6 +669,8 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | NFR-ORG-002 | index · invariant | T-01 · T-02 |
 | NFR-ORG-003 | append-only log | T-03 |
 | NFR-ORG-004 | roles per handler | T-01…T-04 |
+| R-ORG-015 | directors (83, June 2026 sheet) and seeded delegates (amended 2026-11-09) | **T-14** (T-05 owned the 11 mockup directors) |
+| NFR-ORG-004 | "no write reachable by machine tokens" | **T-13** (was closed by ID only — found by `/akili-validate` 2026-11-09) |
 | NFR-ORG-005 | keyboard / aria (automated) · focus trap · manual pass | T-01 · T-03 · T-06 |
 | NFR-ORG-006 | Swagger | T-01…T-04 |
 
@@ -664,11 +701,11 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-10-16 | P-11: the mockup `TREE` has 95 units, the proposal says 94 | T-05 first step: per-group list, requester decides before the seed is written | Leader / requester | **closed 2026-10-21** — `TREE` re-counted by evaluation: 94 units (the 95 was a regex miscount); matches the requester's sheet image per department; requester: load all rows incl. yellow-highlighted ones, and the mockup directors |
 | RB-2 | 2026-10-16 | P-14: which staff column means "active" is not documented | T-02 first step: measured query, rule written into design before code; stop if it does not separate current staff from people who left | Leader | **closed 2026-10-16** — measured (no separation); requester chose `is_active = 1`, accepted risk (design P-14, §4 B4) |
-| RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open |
+| RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open — **requester 2026-11-09: no merge to `dev` for now, work stays local** ("no hagas paso a dev, seguimos trabajando en local"). Before any merge to `dev`: the seed now includes `…006`, so `…000`–`…006` reach the shared Dev DB on deploy |
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |
 | RB-5 | 2026-10-16 | `alliance_user_staff` charset differs by environment (Dev `utf8mb3` per the 2026-08-14 baseline dump; local `utf8mb4`); Prod not measured. The carnet FK migrations (`…001`, `…003`) depend on it (D-ORG-16) | T-01 rework proves up/down against a local probe schema with the Dev DDL; a human confirms `SHOW CREATE TABLE alliance_user_staff` on Dev and Prod before the merge to `dev`/`main`. **Measured 2026-10-16 by the requester on *testing*:** `alliance_user_staff.carnet` = `utf8mb4` / `utf8mb4_0900_ai_ci`, `VERSION()` = `8.0.46-0ubuntu0.22.04.4` — the baseline dump's `utf8mb3` is stale for that server. Still owed: Prod (`main`) | Requester | open — testing measured, Prod pending |
 | RB-6 | 2026-10-16 | Cross-entry race (T-02 Reviewer A advisory, reasoned): `FOR UPDATE` locks only the saved entry and the hierarchy graph is read unlocked, so two concurrent saves on different entries (e.g. P L2→L3 while an L3 is created under P) can each pass validation and leave an I-3 violation | Either lock the parent/child rows the check reads, or accept (≈ 500 entries, few admins). **Requester decision pending** | Requester | open — **widened 2026-10-19 (T-03 Reviewer A, constructed, not executed):** inactivate / logical delete can now shorten a parent's coverage while a concurrent child move or reactivate under it reads the parent unlocked → I-3 break; a physical delete is backstopped by the RESTRICT FK (surfaces as a 500) |
-| RB-7 | 2026-10-22 | Pivot (D-ORG-24): (a) **contract change** — `resolve` now returns the requested year's delegates, and B5 drops its entry-level delegates field; a future consumer that wants "who acts now" must ask for the current year; (b) **schema change after an applied migration** — `…003` is applied locally, so `…005` rebuilds the table; it refuses on non-empty tables (P-15) | (a) No consumer exists yet (R-ORG-010 risk row; each consumer spec cites AC.3). (b) T-12 first step measures the local row count; `…003` + `…005` reach Dev together because neither is on a remote branch | Leader / requester | open — closes when T-12 passes |
+| RB-7 | 2026-10-22 | Pivot (D-ORG-24): (a) **contract change** — `resolve` now returns the requested year's delegates, and B5 drops its entry-level delegates field; a future consumer that wants "who acts now" must ask for the current year; (b) **schema change after an applied migration** — `…003` is applied locally, so `…005` rebuilds the table; it refuses on non-empty tables (P-15) | (a) No consumer exists yet (R-ORG-010 risk row; each consumer spec cites AC.3). (b) T-12 first step measures the local row count; `…003` + `…005` reach Dev together because neither is on a remote branch | Leader / requester | **closed 2026-11-09** — T-12 passed (Reviewers A and B PASS, 2026-10-22); the contract and schema change are recorded in D-ORG-24 |
 
 ---
 
