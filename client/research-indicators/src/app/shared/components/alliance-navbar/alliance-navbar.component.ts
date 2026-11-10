@@ -17,7 +17,7 @@ import {
 import { ButtonModule } from 'primeng/button';
 import { BadgeModule } from 'primeng/badge';
 import { ChipModule } from 'primeng/chip';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { IsActiveMatchOptions, NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { CacheService } from '@services/cache/cache.service';
 import { DarkModeService } from '@services/dark-mode.service';
 import { AvatarModule } from 'primeng/avatar';
@@ -98,6 +98,10 @@ export class AllianceNavbarComponent implements OnInit, AfterViewInit, OnDestroy
     { label: 'Results Center', path: '/results-center', underConstruction: false, disabled: false },
     { label: 'Results Dashboard', path: '/dashboard', underConstruction: false }
   ];
+
+  // Exact on the path only: Results Center writes its filters to the query string,
+  // and `{ exact: true }` would also require the query params to match the bare link.
+  readonly exactPathMatch: IsActiveMatchOptions = { paths: 'exact', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' };
 
   isProjectsOrDetailActive(): boolean {
     return this.isProjectsOrDetailActiveFlag;

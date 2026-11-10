@@ -1039,4 +1039,17 @@ describe('ResultAiAssistantComponent', () => {
     expect(result).toBe(existing);
     expect(result.results).toEqual([{ title: 'existing' }]);
   });
+  it('names the identified results in the singular only when there is one (H57)', () => {
+    const title = () => fixture.nativeElement.querySelector('.analyze-result-container h1').textContent.replace(/\s+/g, ' ').trim();
+    const item = (title: string) => ({ title, indicator: 'Policy change', main_contact_person: { name: '' } });
+    createResultManagementServiceMock.expandedItem = signal(null);
+    component.documentAnalyzed.set(true);
+    createResultManagementServiceMock.items.set([item('a')]);
+    fixture.detectChanges();
+    expect(title()).toBe('THE AI IDENTIFIED 1 RESULT');
+
+    createResultManagementServiceMock.items.set([item('a'), item('b')]);
+    fixture.detectChanges();
+    expect(title()).toBe('THE AI IDENTIFIED 2 RESULTS');
+  });
 });

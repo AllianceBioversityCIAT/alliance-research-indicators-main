@@ -117,13 +117,20 @@ export class SubmitResultContentComponent {
   }
   setInitialSelectedReviewOption(): void {
     const currentStatusId = this.cache.currentMetadata()?.status_id;
-    if (currentStatusId == null) return;
+    const matchingOption =
+      currentStatusId == null ? undefined : this.reviewOptions().find(option => option.statusId === currentStatusId);
 
-    const matchingOption = this.reviewOptions().find(option => option.statusId === currentStatusId);
-    
     if (matchingOption && !matchingOption.disabled) {
       this.submissionService.statusSelected.set(matchingOption);
-    } else {
+      return;
+    }
+
+    // H54 — the OICR review opens with "Accepted" already chosen; a decision already taken is kept above.
+    const isLatest = this.allModalsService.submitResultOrigin?.() === 'latest';
+    const accepted = isLatest ? this.reviewOptions().find(option => option.key === 'approve') : undefined;
+    if (accepted) {
+      this.submissionService.statusSelected.set(accepted);
+    } else if (currentStatusId != null) {
       this.submissionService.statusSelected.set(null);
     }
   }
@@ -351,12 +358,16 @@ export class SubmitResultContentComponent {
   }
 
   private async handlePostSubmitForLegacyFlow(): Promise<boolean> {
+    const reviewStatusId = this.submissionService.statusSelected()?.statusId;
     const response = await this.api.PATCH_SubmitResult({
       resultCode: this.cache.getCurrentNumericResultId(),
       comment: this.submissionService.comment(),
       status: this.submissionService.statusSelected()!.statusId
     });
     if (!response.successfulRequest) return false;
+    // H44 — an open Submission History panel only reloads when this counter moves.
+    this.submissionService.refreshSubmissionHistory.update(v => v + 1);
+    this.showReviewConfirmation(reviewStatusId);
     if (this.submissionService.statusSelected()?.statusId === 6) this.submissionService.comment.set('');
     await this.metadata.update(this.cache.getCurrentNumericResultId());
     this.cache.lastResultId.set(null);
@@ -392,7 +403,8 @@ export class SubmitResultContentComponent {
 
   async submitReview(): Promise<void> {
     if (this.allModalsService.submitResultOrigin?.() === 'latest') {
-      const isApprove = this.submissionService.statusSelected()?.statusId === 10;
+      const reviewStatusId = this.submissionService.statusSelected()?.statusId;
+      const isApprove = reviewStatusId === 10;
       const formValue = this.form();
       const body = this.buildLatestBody(isApprove, formValue);
       const response = await this.api.PATCH_SubmitResult(
@@ -405,7 +417,8 @@ export class SubmitResultContentComponent {
       );
       
       if (!response.successfulRequest) return;
-      
+
+      this.submissionService.refreshSubmissionHistory.update(v => v + 1);
       this.form.set({ mel_regional_expert: '', oicr_internal_code: '', sharepoint_link: '' });
       this.submissionService.comment.set('');
       this.submissionService.statusSelected.set(null);
@@ -418,7 +431,7 @@ export class SubmitResultContentComponent {
         severity: 'success',
         summary: 'Review submitted successfully',
         hasNoCancelButton: true,
-        detail: 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.',
+        detail: this.oicrReviewOutcomeMessage(reviewStatusId),
         confirmCallback: {
           label: 'Done',
           event: () => {
@@ -433,6 +446,29 @@ export class SubmitResultContentComponent {
         this.allModalsService.closeModal('submitResult');
       }
     }
+  }
+
+  // H50 — review decisions confirm themselves with the same alert Submit ("RESULT SUBMITTED") uses.
+  private showReviewConfirmation(statusId: number | undefined): void {
+    const confirmations: Record<number, { summary: string; detail: string }> = {
+      6: { summary: 'RESULT APPROVED', detail: 'The result was approved successfully.' },
+      5: { summary: 'REVISION REQUESTED', detail: 'The result was sent back to the submitter for revision.' },
+      7: { summary: 'RESULT NOT APPROVED', detail: 'The result was marked as not approved.' }
+    };
+    const confirmation = statusId == null ? undefined : confirmations[statusId];
+    if (!confirmation) return;
+    this.actions.showGlobalAlert({ severity: 'success', hasNoButton: true, ...confirmation });
+  }
+
+  // H20 — the confirmation must describe what the chosen decision actually does to the OICR.
+  private oicrReviewOutcomeMessage(statusId: number | undefined): string {
+    if (statusId === 11) {
+      return 'Your review has been submitted. The OICR is now Postponed and can be reported again in a later reporting year.';
+    }
+    if (statusId === 15) {
+      return 'Your review has been submitted. The OICR is now Not Accepted and will not continue in the OICR development process.';
+    }
+    return 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.';
   }
 
   private cleanUpSubmitResultData(): void {

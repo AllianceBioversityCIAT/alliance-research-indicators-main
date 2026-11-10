@@ -54,6 +54,9 @@ export class InputComponent {
   MAX_SAFE_INTEGER = 18;
   MAX_SAFE_TEXT = 40000;
   showMaxReachedMessage = signal(false);
+  // H8 — PrimeNG swallows the minus key when `min >= 0`, so "-5" silently became "5".
+  // The key stays rejected; this tells the user why until the field loses focus.
+  showNegativeNotAllowed = signal(false);
   // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-09 — max promoted to @Input, default unchanged)
   @Input() max = Number.MAX_SAFE_INTEGER;
 
@@ -61,6 +64,18 @@ export class InputComponent {
   onPaste(event: ClipboardEvent): void {
     if (this.type === 'text') {
       this.handlePasteText(event);
+    } else if (this.rejectsNegatives() && event.clipboardData?.getData('text')?.includes('-')) {
+      this.showNegativeNotAllowed.set(true);
+    }
+  }
+
+  rejectsNegatives(): boolean {
+    return this.type === 'number' && this.min >= 0;
+  }
+
+  onNumberKeyDown(event: KeyboardEvent): void {
+    if (this.rejectsNegatives() && (event.key === '-' || event.key === 'Subtract')) {
+      this.showNegativeNotAllowed.set(true);
     }
   }
 

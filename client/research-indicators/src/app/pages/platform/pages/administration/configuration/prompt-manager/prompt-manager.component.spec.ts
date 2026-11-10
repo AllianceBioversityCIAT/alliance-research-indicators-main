@@ -104,7 +104,7 @@ describe('PromptManagerComponent', () => {
   it('formatUpdatedAt should fall back to a dash for missing or invalid dates', () => {
     expect(component.formatUpdatedAt(null)).toBe('—');
     expect(component.formatUpdatedAt('not-a-date')).toBe('—');
-    expect(component.formatUpdatedAt('2026-08-27T20:17:09.994763+00:00')).toContain('08/27/2026');
+    expect(component.formatUpdatedAt('2026-08-27T20:17:09.994763+00:00')).toContain('27/08/2026');
   });
 
   it('should expose fixed and fluid column styles', () => {

@@ -25,6 +25,16 @@ describe('CacheService', () => {
     expect(service.isSidebarCollapsed()).toBe(false);
   });
 
+  it('H18: reloads the whole page when a profile simulation starts or ends', () => {
+    const service = TestBed.inject(CacheService);
+    const reloadPage = jest.fn();
+    service.reloadPage = reloadPage;
+
+    service.bumpContentReload();
+
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to empty object when JSON invalid', () => {
     withLocalStorage({ data: '}{', isSidebarCollapsed: 'true' });
     const service = TestBed.inject(CacheService);

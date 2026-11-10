@@ -52,6 +52,7 @@ export class ResultOpenSearchController {
         ],
         size,
       )
+      .then((hits) => this.openSearchResultApi.filterLiveResults(hits))
       .then((response) =>
         ResponseUtils.format({
           description: 'Results found',

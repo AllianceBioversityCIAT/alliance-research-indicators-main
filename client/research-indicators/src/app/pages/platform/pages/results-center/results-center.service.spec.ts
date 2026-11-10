@@ -2383,7 +2383,42 @@ describe('ResultsCenterService', () => {
     });
   });
 
+  describe('H16 — Primary Lever column', () => {
+    it('shows the primary lever for 2010–2025 results', () => {
+      const result = { result_levers: [{ is_primary: 1, lever: { short_name: 'Lever 6' } }] } as any;
+      expect(service.getPrimaryLeverDisplay(result)).toBe('Lever 6');
+    });
+
+    it('falls back to the Research Areas for 2026–2030 results that have no primary lever', () => {
+      const result = { result_levers: [], result_research_areas: [{ research_area: { short_name: 'Climate Action' } }] } as any;
+      expect(service.getPrimaryLeverDisplay(result)).toBe('Climate Action');
+    });
+
+    it('shows a dash when there is neither', () => {
+      expect(service.getPrimaryLeverDisplay({} as any)).toBe('-');
+    });
+  });
+
   describe('main', () => {
+    it('should keep the newest request when an older, unfiltered one resolves last (reload race)', async () => {
+      let resolveUnfiltered!: (value: { results: Result[]; total: number }) => void;
+      const filteredResult = { ...mockResults[0], result_official_code: 'FILTERED' };
+      mockGetResultsService.fetchPaginated
+        .mockImplementationOnce(() => new Promise(resolve => (resolveUnfiltered = resolve)))
+        .mockResolvedValueOnce({ results: [filteredResult], total: 1 });
+
+      const unfiltered = service.main();
+      service.resultsFilter.update(prev => ({ ...prev, 'status-codes': [1] }));
+      await service.main();
+
+      resolveUnfiltered({ results: [{ ...mockResults[0], result_official_code: 'UNFILTERED' }], total: 99 });
+      await unfiltered;
+
+      expect(service.list().map(r => r.result_official_code)).toEqual(['FILTERED']);
+      expect(service.resultsTableTotalRecords()).toBe(1);
+      expect(service.loading()).toBe(false);
+    });
+
     it('should pass contract-codes when primaryContractId is set', async () => {
       service.primaryContractId.set('contract-123');
       await service.main();

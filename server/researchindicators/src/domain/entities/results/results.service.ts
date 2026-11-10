@@ -387,6 +387,13 @@ export class ResultsService {
           this.logger.warn(
             `Result ${result_id} was NOT deleted: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling.`,
           );
+        } else {
+          // H13 — like deleteResult(): without this the global search keeps
+          // offering a result that no longer opens ("Result not found").
+          this._openSearchResultApi.uploadSingleToOpenSearch(
+            { result_id },
+            ElasticOperationEnum.DELETE,
+          );
         }
       }
     }

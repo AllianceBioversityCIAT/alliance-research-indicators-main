@@ -44,7 +44,9 @@
       }
       @if (showStarPdfReport()) {
       @if (starPdfReportDisabled()) {
-      <span aria-hidden="true" class="inline-flex px-2 opacity-40 text-[#777C83]">
+      <span tabindex="0" role="img" [attr.aria-label]="'PDF report: ' + starPdfComingSoonTooltip"
+        [pTooltip]="starPdfComingSoonTooltip" tooltipPosition="left"
+        class="inline-flex px-2 opacity-40 text-[#777C83] cursor-default">
         <i class="pi pi-file-pdf !text-[17px]"></i>
       </span>
       } @else {

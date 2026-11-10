@@ -17,6 +17,7 @@
       styleClass="w-full"
       [(ngModel)]="signal()[optionValue]"
       (ngModelChange)="setValue($event)"
+      (onBlur)="onBlur($event)"
       [inputStyle]="isInvalid() ? { border: '2px solid #E69F00' } : {}"
       [minDate]="minDate"
       [maxDate]="maxDate"
@@ -27,6 +28,12 @@
       appendTo="body" />
   }
 
+  @if (outOfRangeMessage()) {
+    <div class="flex items-center gap-1 -mt-1.5 text-[#E69F00] text-sm" role="alert">
+      <i class="material-symbols-rounded !text-base">warning</i>
+      <span>{{ outOfRangeMessage() }}</span>
+    </div>
+  }
   @if (!this.inputValid().valid) {
     @if (isInvalid()) {
       <div class="flex items-center gap-1 -mt-1.5 text-[#E69F00] text-sm">

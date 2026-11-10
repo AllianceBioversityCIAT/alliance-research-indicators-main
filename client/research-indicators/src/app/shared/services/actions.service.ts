@@ -48,7 +48,7 @@ export class ActionsService {
 
   changeResultRoute(resultId: number) {
     this.router.navigate(['load-results'], { skipLocationChange: true }).then(() => {
-      this.router.navigate(['result', resultId]);
+      this.router.navigate(['result', `STAR-${resultId}`]);
     });
   }
 

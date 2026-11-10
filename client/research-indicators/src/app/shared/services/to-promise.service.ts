@@ -12,10 +12,17 @@ export class ToPromiseService {
   http = inject(HttpClient);
   cacheService = inject(CacheService);
 
+  /** Result whose green checks are currently held in `CacheService.greenChecks`. */
+  private greenChecksResultId: string | number | null = null;
+
   private readonly TP = (subscription: Observable<any>, loadingTrigger?: boolean): Promise<MainResponse<any>> => {
     if (loadingTrigger) {
       this.cacheService.currentResultIsLoading.set(true);
-      this.cacheService.greenChecks.set({});
+      // H37 — clearing on every section load made the "sections completed" counter drop to 0
+      // and climb back (1/7 → 0/7 → 1/7). Only another result's checks must not linger.
+      if (this.greenChecksResultId !== this.cacheService.currentResultId()) {
+        this.cacheService.greenChecks.set({});
+      }
     }
 
     return firstValueFrom(
@@ -254,7 +261,9 @@ export class ToPromiseService {
   };
 
   async updateGreenChecks() {
+    const resultId = this.cacheService.currentResultId();
     const response = await this.getGreenChecks();
+    this.greenChecksResultId = resultId;
     // `greenChecks` is read as an object by every consumer — most directly by
     // ResultSidebarComponent's `greenChecks()[option.greenCheckKey]`. A failed
     // request resolves with `data: undefined` (see the catchError above, which

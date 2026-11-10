@@ -1,5 +1,5 @@
 import { ApplicationConfig, importProvidersFrom, provideZoneChangeDetection, isDevMode, provideAppInitializer, inject } from '@angular/core';
-import { provideRouter, withViewTransitions } from '@angular/router';
+import { provideRouter, TitleStrategy, withViewTransitions } from '@angular/router';
 
 import { routes } from './app.routes';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -19,11 +19,13 @@ import { ValidateCacheService } from '@shared/services/validate-cache.service';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
 import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { applyLocalAuthBypass } from '@shared/auth/local-auth-bypass';
+import { PageTitleStrategy } from '@shared/services/page-title.strategy';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withViewTransitions()),
+    { provide: TitleStrategy, useClass: PageTitleStrategy },
     provideHttpClient(withInterceptors([jWtInterceptor, httpErrorInterceptor, resultInterceptor])),
     importProvidersFrom(BrowserModule, BrowserAnimationsModule),
     provideAnimationsAsync(),

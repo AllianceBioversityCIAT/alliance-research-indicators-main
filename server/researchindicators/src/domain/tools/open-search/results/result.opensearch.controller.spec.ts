@@ -11,6 +11,7 @@ describe('ResultOpenSearchController', () => {
   const mockApi = {
     resetElasticData: jest.fn(),
     search: jest.fn(),
+    filterLiveResults: jest.fn(),
   };
   const mockFormat = jest.fn();
 
@@ -43,6 +44,7 @@ describe('ResultOpenSearchController', () => {
   it('search', async () => {
     const hits = [];
     mockApi.search.mockResolvedValue(hits);
+    mockApi.filterLiveResults.mockResolvedValue(hits);
     mockFormat.mockReturnValue({});
     await controller.search('title', 10);
     expect(mockApi.search).toHaveBeenCalledWith(
@@ -57,5 +59,20 @@ describe('ResultOpenSearchController', () => {
       [{ title: { order: 'asc' } }],
       10,
     );
+  });
+
+  it('H13: returns only the hits that are still live in the database', async () => {
+    const live = { result_id: 1 };
+    const deleted = { result_id: 2 };
+    mockApi.search.mockResolvedValue([live, deleted]);
+    mockApi.filterLiveResults.mockResolvedValue([live]);
+    mockFormat.mockReturnValue({});
+    await controller.search('cloud', 20);
+    expect(mockApi.filterLiveResults).toHaveBeenCalledWith([live, deleted]);
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      description: 'Results found',
+      data: [live],
+      status: HttpStatus.OK,
+    });
   });
 });

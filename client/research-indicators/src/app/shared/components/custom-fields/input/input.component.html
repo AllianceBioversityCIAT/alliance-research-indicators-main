@@ -52,6 +52,8 @@
           (ngModelChange)="setValue($event)"
           [disabled]="disabled"
           [showButtons]="true"
+          (onKeyDown)="onNumberKeyDown($event)"
+          (onBlur)="showNegativeNotAllowed.set(false)"
           inputId="minmax-buttons" />
       }
       @if (helperText) {
@@ -70,6 +72,12 @@
         <div class="flex items-center gap-1 mt-1 text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]">
           <i class="material-symbols-rounded !text-base">warning</i>
           <span>Maximum reached</span>
+        </div>
+      }
+      @if (showNegativeNotAllowed()) {
+        <div class="flex items-center gap-1 mt-1 text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]" role="alert">
+          <i class="material-symbols-rounded !text-base">warning</i>
+          <span>Negative numbers are not allowed</span>
         </div>
       }
     </div>

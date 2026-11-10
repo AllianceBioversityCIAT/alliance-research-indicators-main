@@ -62,7 +62,6 @@ export const cacheServiceMock = {
   loading: jest.fn().mockReturnValue(false),
   headerHeight: signal(0),
   navbarHeight: signal(0),
-  contentReloadKey: signal(0),
   bumpContentReload: jest.fn(),
   showSubmissionHistory: signal(false),
   isMyResult: jest.fn().mockReturnValue(true),

@@ -933,9 +933,11 @@ export default class PoolFundingAlignmentComponent {
   //      section rendered immediately above it, not a step in the linear flow.
   //   2. Back must not attempt a save: `canSave()` blocks on an unanswered ToC
   //      question, so a save-then-navigate Back would silently do nothing — the
-  //      exact dead-button symptom this fixes. links-to-result makes the same
-  //      choice (navigate('back') never saves).
-  onBack(): void {
+  //      exact dead-button symptom this fixes.
+  // H3 — Back still saves whenever `canSave()` allows it (like Next elsewhere), so
+  // pending changes are kept; when the save is blocked it only navigates.
+  async onBack(): Promise<void> {
+    if (this.canSave()) await this.onSave();
     const version = this.route.snapshot.queryParamMap.get('version');
     const queryParams = version ? { version } : undefined;
     void this.router.navigate(['/result', this.resultCode(), this.previousSectionPath()], {

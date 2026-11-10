@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResultAiItemComponent } from './result-ai-item.component';
 import { signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { CreateResultManagementService } from '../../../../services/create-result-management.service';
 import { ApiService } from '@shared/services/api.service';
 import { ActionsService } from '@shared/services/actions.service';
@@ -68,7 +69,8 @@ describe('ResultAiItemComponent', () => {
 
     allModalsServiceMock = {
       setModalWidth: jest.fn(),
-      setGoBackFunction: jest.fn()
+      setGoBackFunction: jest.fn(),
+      closeModal: jest.fn()
     } as Partial<AllModalsService>;
 
     await TestBed.configureTestingModule({
@@ -129,10 +131,14 @@ describe('ResultAiItemComponent', () => {
     errSpy.mockRestore();
   });
 
-  it('openResult should open new tab with result url', () => {
+  it('H45: openResult opens the STAR- prefixed result in this tab and closes the modal', () => {
+    const router = TestBed.inject(Router);
+    const navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    component.openResult(component.item as AIAssistantResult);
-    expect(openSpy).toHaveBeenCalledWith(`/result/${component.item.result_official_code}/general-information`, '_blank');
+    component.openResult({ ...(component.item as AIAssistantResult), result_official_code: '637' });
+    expect(navigateSpy).toHaveBeenCalledWith(['result', 'STAR-637', 'general-information']);
+    expect(allModalsServiceMock.closeModal).toHaveBeenCalledWith('createResult');
+    expect(openSpy).not.toHaveBeenCalled();
     openSpy.mockRestore();
   });
 

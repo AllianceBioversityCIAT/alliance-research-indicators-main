@@ -2,12 +2,16 @@
 
 import { Component, computed, inject, OnInit, signal, WritableSignal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { ApiService } from '@shared/services/api.service';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
 import {
   INDICATOR_ID_TO_SLUG,
   STATUS_ID_TO_SLUG
 } from '@platform/pages/results-center/url/results-center-url.vocabulary';
+
+/** `result_status.result_status_id` of Deleted (server ResultStatusEnum.DELETED). */
+const DELETED_STATUS_ID = 8;
 
 interface Indicator {
   indicator_id: number;
@@ -29,7 +33,7 @@ interface ChartLegendItem {
 
 @Component({
   selector: 'app-data-overview',
-  imports: [S3ImageUrlPipe, RouterLink],
+  imports: [S3ImageUrlPipe, RouterLink, NgTemplateOutlet],
   templateUrl: './data-overview.component.html',
   styleUrl: './data-overview.component.scss'
 })
@@ -100,6 +104,12 @@ export class DataOverviewComponent implements OnInit {
    * An id absent from the vocabulary (drift) degrades to an unfiltered
    * My-Results link rather than emitting an invalid token.
    */
+  // H17 — deleted results are never listed in the Results Center, so linking the
+  // "Deleted" row there always opened an empty table. It stays as a count only.
+  isStatusLinkable(item: ChartLegendItem): boolean {
+    return item.result_status_id !== DELETED_STATUS_ID;
+  }
+
   statusRowQueryParams(item: ChartLegendItem): Record<string, string> {
     const slug = STATUS_ID_TO_SLUG.get(item.result_status_id);
     return slug ? { status: slug, tab: 'my' } : { tab: 'my' };

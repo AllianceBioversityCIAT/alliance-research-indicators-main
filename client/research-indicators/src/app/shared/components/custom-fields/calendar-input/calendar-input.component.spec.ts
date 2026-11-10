@@ -28,6 +28,26 @@ describe('CalendarInputComponent', () => {
     component.optionValue = 'testField';
   });
 
+  it('H38: explains why a typed date before minDate is cleared, and resets on a valid pick', () => {
+    component.minDate = new Date(2026, 4, 10);
+    const input = document.createElement('input');
+    input.value = '01/05/2026';
+
+    component.onBlur({ target: input } as unknown as Event);
+    expect(component.outOfRangeMessage()).toBe('The date cannot be earlier than 10/05/2026.');
+
+    component.setValue('2026-05-12');
+    expect(component.outOfRangeMessage()).toBe('');
+  });
+
+  it('H38: stays silent for a typed date inside the range', () => {
+    component.minDate = new Date(2026, 4, 10);
+    const input = document.createElement('input');
+    input.value = '15/05/2026';
+    component.onBlur({ target: input } as unknown as Event);
+    expect(component.outOfRangeMessage()).toBe('');
+  });
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });

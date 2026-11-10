@@ -28,7 +28,7 @@
             <p-multiSelect #globalTargetMs [inputId]="'impact-area-global-target-' + area.id"
               [style]="isGlobalTargetInvalid(area.id) ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
               [options]="globalTargetOptions(area.id)" [loading]="globalTargetLoading(area.id)"
-              [display]="'comma'" optionLabel="target" optionValue="targetId" [showToggleAll]="false" [filter]="true"
+              [display]="'comma'" optionLabel="target" optionValue="targetId" [showToggleAll]="false" [filter]="true" [autofocusFilter]="true"
               filterBy="smo_code,target" [ngModel]="getGlobalTargetIdsSignal(area.id)()"
               (ngModelChange)="onGlobalTargetIdsChange(area.id, $event)" [disabled]="disabled" [virtualScroll]="false"
               [scrollHeight]="'145px'" placeholder="Select the Global Target" appendTo="body" [baseZIndex]="11000"

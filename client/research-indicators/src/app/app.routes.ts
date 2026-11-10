@@ -6,8 +6,10 @@ import { centerAdminGuard } from '@guards/center-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
 import { resultExistsResolver } from '@pages/platform/pages/result/resolvers/result-exists.resolver';
 
-const createResultData = () => ({
-  title: 'Result Information'
+// `title` feeds the section header; `pageTitle` is the section name shown in the browser tab.
+const createResultData = (pageTitle: string) => ({
+  title: 'Result Information',
+  pageTitle
 });
 
 export const routes: Routes = [
@@ -106,68 +108,68 @@ export const routes: Routes = [
           {
             path: 'general-information',
             loadComponent: () => import('@platform/pages/result/pages/general-information/general-information.component'),
-            data: createResultData()
+            data: createResultData('General information')
           },
           {
             path: 'links-to-result',
             loadComponent: () => import('@platform/pages/result/pages/links-to-result/links-to-result.component'),
-            data: createResultData()
+            data: createResultData('Links to result')
           },
           {
             path: 'alliance-alignment',
             loadComponent: () => import('@platform/pages/result/pages/alliance-alignment/alliance-alignment.component'),
-            data: createResultData()
+            data: createResultData('Alliance alignment')
           },
           {
             path: 'pool-funding-alignment',
             loadComponent: () => import('@platform/pages/result/pages/pool-funding-alignment/pool-funding-alignment.component'),
-            data: createResultData()
+            data: createResultData('Pool funding alignment')
           },
           {
             path: 'partners',
             loadComponent: () => import('@platform/pages/result/pages/partners/partners.component'),
-            data: createResultData()
+            data: createResultData('Results partners')
           },
           {
             path: 'evidence',
             loadComponent: () => import('@platform/pages/result/pages/evidence/evidence.component'),
-            data: createResultData()
+            data: createResultData('Evidence')
           },
           {
             path: 'oicr-details',
             loadComponent: () => import('@platform/pages/result/pages/oicr-details/oicr-details.component'),
-            data: createResultData()
+            data: createResultData('OICR Details')
           },
           {
             path: 'ip-rights',
             loadComponent: () => import('@platform/pages/result/pages/ip-rights/ip-rights.component'),
-            data: createResultData()
+            data: createResultData('IP rights')
           },
           {
             path: 'capacity-sharing',
             loadComponent: () => import('@platform/pages/result/pages/capacity-sharing/capacity-sharing.component'),
-            data: createResultData()
+            data: createResultData('CapSharing details')
           },
           {
             path: 'policy-change',
             loadComponent: () => import('@platform/pages/result/pages/policy-change/policy-change.component'),
-            data: createResultData()
+            data: createResultData('Policy Change details')
           },
           {
             path: 'innovation-details',
             loadComponent: () => import('@platform/pages/result/pages/innovation-details/innovation-details.component'),
-            data: createResultData()
+            data: createResultData('Innovation details')
           },
           // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
           {
             path: 'innovation-use-details',
             loadComponent: () => import('@platform/pages/result/pages/innovation-use-details/innovation-use-details.component'),
-            data: createResultData()
+            data: createResultData('Innovation use details')
           },
           {
             path: 'geographic-scope',
             loadComponent: () => import('@platform/pages/result/pages/geographic-scope/geographic-scope.component'),
-            data: createResultData()
+            data: createResultData('Geographic scope')
           }
         ]
       },
@@ -208,10 +210,12 @@ export const routes: Routes = [
           title: 'Project Detail'
         },
         children: [
+          // H59 — `redirectTo: '../'` is not a valid redirect and left a blank page. The parent
+          // renders the results table whenever the last segment is `project-results`, so this
+          // only has to match; it renders nothing of its own.
           {
             path: 'project-results',
-            redirectTo: '../',
-            pathMatch: 'full'
+            children: []
           },
           {
             path: 'project-dashboard',
@@ -385,9 +389,11 @@ export const routes: Routes = [
       }
     ]
   },
+  // H59 — there is no `not-found` route, so redirecting there failed the navigation and
+  // rendered a blank page. Signed-out visitors never reach this: the landing route catches them.
   {
     path: '**',
-    redirectTo: 'not-found',
+    redirectTo: 'home',
     pathMatch: 'full'
   }
 ];

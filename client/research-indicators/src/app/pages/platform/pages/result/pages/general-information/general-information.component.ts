@@ -77,10 +77,29 @@ export default class GeneralInformationComponent {
   }
 
   async getData() {
+    const bodyAtRequest = this.body();
     const response = await this.api.GET_GeneralInformation(this.cache.getCurrentNumericResultId());
     if (response.data?.main_contact_person?.user_id) response.data.user_id = response.data.main_contact_person.user_id;
-    this.body.set(response.data);
+    this.body.set(this.keepEditsMadeWhileLoading(bodyAtRequest, this.body(), response.data));
     this.initialReportingYear = response.data?.year ?? null;
+  }
+
+  /**
+   * H4 — the load can take several seconds (and re-runs on a version change), and its response
+   * used to replace the whole form, wiping whatever the user typed meanwhile (Description and
+   * Main contact were saved empty on STAR-632). Fields edited during the request win over it.
+   */
+  private keepEditsMadeWhileLoading(
+    atRequest: GeneralInformation,
+    current: GeneralInformation,
+    loaded: GeneralInformation
+  ): GeneralInformation {
+    if (current === atRequest || !loaded) return loaded;
+    const edits: Partial<GeneralInformation> = {};
+    for (const key of Object.keys(current ?? {}) as (keyof GeneralInformation)[]) {
+      if (current[key] !== atRequest?.[key]) (edits as Record<string, unknown>)[key] = current[key];
+    }
+    return { ...loaded, ...edits };
   }
 
   /**

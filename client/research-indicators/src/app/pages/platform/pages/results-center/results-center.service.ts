@@ -138,15 +138,7 @@ export class ResultsCenterService {
       path: 'primaryLeverSort',
       header: 'Primary Lever',
       maxWidth: 'max-w-[100px]',
-      getValue: (result: Result) => {
-        if (!result.result_levers || !Array.isArray(result.result_levers)) return '-';
-        const primaryLevers = result.result_levers.filter(rl => rl.is_primary === 1);
-        if (primaryLevers.length === 0) return '-';
-        return primaryLevers
-          .map(rl => rl.lever?.short_name)
-          .filter(Boolean)
-          .join(', ');
-      }
+      getValue: (result: Result) => this.getPrimaryLeverDisplay(result)
     },
     {
       field: 'year',
@@ -198,6 +190,16 @@ export class ResultsCenterService {
       .filter(column => column.filter)
       .flatMap(column => column.filterPaths ?? [column.path])
   );
+
+  /**
+   * H16 — 2026–2030 results align to Research Areas instead of levers, so the column was blank
+   * for them. Primary levers first (2010–2025); otherwise the result's Research Areas.
+   */
+  getPrimaryLeverDisplay(result: Result): string {
+    const primaryLevers = Array.isArray(result.result_levers) ? result.result_levers.filter(rl => rl.is_primary === 1) : [];
+    const leverNames = primaryLevers.map(row => this.getPortfolioItemLabel(row)).filter(Boolean);
+    return leverNames.length ? leverNames.join(', ') : this.getResearchAreasDisplay(result);
+  }
 
   private getResearchAreasDisplay(result: Result): string {
     const directRows = this.asArray(result.result_research_areas ?? result.research_areas);
@@ -262,6 +264,10 @@ export class ResultsCenterService {
   resultsTablePaginatorRows = signal(10);
   resultsTableTotalRecords = signal(0);
   private lastSuccessfulResultsFetchKey: string | null = null;
+  // Every main() call takes a ticket; only the newest one may write the table. On reload the
+  // table's first lazy load fires before the URL/session filters are seeded, and when that
+  // unfiltered response landed last it replaced the filtered one while the chips stayed active.
+  private resultsRequestSeq = 0;
   resultsTableSortField = signal<string>('result_official_code');
   resultsTableSortOrder = signal<-1 | 1>(-1);
 
@@ -494,6 +500,7 @@ export class ResultsCenterService {
   }
 
   async main() {
+    const requestId = ++this.resultsRequestSeq;
     this.loading.set(true);
     const primaryContractIdAtRequest = this.primaryContractId();
     const activeTabIdAtRequest = this.myResultsFilterItem()?.id;
@@ -580,6 +587,10 @@ export class ResultsCenterService {
         } as Result & { primaryLeverSort: string; _creatorFullName: string };
       });
 
+      if (requestId !== this.resultsRequestSeq) {
+        return;
+      }
+
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
       if (stillSameContext) {
         this.resultsTableTotalRecords.set(total);
@@ -588,6 +599,9 @@ export class ResultsCenterService {
       }
     } catch (error) {
       console.error('Error loading results:', error);
+      if (requestId !== this.resultsRequestSeq) {
+        return;
+      }
       this.lastSuccessfulResultsFetchKey = null;
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
       if (stillSameContext) {
@@ -595,7 +609,9 @@ export class ResultsCenterService {
         this.list.set([]);
       }
     } finally {
-      this.loading.set(false);
+      if (requestId === this.resultsRequestSeq) {
+        this.loading.set(false);
+      }
     }
   }
   handleResultsTableLazyLoad(event: TableLazyLoadEvent): void {

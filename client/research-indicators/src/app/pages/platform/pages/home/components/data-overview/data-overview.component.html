@@ -8,15 +8,24 @@
         <ul class="status-bars">
           @for (item of chartLegend(); track item.result_status_id) {
           <li class="status-bar-row">
-            <a class="status-bar-link" [routerLink]="['/results-center']" [queryParams]="statusRowQueryParams(item)"
-              [attr.aria-label]="'View My Results filtered by ' + item.label">
+            <ng-template #statusBarContent>
               <span class="status-bar-label" [title]="item.label">{{ item.label }}</span>
               <div class="status-bar-track" aria-hidden="true">
                 <div class="status-bar-fill" [style.width.%]="barFillPercent(item.value)"
                   [style.background-color]="item.color"></div>
               </div>
               <span class="status-bar-value">{{ item.value }}</span>
+            </ng-template>
+            @if (isStatusLinkable(item)) {
+            <a class="status-bar-link" [routerLink]="['/results-center']" [queryParams]="statusRowQueryParams(item)"
+              [attr.aria-label]="'View My Results filtered by ' + item.label">
+              <ng-container [ngTemplateOutlet]="statusBarContent"></ng-container>
             </a>
+            } @else {
+            <div class="status-bar-link status-bar-link--static">
+              <ng-container [ngTemplateOutlet]="statusBarContent"></ng-container>
+            </div>
+            }
           </li>
           }
         </ul>

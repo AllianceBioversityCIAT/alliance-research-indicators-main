@@ -172,6 +172,20 @@ describe('ResultUsersService', () => {
       expect(pending[0].user_name).toBe('Bob');
     });
 
+    it('H47: accepts a main contact whose score comes as a fraction', () => {
+      const users = [
+        { code: 'U1', name: 'Alice', similarity_score: 0.92 },
+      ] as any[];
+
+      const { acept, pending } = service.filterInstitutionsAi(
+        users,
+        UserRolesEnum.MAIN_CONTACT,
+      );
+
+      expect(acept).toEqual([{ user_id: 'U1' }]);
+      expect(pending).toEqual([]);
+    });
+
     it('should classify users with score < 70 as pending', () => {
       const users = [
         { code: null, name: 'Charlie', similarity_score: '50' },

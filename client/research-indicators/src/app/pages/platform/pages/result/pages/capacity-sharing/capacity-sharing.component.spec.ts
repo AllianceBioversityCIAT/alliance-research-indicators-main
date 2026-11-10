@@ -193,6 +193,52 @@ describe('CapacitySharingComponent', () => {
   });
 
   describe('saveData', () => {
+    it('H8: saves and raises the total to the sum when the participants by sex add up to more', async () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_CapacitySharing.mockClear();
+      apiService.PATCH_CapacitySharing.mockResolvedValue({});
+      apiService.GET_CapacitySharing.mockResolvedValue({ data: {} });
+      component.body.set({
+        session_format_id: 2,
+        group: { session_participants_total: 10, session_participants_female: 6, session_participants_male: 6 }
+      } as any);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_CapacitySharing).toHaveBeenCalledWith(
+        expect.objectContaining({ group: expect.objectContaining({ session_participants_total: 12 }) })
+      );
+    });
+
+    it('H8: keeps a total that already covers the sum', async () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_CapacitySharing.mockClear();
+      apiService.PATCH_CapacitySharing.mockResolvedValue({});
+      apiService.GET_CapacitySharing.mockResolvedValue({ data: {} });
+      component.body.set({
+        session_format_id: 2,
+        group: { session_participants_total: 20, session_participants_female: 6, session_participants_male: 6 }
+      } as any);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_CapacitySharing).toHaveBeenCalledWith(
+        expect.objectContaining({ group: expect.objectContaining({ session_participants_total: 20 }) })
+      );
+    });
+
+    it('H10: saves a long-term training shorter than 3 months (expected behaviour)', async () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_CapacitySharing.mockClear();
+      apiService.PATCH_CapacitySharing.mockResolvedValue({});
+      apiService.GET_CapacitySharing.mockResolvedValue({ data: {} });
+      component.body.set({ session_length_id: 2, start_date: new Date(2026, 0, 1), end_date: new Date(2026, 0, 4) });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_CapacitySharing).toHaveBeenCalled();
+    });
+
     it('should send ISO 8601 UTC strings to the API', async () => {
       submission.isEditableStatus.mockReturnValue(true);
       apiService.PATCH_CapacitySharing.mockResolvedValue({});

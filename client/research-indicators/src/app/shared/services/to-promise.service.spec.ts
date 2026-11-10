@@ -112,6 +112,20 @@ describe('ToPromiseService', () => {
     expect(greenChecksSpy).toHaveBeenCalled();
   });
 
+  it('H37: a section reload of the same result does not blank the green checks first', async () => {
+    const getGreenChecksSpy = jest.spyOn(service, 'getGreenChecks').mockResolvedValue({ data: { general_information: 1 } } as any);
+    httpClientMock.get = jest.fn().mockReturnValue(of({ data: {} }));
+    await service.get('/section', { loadingTrigger: true });
+    await Promise.resolve();
+
+    const greenChecksSpy = jest.spyOn(service.cacheService.greenChecks, 'set');
+    httpClientMock.get = jest.fn().mockReturnValue(of({ data: {} }));
+    await service.get('/section', { loadingTrigger: true });
+
+    expect(greenChecksSpy).not.toHaveBeenCalledWith({});
+    getGreenChecksSpy.mockRestore();
+  });
+
   it('delete sets X-Use-Year header if useResultInterceptor', async () => {
     httpClientMock.delete = jest.fn().mockReturnValue(of({ data: { foo: 'bar' } }));
     await service.delete('/test-url', { useResultInterceptor: true });

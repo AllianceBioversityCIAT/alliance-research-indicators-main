@@ -143,32 +143,32 @@ describe('ResultQuantificationsService', () => {
       );
     });
 
-    it('accepts a signed decimal for role 3 (Innovation Use)', async () => {
+    it('accepts a positive decimal for role 3 (Innovation Use)', async () => {
       const result = await service.upsertByCompositeKeys(
         10,
-        [{ quantification_number: -12.75, unit: 'ha', description: 'test' }],
+        [{ quantification_number: 12.75, unit: 'ha', description: 'test' }],
         ['quantification_number', 'unit', 'description'],
         QuantificationRolesEnum.INNOVATION_USE,
       );
 
       expect(result).toHaveLength(1);
-      expect(result[0].quantification_number).toBe(-12.75);
+      expect(result[0].quantification_number).toBe(12.75);
     });
 
     // OICR signed-decimal extension (2026-09-24): roles 1 (ACTUAL_COUNT) and
-    // 2 (EXTRAPOLATE_ESTIMATES) now share the same signed-scaled rule as
-    // INNOVATION_USE, so negative values and decimals are accepted.
+    // 2 (EXTRAPOLATE_ESTIMATES) share the same scaled rule as INNOVATION_USE,
+    // so decimals are accepted. Negatives are not (H9).
     it.each([
       ['ACTUAL_COUNT', QuantificationRolesEnum.ACTUAL_COUNT],
       ['EXTRAPOLATE_ESTIMATES', QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES],
     ])(
-      'accepts a signed decimal for role %s (OICR signed-decimal extension)',
+      'accepts a positive decimal for role %s (OICR signed-decimal extension)',
       async (_label, role) => {
         const result = await service.upsertByCompositeKeys(
           10,
           [
             {
-              quantification_number: -12.75,
+              quantification_number: 12.75,
               unit: 'ha',
               description: 'test',
             },
@@ -178,10 +178,26 @@ describe('ResultQuantificationsService', () => {
         );
 
         expect(result).toHaveLength(1);
-        expect(result[0].quantification_number).toBe(-12.75);
+        expect(result[0].quantification_number).toBe(12.75);
         expect(mockSave).toHaveBeenCalled();
       },
     );
+
+    it.each([
+      ['ACTUAL_COUNT', QuantificationRolesEnum.ACTUAL_COUNT],
+      ['EXTRAPOLATE_ESTIMATES', QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES],
+      ['INNOVATION_USE', QuantificationRolesEnum.INNOVATION_USE],
+    ])('H9: rejects a negative number on role %s', async (_label, role) => {
+      await expect(
+        service.upsertByCompositeKeys(
+          10,
+          [{ quantification_number: -12.75, unit: 'ha', description: 'test' }],
+          ['quantification_number', 'unit', 'description'],
+          role,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(mockSave).not.toHaveBeenCalled();
+    });
 
     it.each([
       ['ACTUAL_COUNT', QuantificationRolesEnum.ACTUAL_COUNT],
@@ -258,15 +274,7 @@ describe('ResultQuantificationsService', () => {
     // predicate and stays green only under the round-trip fix. Asserted on
     // the persisted row through the real, inherited `upsertByCompositeKeys`
     // (KZ-001).
-    it.each([
-      [0.07],
-      [1.005],
-      [0.0003],
-      [2.55],
-      [0.0001],
-      [549_755_813_887],
-      [-549_755_813_887],
-    ])(
+    it.each([[0.07], [1.005], [0.0003], [2.55], [0.0001], [549_755_813_887]])(
       'accepts role-3 value %p on the 4-decimal grid despite binary floating-point error',
       async (value) => {
         const result = await service.upsertByCompositeKeys(

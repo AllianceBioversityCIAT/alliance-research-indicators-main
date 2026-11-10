@@ -102,7 +102,8 @@ describe('SubmitResultContentComponent', () => {
       comment: signal(''),
       melRegionalExpert: signal(''),
       oicrNo: signal(''),
-      sharePointFolderLink: signal('')
+      sharePointFolderLink: signal(''),
+      refreshSubmissionHistory: signal(0)
     };
 
     // Create spies for signal methods
@@ -302,6 +303,30 @@ describe('SubmitResultContentComponent', () => {
     mockCacheService.currentMetadata!.set({ status_id: 999 });
     component.setInitialSelectedReviewOption();
     expect(mockSubmissionService.statusSelected()).toBeNull();
+  });
+
+  it('preselects Accepted when the OICR review opens (H54)', () => {
+    mockAllModalsService.submitResultOrigin!.set('latest');
+    mockCacheService.currentMetadata!.set({ status_id: undefined });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()?.statusId).toBe(10);
+
+    mockCacheService.currentMetadata!.set({ status_id: 9 });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()?.statusId).toBe(10);
+  });
+
+  it('keeps a decision already taken on the OICR instead of Accepted (H54)', () => {
+    mockAllModalsService.submitResultOrigin!.set('latest');
+    mockCacheService.currentMetadata!.set({ status_id: 11 });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()?.statusId).toBe(11);
+  });
+
+  it('does not preselect anything in Review Result (H54)', () => {
+    mockCacheService.currentMetadata!.set({ status_id: 9 });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()).toBeNull();
   });
 
   it('constructor should register callbacks in AllModalsService', () => {
@@ -647,6 +672,35 @@ describe('SubmitResultContentComponent', () => {
     });
   });
 
+  it('H44: a successful legacy review refreshes the open Submission History panel', async () => {
+    const submission = mockSubmissionService as any;
+    submission.statusSelected.set({ statusId: 5 });
+    mockApiService.PATCH_SubmitResult = jest.fn().mockResolvedValue({ successfulRequest: true });
+    const before = submission.refreshSubmissionHistory();
+
+    await (component as any).handlePostSubmitForLegacyFlow();
+
+    expect(submission.refreshSubmissionHistory()).toBe(before + 1);
+  });
+
+  it.each([
+    [6, 'RESULT APPROVED'],
+    [5, 'REVISION REQUESTED'],
+    [7, 'RESULT NOT APPROVED']
+  ])('H50: a legacy review decision (status %i) confirms with the shared success alert', (statusId: number, summary: string) => {
+    const alertSpy = jest.spyOn(component.actions, 'showGlobalAlert').mockImplementation(() => undefined);
+    (component as any).showReviewConfirmation(statusId);
+    expect(alertSpy).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary }));
+  });
+
+  it.each([
+    [10, 'backstopping from the MELP team'],
+    [11, 'now Postponed'],
+    [15, 'now Not Accepted']
+  ])('H20: the OICR review confirmation matches the decision (status %i)', (statusId: number, fragment: string) => {
+    expect((component as any).oicrReviewOutcomeMessage(statusId)).toContain(fragment);
+  });
+
   it('should handle latest flow submit review with non-approve', async () => {
     mockAllModalsService.submitResultOrigin!.set('latest');
     
@@ -681,7 +735,7 @@ describe('SubmitResultContentComponent', () => {
       severity: 'success',
       summary: 'Review submitted successfully',
       hasNoCancelButton: true,
-      detail: 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.',
+      detail: 'Your review has been submitted. The OICR is now Postponed and can be reported again in a later reporting year.',
       confirmCallback: {
         label: 'Done',
         event: expect.any(Function)

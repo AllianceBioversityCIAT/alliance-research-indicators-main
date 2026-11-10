@@ -12,6 +12,7 @@ import { Result } from '../results/entities/result.entity';
 import { AiRawInstitution } from '../results/dto/result-ai.dto';
 import { ResultInstitutionAi } from './entities/result-institution-ai.entity';
 import { selectManager } from '../../shared/utils/orm.util';
+import { normalizeSimilarityScore } from '../../shared/utils/ai-similarity.util';
 @Injectable()
 export class ResultInstitutionsService extends BaseServiceSimple<
   ResultInstitution,
@@ -43,7 +44,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
     const pendingInstitutions: Partial<ResultInstitutionAi>[] = [];
     for (const institution of institutios) {
       if (
-        parseInt(institution.similarity_score) >= 70 &&
+        normalizeSimilarityScore(institution.similarity_score) >= 70 &&
         institution?.institution_id
       )
         aceptInstitutions.push({
@@ -56,7 +57,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
             : null,
           institution_role_id: institution_role,
           institution_name: institution.institution_name,
-          score: parseInt(institution.similarity_score),
+          score: normalizeSimilarityScore(institution.similarity_score),
         });
     }
 

@@ -17,6 +17,9 @@ const MAX_OVERVIEW_TEXT_LENGTH = 20_000;
 })
 export class DocumentOverviewService {
   private readonly cache = inject(CacheService);
+  // H29 — last summary seen per project, so revisiting a dashboard shows it at once
+  // while the (slow) AI service is asked again in the background.
+  private readonly summaryByProject = new Map<string, DocumentOverviewResponse>();
 
   constructor(private readonly http: HttpClient) {}
 
@@ -26,12 +29,14 @@ export class DocumentOverviewService {
       .set('project_folder', this.buildProjectFolder(projectId));
 
     try {
-      return await firstValueFrom(
+      const response = await firstValueFrom(
         this.http.get<DocumentOverviewResponse>(`${environment.documentOverviewUrl}/api/document-overview`, {
           headers: this.buildAuthHeaders(),
           params
         })
       );
+      this.summaryByProject.set(projectId, response);
+      return response;
     } catch (error) {
       console.error('Error occurred while fetching document overview summary:', error);
       throw error;
@@ -48,11 +53,13 @@ export class DocumentOverviewService {
     };
 
     try {
-      return await firstValueFrom(
+      const response = await firstValueFrom(
         this.http.post<DocumentOverviewResponse>(`${environment.documentOverviewUrl}/api/document-overview`, body, {
           headers: this.buildAuthHeaders()
         })
       );
+      this.summaryByProject.set(projectId, response);
+      return response;
     } catch (error) {
       console.error('Error occurred while generating document overview:', error);
       throw error;
@@ -72,10 +79,16 @@ export class DocumentOverviewService {
           headers: this.buildPublicHeaders()
         })
       );
+      this.summaryByProject.delete(projectId);
     } catch (error) {
       console.error('Error occurred while deleting document overview files:', error);
       throw error;
     }
+  }
+
+  /** The last summary fetched or generated for this project in this session, if any. */
+  getCachedSummary(projectId: string): DocumentOverviewResponse | undefined {
+    return this.summaryByProject.get(projectId);
   }
 
   private buildProjectFolder(projectId: string): string {

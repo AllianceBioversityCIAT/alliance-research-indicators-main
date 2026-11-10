@@ -114,6 +114,26 @@ describe('GeneralInformationComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('H4: keeps what the user typed while the section was still loading', async () => {
+    let resolveLoad!: (value: unknown) => void;
+    (apiService as any).GET_GeneralInformation = jest.fn().mockImplementation(() => new Promise(r => (resolveLoad = r)));
+
+    const pending = component.getData();
+    component.body.update(b => ({ ...b, description: 'Typed during load', user_id: 'user-9' }) as any);
+    resolveLoad({ data: { title: 'Saved title', description: '', user_id: null } });
+    await pending;
+
+    expect(component.body().title).toBe('Saved title');
+    expect(component.body().description).toBe('Typed during load');
+    expect((component.body() as any).user_id).toBe('user-9');
+  });
+
+  it('H4: takes the loaded data as-is when nothing was edited during the load', async () => {
+    (apiService as any).GET_GeneralInformation = jest.fn().mockResolvedValue({ data: { title: 'Loaded', description: 'From server' } });
+    await component.getData();
+    expect(component.body().description).toBe('From server');
+  });
+
   it('should call getData and set body', async () => {
     const mockData: GeneralInformation = {
       title: 'Test Title',

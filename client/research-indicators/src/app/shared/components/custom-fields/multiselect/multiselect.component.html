@@ -18,7 +18,7 @@
   } @else {
   <div>
     <p-multiSelect [style]="isInvalid() ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
-      [loading]="this.loadingSig()" [options]="this.availableOptions()" [filter]="!this.service?.isOpenSearch()"
+      [loading]="this.loadingSig()" [options]="this.availableOptions()" [filter]="!this.service?.isOpenSearch()" [autofocusFilter]="true"
       [filterBy]="this.filterBy || this.optionLabel" [optionLabel]="this.optionLabel" [showToggleAll]="false"
       [optionValue]="this.optionValue" [(ngModel)]="this.body().value" (ngModelChange)="this.setValue($event)"
       [disabled]="disabled" [virtualScroll]="effectiveVirtualScroll()" [placeholder]="placeholder"
@@ -42,7 +42,7 @@
         @if (selectedItems) {
         <ng-container *ngTemplateOutlet="selectedItems; context: { $implicit: value }"></ng-container>
         } @else {
-        {{ selectedOptions().length > 0 ? selectedOptions().length + ' items selected' : '' }}
+        {{ selectedOptions().length > 0 ? selectedOptions().length + (selectedOptions().length === 1 ? ' item selected' : ' items selected') : '' }}
         }
       </ng-template>
 

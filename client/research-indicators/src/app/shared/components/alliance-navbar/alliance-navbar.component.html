@@ -19,7 +19,7 @@
     @if (!option.hide) {
     <a class="option atc-white-1 {{ hss ? 'py-[15px] px-[15px] xl:px-[10px]' : 'py-[25px] px-[15px] xl:px-[25px]' }} "
       [routerLink]="option.disabled ? null : option.path" routerLinkActive="active atc-light-blue-200-i"
-      [routerLinkActiveOptions]="option.path === '/projects' ? { exact: false } : { exact: true }"
+      [routerLinkActiveOptions]="option.path === '/projects' ? { exact: false } : exactPathMatch"
       [attr.data-route]="option.path" [class.disabled]="option.disabled"
       [attr.aria-disabled]="option.disabled ? true : null">
       @if (option.path === '/projects') {

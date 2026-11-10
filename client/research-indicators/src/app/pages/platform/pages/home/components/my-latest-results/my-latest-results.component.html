@@ -27,9 +27,6 @@
               }
             </div>
             <label class="indicator-type" for="username">{{ result.indicators?.name ?? '' }}</label>
-            <div class="more-vert" (click)="$event.stopPropagation(); $event.preventDefault()">
-              <span class="material-symbols-rounded more-vert__icon">more_vert</span>
-            </div>
           </div>
           <div class="organization-identifier">
             <div class="project">
@@ -57,7 +54,7 @@
               [statusBackground]="rs.config?.color?.background ?? undefined"
               [statusBorder]="rs.config?.color?.border ?? undefined" [icon]="true"
               [iconName]="rs.config?.icon?.name || undefined" [iconColor]="rs.config?.icon?.color || undefined"
-              [tooltip]="rs.description ?? ''" [textSizePx]="10" maxWidth="100px" [multiline]="false">
+              [tooltip]="rs.description ?? ''" [textSizePx]="10" maxWidth="140px" [multiline]="false">
             </app-custom-tag>
             }
             <div class="progress-bar-content">
