@@ -239,7 +239,8 @@
             <a [routerLink]="getResultRouteArray(result)" [queryParams]="getResultQueryParams(result)"
               (click)="$event.stopPropagation()" class="block w-full h-full"
               style="color: inherit; text-decoration: none">
-              <div class="overflow-hidden line-clamp-3 xl:line-clamp-2">
+              <div class="overflow-hidden line-clamp-3 xl:line-clamp-2" [appTruncatedTooltip]="getCellTooltip(column, result)"
+                tooltipPosition="top">
                 {{ column.getValue ? column.getValue(result) : '-' }}
               </div>
             </a>
