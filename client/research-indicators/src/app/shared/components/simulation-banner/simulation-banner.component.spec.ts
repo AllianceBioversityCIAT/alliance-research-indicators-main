@@ -216,6 +216,7 @@ describe('SimulationBannerComponent edge cases', () => {
         { provide: CacheService, useValue: cache },
         { provide: ImpersonationService, useValue: impersonation },
         { provide: ActionsService, useValue: actions },
+        { provide: DateFormatConfigService, useValue: { config: signal(null) } },
         websocketProvider
       ]
     });
