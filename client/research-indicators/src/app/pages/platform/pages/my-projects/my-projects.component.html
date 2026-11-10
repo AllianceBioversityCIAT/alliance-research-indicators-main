@@ -211,7 +211,7 @@
                 <td>
                   <a [routerLink]="projectDetailRoute(project.agreement_id)" (click)="$event.stopPropagation()"
                     class="block" style="color: inherit; text-decoration: none">
-                    <div class="overflow-hidden line-clamp-2">
+                    <div class="overflow-hidden line-clamp-2" [appTruncatedTooltip]="project.description" tooltipPosition="top">
                       {{ project.description }}
                     </div>
                   </a>
