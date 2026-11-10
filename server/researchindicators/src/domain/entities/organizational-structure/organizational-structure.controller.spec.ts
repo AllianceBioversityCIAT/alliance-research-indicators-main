@@ -154,6 +154,20 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       },
     );
 
+    // Validation advisory T13-a (2026-11-10): the 403 is documented in Swagger.
+    it.each(writeHandlerNames)(
+      '%s documents the 403 for a machine credential or a missing role',
+      (handlerName) => {
+        const responses = Reflect.getMetadata(
+          DECORATORS.API_RESPONSE,
+          proto[handlerName],
+        );
+        expect(responses?.['403']?.description).toBe(
+          'The caller lacks CENTER_ADMIN / SYSTEM_ADMIN, or authenticated with a machine (app-secret) credential: writes need a signed-in user',
+        );
+      },
+    );
+
     it('is not declared at class level (that would close the reads too)', () => {
       expect(
         Reflect.getMetadata(GUARDS_METADATA, OrganizationalStructureController),

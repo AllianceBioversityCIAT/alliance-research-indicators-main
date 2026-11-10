@@ -20,6 +20,7 @@ import {
   ApiBody,
   ApiCreatedResponse,
   ApiExtraModels,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -409,6 +410,10 @@ export class OrganizationalStructureController {
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UseGuards(HumanCredentialGuard)
+  @ApiForbiddenResponse({
+    description:
+      'The caller lacks CENTER_ADMIN / SYSTEM_ADMIN, or authenticated with a machine (app-secret) credential: writes need a signed-in user',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -456,6 +461,10 @@ export class OrganizationalStructureController {
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UseGuards(HumanCredentialGuard)
+  @ApiForbiddenResponse({
+    description:
+      'The caller lacks CENTER_ADMIN / SYSTEM_ADMIN, or authenticated with a machine (app-secret) credential: writes need a signed-in user',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -496,6 +505,10 @@ export class OrganizationalStructureController {
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UseGuards(HumanCredentialGuard)
+  @ApiForbiddenResponse({
+    description:
+      'The caller lacks CENTER_ADMIN / SYSTEM_ADMIN, or authenticated with a machine (app-secret) credential: writes need a signed-in user',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -536,6 +549,10 @@ export class OrganizationalStructureController {
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UseGuards(HumanCredentialGuard)
+  @ApiForbiddenResponse({
+    description:
+      'The caller lacks CENTER_ADMIN / SYSTEM_ADMIN, or authenticated with a machine (app-secret) credential: writes need a signed-in user',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -588,6 +605,10 @@ export class OrganizationalStructureController {
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UseGuards(HumanCredentialGuard)
+  @ApiForbiddenResponse({
+    description:
+      'The caller lacks CENTER_ADMIN / SYSTEM_ADMIN, or authenticated with a machine (app-secret) credential: writes need a signed-in user',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,

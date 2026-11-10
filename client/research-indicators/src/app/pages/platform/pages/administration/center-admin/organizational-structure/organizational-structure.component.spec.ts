@@ -177,6 +177,19 @@ describe('OrganizationalStructureComponent', () => {
     });
   });
 
+  // Validation advisory A-1 (2026-11-10): `bg-white` is a literal colour and
+  // does not follow the dark theme; the panes use the `--ac-white-1` token.
+  describe('design tokens (A-1)', () => {
+    it('no element uses the literal bg-white; both panes use the --ac-white-1 token', async () => {
+      await create();
+
+      expect(root().querySelectorAll('.bg-white')).toHaveLength(0);
+      const panes = Array.from(root().querySelectorAll('.basis-\\[60\\%\\], .basis-\\[40\\%\\]'));
+      expect(panes).toHaveLength(2);
+      for (const pane of panes) expect(pane.classList).toContain('bg-[var(--ac-white-1)]');
+    });
+  });
+
   describe('R-ORG-013 AC.2 UI states, in both views', () => {
     it('shows the progress bar while B1 is pending, in both views', async () => {
       api.GET_OrgStructureYears.mockResolvedValue(ok(RANGE));

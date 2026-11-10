@@ -14,6 +14,7 @@ import {
   seedOrgUnitChangeLog,
   seedOrgUnits,
   seedOrgUnitVersions,
+  SeedDelegate,
   SeedEntry,
   SEED_DIRECTORS,
   SEED_ENTRIES,
@@ -590,6 +591,56 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
         expect(report.map((r) => [r.code, r.outcome, r.inserted])).toEqual([
           ['ORG-032', 'matched', 0],
         ]);
+      } finally {
+        await tx.rollbackTransaction();
+        await tx.release();
+      }
+    });
+
+    // Validation advisory T14-a (2026-11-10): the three skip paths of
+    // seedOrgDelegates, each inside a rolled-back transaction.
+    it.each<[string, SeedDelegate, string]>([
+      [
+        'an unmatched person is reported and not inserted',
+        {
+          unitId: 32,
+          person: { name: 'Nobody T14', email: 'nobody.t14@example.invalid' },
+        },
+        'no match',
+      ],
+      [
+        'a unit with no seeded 2026 version inserts nothing',
+        {
+          unitId: 2147483000,
+          person: { name: 'Christopher Kettle', email: 'c.kettle@cgiar.org' },
+        },
+        'matched',
+      ],
+      [
+        "the version's own director is never seeded as its delegate (I-6)",
+        {
+          unitId: 32,
+          person: { name: 'Louis Verchot', email: 'l.verchot@cgiar.org' },
+        },
+        'matched',
+      ],
+    ])('%s', async (_label, delegate, outcome) => {
+      const tx = dataSource.createQueryRunner();
+      await tx.startTransaction();
+      try {
+        const before = Number(
+          (await tx.query('SELECT COUNT(*) AS n FROM org_unit_delegates'))[0].n,
+        );
+        const report = await seedOrgDelegates(tx, [delegate]);
+        expect(report.map((r) => [r.outcome, r.inserted])).toEqual([
+          [outcome, 0],
+        ]);
+        expect(
+          Number(
+            (await tx.query('SELECT COUNT(*) AS n FROM org_unit_delegates'))[0]
+              .n,
+          ),
+        ).toBe(before);
       } finally {
         await tx.rollbackTransaction();
         await tx.release();

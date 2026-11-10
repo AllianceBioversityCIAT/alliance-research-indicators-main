@@ -505,6 +505,14 @@ export class OrgStructureService {
             );
           }
           const versions = await this.store.loadVersions(manager, id);
+          // Validation advisory A-2: an ended entry always has a closed last
+          // version through the API; an open one means hand-made rows. Refuse
+          // with a 409 before any write instead of failing the timeline (500).
+          if (versions[versions.length - 1].to === null) {
+            throw conflict(
+              `Organizational unit ${unit.code} is ${unit.status} but its last version has no end year; the data is inconsistent and must be corrected before it can be reactivated`,
+            );
+          }
           const endedFrom =
             unit.status_from_year ?? versions[versions.length - 1].to;
           const reopened = reopenTimeline(versions, year, endedFrom);

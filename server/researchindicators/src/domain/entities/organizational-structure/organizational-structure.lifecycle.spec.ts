@@ -634,6 +634,27 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
       expectUntouched(before);
     });
 
+    // Validation advisory A-2 (2026-11-10): an inactive entry whose last version
+    // has no end year cannot come from the API (inactivate always closes it),
+    // only from hand-made rows. It used to fail the overlap invariant as a 500.
+    it('an inactive entry whose last version is open-ended (inconsistent rows) is a 409, not a 500, and nothing changes', async () => {
+      store.unit(
+        10,
+        'ORG-010',
+        [{ from: 2026, to: null, parentId: 2 }],
+        'inactive',
+        2027,
+      );
+      store.writes = 0;
+      const before = checksum();
+      const error = await rejection(service.reactivate(10, { fromYear: 2027 }));
+      expect(error.getStatus()).toBe(409);
+      expect(descriptionOf(error)).toBe(
+        'Organizational unit ORG-010 is inactive but its last version has no end year; the data is inconsistent and must be corrected before it can be reactivated',
+      );
+      expectUntouched(before);
+    });
+
     it('an active entry is 409 "already active"; an unknown one is 404', async () => {
       const active = await rejection(service.reactivate(4, { fromYear: 2027 }));
       expect(active.getStatus()).toBe(409);
