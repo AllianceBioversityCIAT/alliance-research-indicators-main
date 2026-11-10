@@ -150,9 +150,9 @@ describe('PfmResultRowComponent', () => {
     expect(render({ official_code: 7 }).q('pfm-row-code-number').textContent?.trim()).toBe('007');
   });
 
-  it('title follows the Results Center rule: inner div clamps 3 lines (2 on xl), the link is not clamped, full text in title, underline only on hover/focus', () => {
+  it('title follows the Results Center rule: inner div clamps 3 lines (2 on xl), the link is not clamped, full text in the PrimeNG tooltip, underline only on hover/focus', () => {
     const long = 'Long title '.repeat(60).trim();
-    const { q } = render({ title: long });
+    const { q, tipOf } = render({ title: long });
     const t = q('pfm-row-title');
     const inner = t.querySelector('div') as HTMLElement;
     expect(inner.classList).toContain('overflow-hidden');
@@ -162,7 +162,8 @@ describe('PfmResultRowComponent', () => {
     expect(t.classList).not.toContain('line-clamp-3');
     expect(t.classList).toContain('block');
     expect(t.classList).toContain('w-full');
-    expect(t.getAttribute('title')).toBe(long);
+    expect(t.getAttribute('title')).toBeNull();
+    expect(tipOf(inner)).toBe(long);
     expect(t.classList).toContain('no-underline');
     expect(t.className).toContain('hover:underline');
     expect(t.className).toContain('focus-visible:underline');
