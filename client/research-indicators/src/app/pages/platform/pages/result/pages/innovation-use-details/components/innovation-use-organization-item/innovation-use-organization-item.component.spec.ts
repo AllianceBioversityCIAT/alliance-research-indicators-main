@@ -1018,3 +1018,131 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
   });
 });
+
+describe('InnovationUseOrganizationItemComponent - defensive branches', () => {
+  let component: InnovationUseOrganizationItemComponent;
+  let fixture: ComponentFixture<InnovationUseOrganizationItemComponent>;
+  let openModal: jest.Mock;
+  let subTypes: FakeSubTypesService;
+
+  beforeEach(async () => {
+    openModal = jest.fn();
+    subTypes = new FakeSubTypesService(SUB_TYPES_BY_TYPE);
+    await TestBed.configureTestingModule({
+      imports: [InnovationUseOrganizationItemComponent],
+      providers: [
+        { provide: GetInstitutionsService, useValue: { list: signal(INSTITUTIONS) } },
+        { provide: GetInstitutionTypesService, useValue: { list: signal(INSTITUTION_TYPES) } },
+        { provide: GetClarisaInstitutionsSubTypesService, useValue: subTypes },
+        { provide: AllModalsService, useValue: { openModal } }
+      ]
+    }).compileComponents();
+    fixture = TestBed.createComponent(InnovationUseOrganizationItemComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('falls back to an empty organization on init when the input is nullish', () => {
+    component.organization = null as unknown as InnovationUseOrganization;
+    component.ngOnInit();
+    expect(component.body()).toEqual({ ...new InnovationUseOrganization() });
+  });
+
+  it('ngOnChanges replaces the body and resyncs sub types when the parent row differs', async () => {
+    component.organization = { ...new InnovationUseOrganization(), is_organization_known: true };
+    fixture.detectChanges();
+
+    component.organization = { ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10 };
+    component.ngOnChanges({ organization: {} as never });
+    await fixture.whenStable();
+
+    expect(component.body().institution_type_id).toBe(10);
+    expect(component.subTypeOptions().map(o => o.code)).toEqual([101, 102]);
+    expect(component.touched()).toBe(false);
+  });
+
+  it('ngOnChanges keeps the body when the parent row is identical', () => {
+    component.organization = { ...new InnovationUseOrganization(), is_organization_known: true };
+    fixture.detectChanges();
+    const before = component.body();
+
+    component.organization = { ...before };
+    component.ngOnChanges({ organization: {} as never });
+    expect(component.body()).toBe(before);
+  });
+
+  it('ngOnChanges falls back to an empty organization when the input became nullish', () => {
+    component.organization = { ...new InnovationUseOrganization(), institution_id: 501, is_organization_known: true };
+    fixture.detectChanges();
+
+    component.organization = null as unknown as InnovationUseOrganization;
+    component.ngOnChanges({ organization: {} as never });
+    expect(component.body()).toEqual({ ...new InnovationUseOrganization() });
+  });
+
+  it('ngOnChanges ignores unrelated inputs and changes before init', () => {
+    component.organization = { ...new InnovationUseOrganization(), institution_id: 501 };
+    component.ngOnChanges({ organization: {} as never });
+    expect(component.body().institution_id).not.toBe(501);
+
+    fixture.detectChanges();
+    const before = component.body();
+    component.ngOnChanges({ disabled: {} as never });
+    expect(component.body()).toBe(before);
+  });
+
+  it('onRequestPartner opens the modal only when enabled', () => {
+    fixture.detectChanges();
+    component.disabled = true;
+    component.onRequestPartner();
+    expect(openModal).not.toHaveBeenCalled();
+
+    component.disabled = false;
+    component.onRequestPartner();
+    expect(openModal).toHaveBeenCalledWith('requestPartner');
+  });
+
+  it('onRemove emits only when enabled', () => {
+    fixture.detectChanges();
+    const emitSpy = jest.spyOn(component.remove, 'emit');
+
+    component.disabled = true;
+    component.onRemove();
+    expect(emitSpy).not.toHaveBeenCalled();
+
+    component.disabled = false;
+    component.onRemove();
+    expect(emitSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears sub type options when the type is cleared', async () => {
+    fixture.detectChanges();
+    component.subTypeOptions.set([{ code: 1 } as ClarisaInstitutionsSubTypes]);
+    await component.onInstitutionTypeChange(undefined as unknown as number);
+    expect(component.subTypeOptions()).toEqual([]);
+  });
+
+  it('drops a stale sub type response when the type changed while loading', async () => {
+    fixture.detectChanges();
+    component.subTypeOptions.set([]);
+    const pending = component.onInstitutionTypeChange(10);
+    component.body.update(current => ({ ...current, institution_type_id: 20 }));
+    await pending;
+    expect(component.subTypeOptions()).toEqual([]);
+  });
+
+  it('onInstitutionChange stores the selected institution id', () => {
+    fixture.detectChanges();
+    component.onInstitutionChange(501);
+    expect(component.body().institution_id).toBe(501);
+  });
+
+  it('identitySatisfied depends on the known/unknown path', () => {
+    fixture.detectChanges();
+    component.body.set({ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 });
+    expect(component.identitySatisfied).toBe(true);
+    component.body.set({ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: null });
+    expect(component.identitySatisfied).toBe(false);
+    component.body.set({ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10 });
+    expect(component.identitySatisfied).toBe(true);
+  });
+});

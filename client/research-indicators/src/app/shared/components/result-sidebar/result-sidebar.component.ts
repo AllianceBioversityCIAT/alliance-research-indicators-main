@@ -21,13 +21,13 @@ import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { CurrentResultService } from '@shared/services/cache/current-result.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { AlignmentResponse } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import {
   isHomeEntryFromUrl,
   isResultsCenterEntryFromUrl,
   RESULT_ENTRY_SOURCE_QUERY,
-  RESULT_ENTRY_SOURCE_VALUE_HOME,
-  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
+  isKnownResultEntrySource
 } from '@shared/constants/result-entry-source';
 
 interface SubmissionAlertData {
@@ -79,6 +79,7 @@ export class ResultSidebarComponent {
   currentResultService = inject(CurrentResultService);
   bilateralService = inject(BilateralService);
   poolFundingFlags = inject(PoolFundingFlagsService);
+  private readonly versionWatcher = inject(VersionWatcherService);
   private readonly publishedOicrStatusId = 14;
 
   allOptionsWithGreenChecks = computed(() => {
@@ -122,7 +123,8 @@ export class ResultSidebarComponent {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
     const hiddenByYearWithoutData = alignment?.version_locked === true && alignment.has_pool_funding_data !== true;
-    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || (alignment.eligible === false && alignment.display_only !== true) || hiddenByYearWithoutData;
+    const hiddenByExistingRules =
+      meta?.indicator_id === 5 || !alignment || (alignment.eligible === false && alignment.display_only !== true) || hiddenByYearWithoutData;
     return hiddenByExistingRules || !this.poolFundingFlags.sectionEnabled();
   }
 
@@ -198,6 +200,12 @@ export class ResultSidebarComponent {
 
   private readonly prmsHistoryEffect = effect(() => {
     const resultCode = this.cache.getCurrentNumericResultId();
+    // The version selector changes only the `version` query param; the result
+    // id stays put. ResultComponent reloads metadata and alignment from this
+    // same signal. The interceptor reads the param off the URL when the
+    // request is made, and `prmsHistoryFetchGen` drops a slower response from
+    // the selection just left.
+    this.versionWatcher.version();
     untracked(() => {
       void this.fetchPrmsSyncHistory(resultCode);
     });
@@ -410,7 +418,7 @@ export class ResultSidebarComponent {
     const v = m.get('version');
     const f = m.get('from');
     if (v) o['version'] = v;
-    if (f === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || f === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(f)) {
       o[RESULT_ENTRY_SOURCE_QUERY] = f;
     }
     return o;
@@ -501,7 +509,7 @@ export class ResultSidebarComponent {
       greenCheckKey: 'ip_rights'
     },
     {
-      label: 'Pool funding alignment',
+      label: 'CGIAR Portfolio Contribution',
       path: 'pool-funding-alignment',
       greenCheckKey: 'pool_funding_alignment',
       optional: true
@@ -615,7 +623,7 @@ export class ResultSidebarComponent {
     if (version) {
       queryParams['version'] = version;
     }
-    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(from)) {
       queryParams[RESULT_ENTRY_SOURCE_QUERY] = from;
     }
 

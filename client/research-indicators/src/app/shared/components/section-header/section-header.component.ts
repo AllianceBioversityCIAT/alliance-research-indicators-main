@@ -15,7 +15,8 @@ import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DownloadOicrTemplateComponent } from '../download-oicr-template/download-oicr-template.component';
 import { RolesService } from '@shared/services/cache/roles.service';
-import { isHomeEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
+import { lastPfmScope } from '@shared/utils/pfm-last-scope.util';
+import { isHomeEntryFromUrl, isPfmMonitorEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import {
@@ -33,6 +34,8 @@ const OICR_INDICATOR_ID = 5;
 export interface BreadcrumbItem {
   label: string;
   route?: string;
+  /** Query params for `route` (e.g. `{ tab: 'queue' }`); a `?` inside `route` is not parsed by routerLink. */
+  queryParams?: Record<string, string>;
   tooltip?: string;
 }
 
@@ -225,6 +228,11 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     const contractId = this.contractId();
     const fullUrl = this.currentUrl();
 
+    const pfmMonitorEntryBreadcrumb = this.breadcrumbForPfmMonitorEntry(fullUrl);
+    if (pfmMonitorEntryBreadcrumb) {
+      return pfmMonitorEntryBreadcrumb;
+    }
+
     const homeEntryBreadcrumb = this.breadcrumbForHomeEntry(fullUrl);
     if (homeEntryBreadcrumb) {
       return homeEntryBreadcrumb;
@@ -297,6 +305,28 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
       if (resultId) {
         return [
           { label: 'Home', route: '/home' },
+          { label: `Result ${resultId}`, tooltip: this.resultTitle() }
+        ];
+      }
+    }
+    return undefined;
+  }
+
+  /** Back to the queue tab, in the scope the user was viewing (omitted when none is remembered). */
+  // Reads sessionStorage, which signals do not track: `breadcrumb` stays fresh only because it recomputes on every currentUrl change.
+  private pfmMonitorQueryParams(): Record<string, string> {
+    const scope = lastPfmScope();
+    return scope ? { tab: 'queue', scope } : { tab: 'queue' };
+  }
+
+  private breadcrumbForPfmMonitorEntry(fullUrl: string): BreadcrumbItem[] | undefined {
+    if (this.isResultPage() && isPfmMonitorEntryFromUrl(fullUrl)) {
+      const pathOnly = fullUrl.split(/[?#]/)[0];
+      const segs = pathOnly.split('/').filter(Boolean);
+      const resultId = segs[0] === 'result' && segs.length >= 2 ? segs[1] : '';
+      if (resultId) {
+        return [
+          { label: 'CGIAR Portfolio Contribution Monitor', route: '/cgiar-portfolio-contribution-monitor', queryParams: this.pfmMonitorQueryParams() },
           { label: `Result ${resultId}`, tooltip: this.resultTitle() }
         ];
       }

@@ -229,4 +229,68 @@ describe('ImpersonationService', () => {
       expect(persisted.user.sec_user_id).toBe(1);
     });
   });
+  describe('edge cases', () => {
+    it('sessionId() is null when there is no session', () => {
+      expect(service.sessionId()).toBeNull();
+    });
+
+    it('end() without stored state falls back to the in-memory actor and skips the api', async () => {
+      service.actor.set(adminUser);
+      const result = await service.end('manual');
+      expect(apiMock.endImpersonation).not.toHaveBeenCalled();
+      expect(result.actor?.sec_user_id).toBe(1);
+      expect(JSON.parse(localStorage.getItem('data') as string).user.sec_user_id).toBe(1);
+    });
+
+    it('end() without stored state or actor returns a null actor and leaves data untouched', async () => {
+      const result = await service.end('manual');
+      expect(result.actor).toBeNull();
+      expect(localStorage.getItem('data')).toBeNull();
+    });
+
+    it('treats a corrupt stored value as no state', async () => {
+      localStorage.setItem('impersonation', '{not-json');
+      await service.restore();
+      expect(apiMock.currentImpersonation).not.toHaveBeenCalled();
+      expect(service.active()).toBe(false);
+    });
+
+    it('uses an empty roleName when the target has no roles or a null/missing list', () => {
+      service.start({ ...startResponse, user: { ...targetProfile, user_role_list: [] } });
+      expect(dataCacheSignal().user.roleName).toBe('');
+      service.start({ ...startResponse, user: { ...targetProfile, user_role_list: undefined as never } });
+      expect(dataCacheSignal().user.roleName).toBe('');
+    });
+
+    it('prefers role 1, otherwise falls back to the first role when neither 1 nor 9 exists', () => {
+      const role = (id: number, name: string) => ({
+        is_active: true,
+        user_id: 55,
+        role_id: id,
+        role: { is_active: true, justification_update: null, sec_role_id: id, name, focus_id: 0 }
+      });
+      service.start({ ...startResponse, user: { ...targetProfile, user_role_list: [role(10, 'Contributor Plus'), role(1, 'System Admin')] } });
+      expect(dataCacheSignal().user.roleName).toBe('System Admin');
+      service.start({ ...startResponse, user: { ...targetProfile, user_role_list: [role(10, 'Contributor Plus'), role(11, 'Other')] } });
+      expect(dataCacheSignal().user.roleName).toBe('Contributor Plus');
+    });
+
+    it('end() times out a hanging api call after 3 s and still restores locally', async () => {
+      jest.useFakeTimers();
+      try {
+        service.start(startResponse);
+        (apiMock.endImpersonation as jest.Mock).mockReturnValue(new Promise(() => undefined));
+        const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+        const pending = service.end('logout');
+        await jest.advanceTimersByTimeAsync(3000);
+        const result = await pending;
+        expect(consoleSpy).toHaveBeenCalled();
+        expect(result.actor?.sec_user_id).toBe(1);
+        expect(service.active()).toBe(false);
+        consoleSpy.mockRestore();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
 });

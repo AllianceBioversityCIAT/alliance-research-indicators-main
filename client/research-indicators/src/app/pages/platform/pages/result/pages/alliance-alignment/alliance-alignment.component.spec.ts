@@ -2458,6 +2458,63 @@ describe('AllianceAlignmentComponent', () => {
     });
   });
 
+  describe('strategicOutcomesForSignal edge cases', () => {
+    const outcomes = (value: unknown) =>
+      (component as any).strategicOutcomesForSignal({ lever_id: 10, result_lever_strategic_outcomes: value });
+
+    it('wraps a single non-array value and resolves it from the catalog', () => {
+      getLeverStrategicOutcomesService.setCatalog([{ id: 7, strategic_outcome: { name: 'From catalog' } }]);
+      const result = outcomes(7);
+      expect(result).toHaveLength(1);
+      expect(result[0].lever_strategic_outcome_id).toBe(7);
+      expect(result[0].strategic_outcome).toEqual({ name: 'From catalog' });
+    });
+
+    it('returns an empty list for null and drops invalid ids', () => {
+      expect(outcomes(null)).toEqual([]);
+      expect(outcomes([0, 'x', { id: 'abc' }, -2])).toEqual([]);
+    });
+
+    it('prefers the saved outcome, then the nested one, then the catalog match', () => {
+      getLeverStrategicOutcomesService.setCatalog([{ lever_strategic_outcome_id: 3, strategic_outcome: { name: 'cat' } }]);
+      const result = outcomes([
+        { lever_strategic_outcome_id: 1, strategic_outcome: { name: 'saved' } },
+        { lever_strategic_outcome_id: 2, lever_strategic_outcome: { strategic_outcome: { name: 'nested' } } },
+        { lever_strategic_outcome_id: 3 },
+        { lever_strategic_outcome_id: 4 }
+      ]);
+      expect(result.map((r: any) => r.strategic_outcome)).toEqual([
+        { name: 'saved' },
+        { name: 'nested' },
+        { name: 'cat' },
+        undefined
+      ]);
+    });
+  });
+
+  describe('pool funding visibility edge cases', () => {
+    it('refreshPoolFundingVisibility falls back to the cached result id when the route has no id', async () => {
+      route.snapshot.paramMap.get = () => null;
+      const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+      await (component as any).refreshPoolFundingVisibility();
+      expect(getAlignment).toHaveBeenCalledWith(String(cache.currentResultId()));
+    });
+
+    it('hasPoolFundingPrimary is false when contracts are missing', () => {
+      component.body.set({ result_sdgs: [], primary_levers: [], contributor_levers: [] } as never);
+      expect((component as any).hasPoolFundingPrimary()).toBe(false);
+    });
+
+    it('confirm alert falls back to "This project" when the contract has no agreement id', () => {
+      cache.metadata.set({ indicator_id: 1 });
+      const item = { is_primary: false, is_pool_funding_contributor: true, contract_id: '9' };
+      component.body.set({ contracts: [item], result_sdgs: [], primary_levers: [], contributor_levers: [] } as never);
+      component.markAsPrimary(item as never, 'contract');
+      const alert = actions.showGlobalAlert.mock.calls[0][0];
+      expect(alert.detail).toContain('This project contributes to Pool Funding.');
+    });
+  });
+
   describe('parseResultLeverSdgTargetEntry / normalizeResultLeverSdgTargets', () => {
     it('parses numeric and object SDG target entries and drops invalid values', () => {
       expect(component.parseResultLeverSdgTargetEntry(4)).toEqual({ sdg_target_id: 4 });

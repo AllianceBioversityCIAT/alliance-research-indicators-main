@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResultSidebarComponent } from './result-sidebar.component';
-import { ActivatedRoute, Router, NavigationEnd, ParamMap } from '@angular/router';
+import { ActivatedRoute, Router, NavigationEnd, ParamMap, Params } from '@angular/router';
 import { computed, signal, WritableSignal } from '@angular/core';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -12,6 +12,7 @@ import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { GetMetadataService } from '@shared/services/get-metadata.service';
 import { SubmissionService } from '@shared/services/submission.service';
 import { of, Subject, firstValueFrom } from 'rxjs';
+import { PrmsSyncCardComponent } from '@shared/components/prms-sync-card/prms-sync-card.component';
 import { PrmsSyncHistoryResponse } from '@shared/interfaces/prms-sync-history.interface';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
@@ -36,6 +37,7 @@ describe('ResultSidebarComponent', () => {
   let bilateralService: Partial<BilateralService>;
   let sectionEnabled: WritableSignal<boolean>;
   let prmsSyncButtonEnabled: WritableSignal<boolean>;
+  let versionQueryParams$: Subject<Params>;
 
   beforeEach(async () => {
     cacheService = {
@@ -110,11 +112,13 @@ describe('ResultSidebarComponent', () => {
       keys: []
     };
 
+    versionQueryParams$ = new Subject<Params>();
     route = {
       snapshot: {
         paramMap: paramMapMock,
         queryParamMap: paramMapMock
-      } as any
+      } as any,
+      queryParams: versionQueryParams$.asObservable()
     };
 
     rolesService = {
@@ -493,13 +497,13 @@ describe('ResultSidebarComponent', () => {
         expect(poolFundingIdx).toBe(paths.length - 1);
       });
 
-      it('uses the lowercase-"f" label "Pool funding alignment" (mockup `33356:11736` RR-F)', () => {
+      it('uses the label "CGIAR Portfolio Contribution"', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
 
         const options = component.allOptionsWithGreenChecks();
         const poolFundingOption = options.find(o => o.path === 'pool-funding-alignment');
 
-        expect(poolFundingOption?.label).toBe('Pool funding alignment');
+        expect(poolFundingOption?.label).toBe('CGIAR Portfolio Contribution');
       });
 
       // AR.3 — sidebar side: the new SidebarOption uses greenCheckKey 'pool_funding_alignment',
@@ -694,7 +698,7 @@ describe('ResultSidebarComponent', () => {
       const container = divider?.parentElement;
       const children = Array.from(container?.children ?? []);
       const dividerIdx = children.indexOf(divider as Element);
-      expect(children[dividerIdx + 1]?.textContent).toContain('Pool funding alignment');
+      expect(children[dividerIdx + 1]?.textContent).toContain('CGIAR Portfolio Contribution');
     });
 
     it('does not render the divider when the Pool funding alignment tab is hidden', () => {
@@ -713,7 +717,7 @@ describe('ResultSidebarComponent', () => {
     function poolFundingItem(): HTMLElement | null {
       return (
         Array.from(fixture.nativeElement.querySelectorAll('.option') as NodeListOf<HTMLElement>).find(node =>
-          (node.textContent ?? '').includes('Pool funding alignment')
+          (node.textContent ?? '').includes('CGIAR Portfolio Contribution')
         ) ?? null
       );
     }
@@ -867,7 +871,7 @@ describe('ResultSidebarComponent', () => {
       await component.fetchPrmsSyncHistory(123);
       fixture.detectChanges();
 
-      expect(poolFundingItem()?.textContent).toContain('Pool funding alignment');
+      expect(poolFundingItem()?.textContent).toContain('CGIAR Portfolio Contribution');
       expect(component.hasPoolFundingOption()).toBe(true);
       expect(syncButton()).toBeNull();
 
@@ -1301,6 +1305,26 @@ describe('ResultSidebarComponent', () => {
       await component.onPrmsSync();
 
       expect(alertDetail()).toContain('just one, unwrapped');
+    });
+
+    it('ignores null entries inside a message list', async () => {
+      failWith('HTTP 400: Bad Request - {"response":{"message":["real problem",null]}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('real problem');
+      expect(alertDetail()).not.toContain('null');
+    });
+
+    it('falls back to the numeric result id for the alignment refresh when the route has no id', async () => {
+      enablePrmsSyncButton();
+      (route.snapshot?.paramMap?.get as jest.Mock).mockReturnValue(null);
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+
+      await component.onPrmsSync();
+
+      expect(bilateralService.getAlignment).toHaveBeenCalledWith('123');
     });
 
     it('ESCAPES the message -- it is data from an external system, rendered via innerHTML', async () => {
@@ -2699,7 +2723,7 @@ describe('ResultSidebarComponent', () => {
 
     function sectionItem(): Element | null {
       const host: HTMLElement = fixture.nativeElement;
-      return Array.from(host.querySelectorAll('.option')).find(el => el.textContent?.includes('Pool funding alignment')) ?? null;
+      return Array.from(host.querySelectorAll('.option')).find(el => el.textContent?.includes('CGIAR Portfolio Contribution')) ?? null;
     }
 
     function syncButton(): HTMLButtonElement | null {
@@ -2821,6 +2845,14 @@ describe('ResultSidebarComponent', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(value);
     }
 
+    function currentNumericResultId(): number {
+      const read = cacheService.getCurrentNumericResultId;
+      if (!read) {
+        throw new Error('getCurrentNumericResultId is not stubbed');
+      }
+      return read();
+    }
+
     function historyPayload(partial: Partial<PrmsSyncHistoryResponse> = {}): { successfulRequest: boolean; data: PrmsSyncHistoryResponse } {
       return {
         successfulRequest: true,
@@ -2939,6 +2971,118 @@ describe('ResultSidebarComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).not.toBeNull();
     });
 
+    it('refetches PRMS history when the version query param changes for the same result id', async () => {
+      setAlignment(panelAlignment);
+      const history = apiService.GET_PrmsSyncHistory as jest.Mock;
+      const callsAtStart = history.mock.calls.length;
+      expect(currentNumericResultId()).toBe(123);
+
+      let releaseVersion!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      const versionResponse = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseVersion = resolve;
+      });
+      history.mockImplementationOnce(() => versionResponse);
+
+      versionQueryParams$.next({ version: '2024' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(history.mock.calls.length).toBe(callsAtStart + 1);
+      expect(history.mock.calls.at(-1)?.[0]).toBe(123);
+      expect(component.prmsHistoryPhase()).toBe('loading');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(component.showPrmsSyncCard()).toBe(false);
+
+      releaseVersion(historyPayload({ events: [starEvent] }));
+      await versionResponse;
+      fixture.detectChanges();
+
+      expect(component.showPrmsSyncCard()).toBe(true);
+      expect(component.showLegacyPrmsCode()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+
+      let releaseLive!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      const liveResponse = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseLive = resolve;
+      });
+      history.mockImplementationOnce(() => liveResponse);
+
+      versionQueryParams$.next({});
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(history.mock.calls.length).toBe(callsAtStart + 2);
+      expect(history.mock.calls.at(-1)?.[0]).toBe(123);
+      expect(currentNumericResultId()).toBe(123);
+      expect(component.prmsHistoryPhase()).toBe('loading');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).not.toBeNull();
+      expect(component.showLegacyPrmsCode()).toBe(false);
+
+      releaseLive(historyPayload({ events: [], sync_count: 0 }));
+      await liveResponse;
+      fixture.detectChanges();
+
+      expect(component.showPrmsSyncCard()).toBe(false);
+      expect(component.showLegacyPrmsCode()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      const line = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]');
+      if (!line) {
+        throw new Error('legacy PRMS code line is missing');
+      }
+      const text = line.textContent;
+      if (text == null) {
+        throw new Error('legacy PRMS code line has no text');
+      }
+      expect(text.replace(/\s+/g, ' ').trim()).toBe('PRMS code #54321');
+    });
+
+    it('ignores a stale PRMS history response from the previous version', async () => {
+      setAlignment(panelAlignment);
+      const history = apiService.GET_PrmsSyncHistory as jest.Mock;
+
+      let releaseOlder!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      let releaseNewer!: (value: { successfulRequest: boolean; data: PrmsSyncHistoryResponse }) => void;
+      const older = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseOlder = resolve;
+      });
+      const newer = new Promise<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>(resolve => {
+        releaseNewer = resolve;
+      });
+      history.mockImplementationOnce(() => older).mockImplementationOnce(() => newer);
+
+      versionQueryParams$.next({ version: '2024' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      versionQueryParams$.next({});
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(component.prmsHistoryPhase()).toBe('loading');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+
+      releaseNewer(historyPayload({ events: [], sync_count: 0 }));
+      await newer;
+      fixture.detectChanges();
+
+      expect(component.showLegacyPrmsCode()).toBe(true);
+      expect(component.showPrmsSyncCard()).toBe(false);
+
+      releaseOlder(historyPayload({ events: [starEvent] }));
+      await older;
+      await Promise.resolve();
+      fixture.detectChanges();
+
+      expect(component.prmsHistoryPhase()).toBe('loaded');
+      expect(component.showPrmsSyncCard()).toBe(false);
+      expect(component.showLegacyPrmsCode()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).not.toBeNull();
+    });
+
     it('does not request history again when the modal opens', async () => {
       (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue(historyPayload({ events: [starEvent] }));
       setAlignment(panelAlignment);
@@ -2953,6 +3097,110 @@ describe('ResultSidebarComponent', () => {
 
       expect(component.prmsHistoryOpen()).toBe(true);
       expect((apiService.GET_PrmsSyncHistory as jest.Mock).mock.calls.length).toBe(callsBeforeOpen);
+    });
+    it('does not show the sync card or the legacy code when history is loaded but null', () => {
+      component.prmsHistory.set(null);
+      component.prmsHistoryPhase.set('loaded');
+      expect(component.showPrmsSyncCard()).toBe(false);
+
+      setAlignment(panelAlignment);
+      expect(component.prmsResultCode()).toBe(54321);
+      expect(component.showLegacyPrmsCode()).toBe(true);
+    });
+
+    it('marks the history failed when the response is unsuccessful or carries no data', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue({ successfulRequest: false, data: null });
+        await component.fetchPrmsSyncHistory(123);
+        expect(component.prmsHistoryPhase()).toBe('failed');
+        expect(component.prmsHistory()).toBeNull();
+        expect(errorSpy).toHaveBeenCalledWith('PRMS sync history request failed', { resultCode: 123 });
+
+        (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue({ successfulRequest: true, data: null });
+        await component.fetchPrmsSyncHistory(123);
+        expect(component.prmsHistoryPhase()).toBe('failed');
+
+        (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue(undefined);
+        await component.fetchPrmsSyncHistory(123);
+        expect(component.prmsHistoryPhase()).toBe('failed');
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('discards a stale history response that resolves after a newer request', async () => {
+      const first = new Subject<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>();
+      const second = new Subject<{ successfulRequest: boolean; data: PrmsSyncHistoryResponse }>();
+      (apiService.GET_PrmsSyncHistory as jest.Mock)
+        .mockImplementationOnce(() => firstValueFrom(first))
+        .mockImplementationOnce(() => firstValueFrom(second));
+
+      const stale = component.fetchPrmsSyncHistory(1);
+      const fresh = component.fetchPrmsSyncHistory(2);
+
+      second.next(historyPayload({ prms_result_code: 222, events: [starEvent] }));
+      second.complete();
+      await fresh;
+      first.next(historyPayload({ prms_result_code: 111, events: [starEvent] }));
+      first.complete();
+      await stale;
+
+      expect(component.prmsHistory()?.prms_result_code).toBe(222);
+      expect(component.prmsHistoryPhase()).toBe('loaded');
+    });
+
+    it('discards a stale history failure that rejects after a newer request', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        let rejectFirst: (reason: unknown) => void = () => undefined;
+        (apiService.GET_PrmsSyncHistory as jest.Mock)
+          .mockImplementationOnce(
+            () =>
+              new Promise((_, reject) => {
+                rejectFirst = reject;
+              })
+          )
+          .mockResolvedValueOnce(historyPayload({ prms_result_code: 222, events: [starEvent] }));
+
+        const stale = component.fetchPrmsSyncHistory(1);
+        await component.fetchPrmsSyncHistory(2);
+        rejectFirst(new Error('late failure'));
+        await stale;
+
+        expect(component.prmsHistoryPhase()).toBe('loaded');
+        expect(component.prmsHistory()?.prms_result_code).toBe(222);
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    describe('onPrmsHistoryVisible', () => {
+      beforeEach(() => jest.useFakeTimers());
+      afterEach(() => jest.useRealTimers());
+
+      it('returns focus to the history link after the modal closes', () => {
+        const focusHistoryLink = jest.fn();
+        component.prmsSyncCard = { focusHistoryLink } as unknown as PrmsSyncCardComponent;
+
+        component.onPrmsHistoryVisible(true);
+        expect(component.prmsHistoryOpen()).toBe(true);
+        jest.runAllTimers();
+        expect(focusHistoryLink).not.toHaveBeenCalled();
+
+        component.onPrmsHistoryVisible(false);
+        expect(component.prmsHistoryOpen()).toBe(false);
+        expect(focusHistoryLink).not.toHaveBeenCalled();
+        jest.runAllTimers();
+        expect(focusHistoryLink).toHaveBeenCalledTimes(1);
+      });
+
+      it('does not throw when the card is not rendered', () => {
+        component.prmsSyncCard = undefined;
+        component.onPrmsHistoryVisible(false);
+        expect(() => jest.runAllTimers()).not.toThrow();
+      });
     });
   });
 });

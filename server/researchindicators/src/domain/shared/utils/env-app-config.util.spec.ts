@@ -24,6 +24,51 @@ describe('EnvAppConfigUtil', () => {
     errorSpy.mockRestore();
   });
 
+  // Same reading as the client's isFeatureFlagEnabled: on unless "false".
+  describe('POOL_FUNDING_SECTION_ENABLED', () => {
+    it.each([
+      ['false', false],
+      [' FALSE ', false],
+      ['true', true],
+      ['', true],
+      [null, true],
+    ])('simple_value %p -> %p', async (value, expected) => {
+      const util = buildUtil({ simple_value: value });
+      await expect(util.POOL_FUNDING_SECTION_ENABLED()).resolves.toBe(expected);
+    });
+
+    it('absent row or a failed read: open (fail-open, as the client), never an error log', async () => {
+      await expect(
+        buildUtil(null).POOL_FUNDING_SECTION_ENABLED(),
+      ).resolves.toBe(true);
+      const findOne = jest.fn().mockRejectedValue(new Error('db down'));
+      const util = new EnvAppConfigUtil({
+        getRepository: jest.fn().mockReturnValue({ findOne }),
+      } as unknown as DataSource);
+      const warnSpy = jest
+        .spyOn(CgiarLogger.prototype, 'warn')
+        .mockImplementation();
+      await expect(util.POOL_FUNDING_SECTION_ENABLED()).resolves.toBe(true);
+      // open, but never silently: the failed read is a warning
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('POOL_FUNDING.SECTION.ENABLED'),
+      );
+      warnSpy.mockRestore();
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('reads the POOL_FUNDING.SECTION.ENABLED key', async () => {
+      const findOne = jest.fn().mockResolvedValue({ simple_value: 'true' });
+      const util = new EnvAppConfigUtil({
+        getRepository: jest.fn().mockReturnValue({ findOne }),
+      } as unknown as DataSource);
+      await util.POOL_FUNDING_SECTION_ENABLED();
+      expect(findOne.mock.calls[0][0].where.key).toBe(
+        'POOL_FUNDING.SECTION.ENABLED',
+      );
+    });
+  });
+
   describe('CAPDEV_BULK_UPLOAD_ENABLED', () => {
     it('returns {value: false, defaulted: true} when the row is absent, and neither throws nor logs an error', async () => {
       const util = buildUtil(null);

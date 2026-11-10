@@ -151,3 +151,26 @@ describe('formatSyncTimestamp', () => {
     expect(formatSyncTimestamp(iso)).toMatch(/^\d{2} \w{3} \d{4}, \d{2}:\d{2}$/);
   });
 });
+
+describe('prms-sync-status.util edge cases', () => {
+  it('returns an empty verb for a PRMS row with neither approve nor reject', () => {
+    const row = event({ id: 1, event_source: 'PRMS', decision: null });
+    expect(deriveSyncVerb(row, [row])).toBe('');
+  });
+
+  it('returns null for a PRMS row with a null or blank reviewer name', () => {
+    expect(presentActorName(event({ id: 1, event_source: 'PRMS', reviewer_name: null }))).toBeNull();
+    expect(presentActorName(event({ id: 2, event_source: 'PRMS', reviewer_name: '   ' }))).toBeNull();
+  });
+
+  it('returns null for a STAR row missing the full or short actor name', () => {
+    expect(presentActorName(event({ id: 1, event_source: 'STAR', actor_name: null, actor_name_short: 'Ana' }))).toBeNull();
+    expect(presentActorName(event({ id: 2, event_source: 'STAR', actor_name: 'Ana Lopez', actor_name_short: null }))).toBeNull();
+    expect(presentActorName(event({ id: 3, event_source: 'STAR', actor_name: 'Ana Lopez', actor_name_short: '  ' }))).toBeNull();
+  });
+
+  it('falls back to an empty month for an invalid date', () => {
+    expect(formatSyncDayMonth('not-a-date')).toBe('NaN ');
+    expect(formatSyncTimestamp('not-a-date')).toContain('NaN  NaN');
+  });
+});

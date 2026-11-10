@@ -171,7 +171,7 @@ export class ResultsService {
     private readonly _aiReportsService: AiReportsService,
     private readonly _capdevBulkNotificationService: CapdevBulkNotificationService,
     private readonly _resultSectionOrchestrator: ResultSectionOrchestratorService,
-  ) {}
+  ) { }
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
     return this.mainRepo.findResultsFilters({
@@ -654,7 +654,7 @@ export class ResultsService {
         .findOne({
           where: {
             result_id: Not(result_id),
-            title: generalInformation.title,
+            title: generalInformation.title?.trim(),
             is_active: true,
             is_snapshot: false,
           },
@@ -680,7 +680,7 @@ export class ResultsService {
       );
 
       await manager.getRepository(this.mainRepo.target).update(result_id, {
-        title: generalInformation.title,
+        title: generalInformation.title?.trim(),
         description: generalInformation.description,
         report_year_id: generalInformation.year,
         ...this.currentUser.audit(SetAuditEnum.UPDATE),
@@ -718,7 +718,7 @@ export class ResultsService {
       this._openSearchResultApi.uploadSingleToOpenSearch(
         {
           result_id,
-          title: generalInformation.title,
+          title: generalInformation.title?.trim(),
           description: generalInformation.description,
           keywords: keywords.map((el) => el.keyword),
         },
@@ -897,12 +897,12 @@ export class ResultsService {
       updated_at: result?.updated_at,
       portfolio: portfolio
         ? {
-            id: portfolio.id,
-            name: portfolio.name,
-            description: portfolio.description,
-            start_year: portfolio.start_year,
-            end_year: portfolio.end_year,
-          }
+          id: portfolio.id,
+          name: portfolio.name,
+          description: portfolio.description,
+          start_year: portfolio.start_year,
+          end_year: portfolio.end_year,
+        }
         : null,
     };
   }
@@ -1493,8 +1493,8 @@ export class ResultsService {
         (country) => {
           country.result_countries_sub_nationals = country?.is_active
             ? saveGeoLocationDto.countries.find(
-                (el) => el.isoAlpha2 === country.isoAlpha2,
-              )?.result_countries_sub_nationals
+              (el) => el.isoAlpha2 === country.isoAlpha2,
+            )?.result_countries_sub_nationals
             : [];
           return country;
         },

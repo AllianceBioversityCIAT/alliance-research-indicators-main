@@ -869,4 +869,86 @@ describe('ByPersonComponent', () => {
       expect(component.isExporting()).toBe(false);
     });
   });
+
+  // ── Coverage completion: null fallbacks and edge branches ───────────────
+
+  describe('null fallbacks and edge branches', () => {
+    const NAMELESS: DelegateProjects = {
+      delegate_user_id: 9,
+      name: null as unknown as string,
+      email: null as unknown as string,
+      is_active: true,
+      projects: [{ project_code: 'PRJ-N', project_name: null }]
+    };
+
+    beforeEach(async () => {
+      await createComponent([ALICE, NAMELESS]);
+    });
+
+    it('coalesces a null name and email to empty strings in personRows', () => {
+      const row = component.personRows().find(r => r.delegate_user_id === 9);
+      expect(row?.name).toBe('');
+      expect(row?.email).toBe('');
+    });
+
+    it('matches by email when the name does not match', () => {
+      component.searchTerm.set('alice@test');
+      expect(component.filteredRows().map(r => r.delegate_user_id)).toEqual([1]);
+    });
+
+    it('does not match a project without a name against a query that is not its code', () => {
+      component.searchTerm.set('zzz');
+      expect(component.filteredRows()).toEqual([]);
+    });
+
+    it('onHistory emits a null name for a person without a name', () => {
+      const emitted: { delegateUserId: number; name: string | null }[] = [];
+      component.historyRequested.subscribe(e => emitted.push(e));
+
+      component.onHistory(component.personRows().find(r => r.delegate_user_id === 9)!);
+
+      expect(emitted).toEqual([{ delegateUserId: 9, name: null }]);
+    });
+
+    it('revoke confirmation shows only the code when the project has no name', () => {
+      const row = component.personRows().find(r => r.delegate_user_id === 9)!;
+
+      component.onRevokeProject(row, { project_code: 'PRJ-N', project_name: null });
+
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('<strong>PRJ-N</strong></div>');
+      expect(alert.detail).not.toContain(' — ');
+    });
+
+    it('remove-delegate confirmation shows only the code when a project has no name', () => {
+      const row = component.personRows().find(r => r.delegate_user_id === 9)!;
+
+      component.onRemoveDelegate(row);
+
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('<strong>PRJ-N</strong></div>');
+      expect(alert.detail).not.toContain(' — ');
+    });
+
+    it('export falls back to the filtered rows when the table has no processed data', async () => {
+      (globalThis.URL as unknown as { createObjectURL: jest.Mock }).createObjectURL = jest.fn().mockReturnValue('blob:x');
+      (globalThis.URL as unknown as { revokeObjectURL: jest.Mock }).revokeObjectURL = jest.fn();
+      const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      Object.defineProperty(component.table(), 'processedData', { configurable: true, get: () => undefined });
+
+      await component.exportTable();
+
+      expect(serviceStub.exportByPerson.mock.calls[0][0]).toEqual([1, 9]);
+      clickSpy.mockRestore();
+    });
+
+    it('an empty export file is reported as a failure and nothing is downloaded', async () => {
+      serviceStub.exportByPerson.mockResolvedValue(new Blob([]));
+
+      await component.exportTable();
+
+      expect(actionsStub.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+      expect(component.isExporting()).toBe(false);
+    });
+  });
 });

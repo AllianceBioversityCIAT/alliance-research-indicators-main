@@ -767,3 +767,85 @@ describe('results-center-url.codec — serialize', () => {
     });
   });
 });
+
+describe('results-center-url.codec — parse edge cases (coverage completion)', () => {
+  it('combines values from keys that differ only by case', () => {
+    const { filters } = parse(convertToParamMap({ CONTRACT: 'a100', contract: 's192' }));
+    expect(filters.contract).toEqual(['A100', 'S192']);
+  });
+
+  it('drops an over-long single indicator value as too-long', () => {
+    const long = 'x'.repeat(65);
+    const { filters, dropped } = parse(convertToParamMap({ indicator: long }));
+    expect(filters.indicator).toBeUndefined();
+    expect(dropped).toContainEqual({ param: 'indicator', value: long, reason: 'too-long' });
+  });
+
+  it('drops a repeated indicator key as invalid instead of picking one', () => {
+    const { filters, dropped } = parse(convertToParamMap({ indicator: ['oicr', 'policy-change'] }));
+    expect(filters.indicator).toBeUndefined();
+    expect(dropped).toContainEqual({ param: 'indicator', value: 'oicr,policy-change', reason: 'invalid-value' });
+  });
+
+  describe('legacy indicatorTab', () => {
+    it('drops a non-numeric value', () => {
+      const { filters, dropped } = parse(convertToParamMap({ indicatorTab: 'abc' }));
+      expect(filters.indicator).toBeUndefined();
+      expect(dropped).toContainEqual({ param: 'indicatortab', value: 'abc', reason: 'invalid-value' });
+    });
+
+    it('drops a repeated key as one invalid token list', () => {
+      const { dropped } = parse(convertToParamMap({ indicatorTab: ['1', '2'] }));
+      expect(dropped).toContainEqual({ param: 'indicatortab', value: '1,2', reason: 'invalid-value' });
+    });
+
+    it('drops an over-long numeric value', () => {
+      const long = '1'.repeat(65);
+      const { dropped } = parse(convertToParamMap({ indicatorTab: long }));
+      expect(dropped).toContainEqual({ param: 'indicatortab', value: long, reason: 'invalid-value' });
+    });
+  });
+
+  describe('legacy statusTab', () => {
+    it('drops a non-numeric value', () => {
+      const { filters, dropped } = parse(convertToParamMap({ statusTab: 'abc' }));
+      expect(filters.status).toBeUndefined();
+      expect(dropped).toContainEqual({ param: 'statustab', value: 'abc', reason: 'invalid-value' });
+    });
+
+    it('drops a repeated key as one invalid token list', () => {
+      const { dropped } = parse(convertToParamMap({ statusTab: ['2', '3'] }));
+      expect(dropped).toContainEqual({ param: 'statustab', value: '2,3', reason: 'invalid-value' });
+    });
+
+    it('drops an over-long numeric value', () => {
+      const long = '2'.repeat(65);
+      const { dropped } = parse(convertToParamMap({ statusTab: long }));
+      expect(dropped).toContainEqual({ param: 'statustab', value: long, reason: 'invalid-value' });
+    });
+
+    it('drops a numeric id the status vocabulary does not know', () => {
+      const { filters, dropped } = parse(convertToParamMap({ statusTab: '999999' }));
+      expect(filters.status).toBeUndefined();
+      expect(dropped).toContainEqual({ param: 'statustab', value: '999999', reason: 'invalid-value' });
+    });
+  });
+
+  describe('tab scope', () => {
+    it('drops a repeated tab key as invalid', () => {
+      const { scope, dropped } = parse(convertToParamMap({ tab: ['my', 'all'] }));
+      expect(scope).toBeUndefined();
+      expect(dropped).toContainEqual({ param: 'tab', value: 'my,all', reason: 'invalid-value' });
+    });
+
+    it('drops an unknown tab value as invalid', () => {
+      const { scope, dropped } = parse(convertToParamMap({ tab: 'everyone' }));
+      expect(scope).toBeUndefined();
+      expect(dropped).toContainEqual({ param: 'tab', value: 'everyone', reason: 'invalid-value' });
+    });
+
+    it('folds the tab value case-insensitively', () => {
+      expect(parse(convertToParamMap({ tab: 'MY' })).scope).toBe('my');
+    });
+  });
+});

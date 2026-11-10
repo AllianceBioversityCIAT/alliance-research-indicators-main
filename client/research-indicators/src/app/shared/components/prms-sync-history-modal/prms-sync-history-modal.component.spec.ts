@@ -488,4 +488,146 @@ describe('PrmsSyncHistoryModalComponent', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(document.activeElement).toBe(trigger);
   });
+  describe('component API edge cases', () => {
+    const rowsFor = (changes: unknown) => {
+      const component = fixture.componentInstance;
+      component.changesEvent.set(event({ id: 9, event_source: 'PRMS', decision: 'APPROVE', changes: changes as never }));
+      return component.changeRows();
+    };
+
+    it('formats scalar, nested and object change values', () => {
+      expect(
+        rowsFor({
+          count: { before: 1, after: 2 },
+          flag: { before: true, after: false },
+          nested: { before: [['a'], 'b', null], after: { k: 'v' } },
+          only_after: { after: 'x' },
+          only_before: { before: 'y' }
+        })
+      ).toEqual([
+        { field: 'count', before: '1', after: '2' },
+        { field: 'flag', before: 'true', after: 'false' },
+        { field: 'nested', before: 'a, b', after: '{"k":"v"}' },
+        { field: 'only_after', before: '', after: 'x' },
+        { field: 'only_before', before: 'y', after: '' }
+      ]);
+    });
+
+    it('renders a plain (non before/after) value in the after column only', () => {
+      expect(rowsFor({ plain: 'text', empty: null, list: ['SP1', 'SP2'], num: 7 })).toEqual([
+        { field: 'plain', before: '', after: 'text' },
+        { field: 'empty', before: '', after: '' },
+        { field: 'list', before: '', after: 'SP1, SP2' },
+        { field: 'num', before: '', after: '7' }
+      ]);
+    });
+
+    it('renders an unserializable value as an empty cell', () => {
+      const circular: Record<string, unknown> = {};
+      circular['self'] = circular;
+      expect(rowsFor({ weird: { before: circular, after: 'ok' } })).toEqual([{ field: 'weird', before: '', after: 'ok' }]);
+    });
+
+    it('returns no rows for a non-object changes payload or a closed changes screen', () => {
+      expect(rowsFor('not-an-object')).toEqual([]);
+      fixture.componentInstance.changesEvent.set(null);
+      expect(fixture.componentInstance.changeRows()).toEqual([]);
+    });
+
+    it('derives initials from the short name, then the full name, and tolerates missing names', () => {
+      const c = fixture.componentInstance;
+      expect(c.initials(event({ id: 1, event_source: 'STAR', actor_name_short: null, actor_name: 'Ana Lopez Garcia' }))).toBe('AL');
+      expect(c.initials(event({ id: 2, event_source: 'STAR', actor_name_short: null, actor_name: null }))).toBe('');
+      expect(c.initials(event({ id: 3, event_source: 'PRMS', reviewer_name: null }))).toBe('');
+      expect(c.initials(event({ id: 4, event_source: 'PRMS', reviewer_name: '  Daniel Okoth ' }))).toBe('DO');
+    });
+
+    it('sorts events with an unparseable timestamp as the oldest and falls back to id order', () => {
+      fixture.componentRef.setInput(
+        'history',
+        history([
+          event({ id: 1, event_source: 'STAR', occurred_at: 'garbage' }),
+          event({ id: 2, event_source: 'STAR', occurred_at: 'garbage' }),
+          event({ id: 3, event_source: 'STAR', occurred_at: '2026-09-12T11:00:00.000Z' })
+        ])
+      );
+      expect(fixture.componentInstance.entries().map(row => row.id)).toEqual([3, 2, 1]);
+    });
+
+    it('onEscape does nothing while the modal is closed', () => {
+      const emitted: boolean[] = [];
+      fixture.componentInstance.visibleChange.subscribe(value => emitted.push(value));
+      fixture.componentInstance.onEscape();
+      expect(emitted).toEqual([]);
+    });
+
+    it('close() without a return-focus target emits and does not throw', () => {
+      open();
+      fixture.componentRef.setInput('returnFocusTo', null);
+      const emitted: boolean[] = [];
+      fixture.componentInstance.visibleChange.subscribe(value => emitted.push(value));
+      expect(() => fixture.componentInstance.close()).not.toThrow();
+      expect(emitted).toEqual([false]);
+    });
+
+    describe('dialog labelling (fake timers)', () => {
+      let dialog: HTMLElement;
+
+      beforeEach(() => {
+        jest.useFakeTimers();
+        dialog = document.createElement('div');
+        dialog.className = 'prms-history-dialog';
+        document.body.appendChild(dialog);
+      });
+
+      afterEach(() => {
+        dialog.remove();
+        jest.useRealTimers();
+      });
+
+      it('onVisibleChange(true) re-emits visibility and labels the dialog with the list title', () => {
+        const emitted: boolean[] = [];
+        fixture.componentInstance.visibleChange.subscribe(value => emitted.push(value));
+
+        fixture.componentInstance.onVisibleChange(true);
+        jest.runAllTimers();
+
+        expect(emitted).toEqual([true]);
+        expect(dialog.getAttribute('aria-labelledby')).toBe('prms-history-title');
+      });
+
+      it('onVisibleChange(false) closes: clears the changes screen and emits false while visible', () => {
+        open();
+        fixture.componentInstance.changesEvent.set(event({ id: 9, event_source: 'PRMS', decision: 'APPROVE' }));
+        const emitted: boolean[] = [];
+        fixture.componentInstance.visibleChange.subscribe(value => emitted.push(value));
+
+        fixture.componentInstance.onVisibleChange(false);
+
+        expect(fixture.componentInstance.changesEvent()).toBeNull();
+        expect(emitted).toEqual([false]);
+      });
+
+      it('openChanges labels the dialog with the changes title; closeChanges restores the list title', () => {
+        const approval = event({ id: 9, event_source: 'PRMS', decision: 'APPROVE', changes: { a: { before: 'x', after: 'y' } } });
+
+        fixture.componentInstance.openChanges(approval);
+        jest.runAllTimers();
+        expect(dialog.getAttribute('aria-labelledby')).toBe('prms-history-changes-title');
+
+        fixture.componentInstance.closeChanges();
+        jest.runAllTimers();
+        expect(dialog.getAttribute('aria-labelledby')).toBe('prms-history-title');
+      });
+
+      it('does nothing when the dialog is not in the DOM', () => {
+        dialog.remove();
+        expect(() => {
+          fixture.componentInstance.closeChanges();
+          jest.runAllTimers();
+        }).not.toThrow();
+        expect(dialog.hasAttribute('aria-labelledby')).toBe(false);
+      });
+    });
+  });
 });
