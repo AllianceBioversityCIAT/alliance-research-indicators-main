@@ -167,6 +167,16 @@ describe('ResultsCenterTableComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('getCellTooltip gives the full title to the title column only', () => {
+    const result = { title: 'A very long result title' } as any;
+    const title = { field: 'title', path: 'title', header: 'Title', getValue: (r: any) => r.title } as any;
+    const years = { field: 'snapshot_years', path: 'snapshot_years', header: 'Years', getValue: () => [2025, 2026] } as any;
+    expect(component.getCellTooltip(title, result)).toBe('A very long result title');
+    expect(component.getCellTooltip({ ...title, getValue: () => ['a', 'b'] }, result)).toBe('a, b');
+    expect(component.getCellTooltip({ ...title, getValue: undefined }, result)).toBe('');
+    expect(component.getCellTooltip(years, result)).toBe('');
+  });
+
   it('setSearchInputFilter should update service searchInput and reset paginator to first page', () => {
     mockService.resultsTablePaginatorFirst.set(40);
     component.setSearchInputFilter('q');
