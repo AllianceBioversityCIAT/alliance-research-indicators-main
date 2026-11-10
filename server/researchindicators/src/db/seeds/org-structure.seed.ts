@@ -38,14 +38,18 @@ import { LoggerUtil } from '../../domain/shared/utils/logger.util';
  * OrgStructure.dc.html` (:417-447), flattened in the same depth-first walk the
  * mockup's `seed()` uses (parent, then its kids in order): 117 entries, ids
  * 1..117, codes ORG-001..ORG-117, every version `[2026, open)`, every entry
- * `active`. Names and acronyms are the mockup's, verbatim. No delegates.
+ * `active`. Names and acronyms are the mockup's, verbatim. No delegates here
+ * (`SEED_DELEGATES` is applied by `…006`).
  *
  * Directors come from the requester's sheet "ORGANIZATIONAL STRUCTURE -
  * Alliance Bioversity-CIAT" (source: Organizational-Structure-June-2026, 2026-
  * 10-28): the *Department director* on each L2 and the *Unit director* on each
- * L4; L1 and L3 have none. Where a cell names two people only the first is the
- * director (Climate Readiness, Biodiversity and Restoration); the second is not
- * seeded because delegates are keyed by version only from `…005` on.
+ * L4; L1 and L3 have none. Two cells name two people; the requester decided
+ * (2026-11-09): Climate Readiness -> Deissy Martinez Baron is the director (not
+ * the sheet's first name), and Biodiversity and Restoration -> Louis Verchot
+ * stays director with Christopher Kettle as a DELEGATE. Delegates are keyed by
+ * version only from `…005` on, so `SEED_DELEGATES` is applied by migration
+ * `…006`, not here.
  * They are resolved against the TARGET database at run time (Dev and Prod each
  * hold their own staff): by email (case-insensitive), else by exact first +
  * last name; a single ACTIVE match stores that staff row's real carnet, any
@@ -165,7 +169,7 @@ export const SEED_ENTRIES: ReadonlyArray<SeedEntry> = [
     null,
     'j.r.villegas@cgiar.org',
   ],
-  [27, 23, 23, 'Climate Readiness', null, 'e.girvetz@cgiar.org'],
+  [27, 23, 23, 'Climate Readiness', null, 'd.m.baron@cgiar.org'],
   [28, 21, 1, 'Multifunctional Landscape', 'MFL', 'lt.desta@cgiar.org'],
   [29, 23, 28, 'Low Emissions Landscapes', null, null],
   [30, 23, 28, 'Soils and Water Management', null, 'j.kihara@cgiar.org'],
@@ -448,7 +452,7 @@ export const SEED_DIRECTORS: Readonly<Record<string, SeedDirector>> =
       person('Henri Rueff', 'h.rueff@cgiar.org'),
       person('Grazia Pacillo', 'g.pacillo@cgiar.org'),
       person('Julian Ramirez Villegas', 'j.r.villegas@cgiar.org'),
-      person('Evan Girvetz', 'e.girvetz@cgiar.org'),
+      person('Deissy Martinez Baron', 'd.m.baron@cgiar.org'),
       person('Lulseged Desta', 'lt.desta@cgiar.org'),
       person('Job Maguta Kihara', 'j.kihara@cgiar.org'),
       person('Wendy Francesconi', 'w.francesconi@cgiar.org'),
@@ -552,6 +556,24 @@ const isActive = (staff: StaffCandidate): boolean =>
 
 const fullName = (staff: StaffCandidate): string =>
   `${staff.first_name} ${staff.last_name}`.replace(/\s+/g, ' ').trim();
+
+/**
+ * Delegates of seeded versions (requester decision 2026-11-09). Applied by
+ * migration `1791000000006`, which runs after `…005` re-keyed the table to the
+ * version. Each one lands on the seeded `[2026, open)` version of its entry and
+ * is resolved like a director (email, else exact name; active staff only).
+ */
+export interface SeedDelegate {
+  unitId: number;
+  person: SeedDirector;
+}
+
+export const SEED_DELEGATES: ReadonlyArray<SeedDelegate> = [
+  {
+    unitId: 32, // Biodiversity and Restoration for Livelihoods and Resilience
+    person: person('Christopher Kettle', 'c.kettle@cgiar.org'),
+  },
+];
 
 /**
  * Pure matching rule (R-ORG-015): email first (case-insensitive), then exact
@@ -945,4 +967,104 @@ export const removeOrgStructureSeed = async (
     `DELETE FROM \`org_unit_versions\` WHERE \`org_unit_id\` ${range}`,
   );
   await runner.query(`DELETE FROM \`org_units\` WHERE \`id\` ${range}`);
+};
+
+// ---------------------------------------------------------------------------
+// Delegates (migration 1791000000006)
+// ---------------------------------------------------------------------------
+
+export interface SeedDelegateReportRow {
+  unitId: number;
+  code: string;
+  name: string;
+  email: string | null;
+  outcome: DirectorOutcome;
+  carnet: string | null;
+  inserted: number;
+}
+
+const resolveSeedDelegates = async (
+  runner: QueryRunner,
+  delegates: ReadonlyArray<SeedDelegate>,
+) => {
+  const staff: StaffCandidate[] = await runner.query(
+    `SELECT carnet, first_name, last_name, email, is_active
+       FROM alliance_user_staff
+      WHERE deleted_at IS NULL`,
+  );
+  return delegates.map((d) => ({
+    ...d,
+    match: matchDirector(staff, d.person),
+  }));
+};
+
+/**
+ * Inserts each matched delegate on the seeded `[2026, open)` version of its
+ * entry. Idempotent (`WHERE NOT EXISTS` on version + carnet). Skips the row when
+ * that version is gone or when the person is that version's director (I-6).
+ * Unmatched people are logged and reported, never guessed.
+ */
+export const seedOrgDelegates = async (
+  runner: QueryRunner,
+  delegates: ReadonlyArray<SeedDelegate> = SEED_DELEGATES,
+): Promise<SeedDelegateReportRow[]> => {
+  const logger = new LoggerUtil({ name: 'seedOrgDelegates' });
+  const report: SeedDelegateReportRow[] = [];
+  for (const { unitId, person: p, match } of await resolveSeedDelegates(
+    runner,
+    delegates,
+  )) {
+    let inserted = 0;
+    if (match.carnet) {
+      inserted = affectedRows(
+        await runner.query(`
+          INSERT INTO \`org_unit_delegates\` (\`org_unit_version_id\`, \`staff_carnet\`)
+          SELECT v.\`id\`, ${sqlString(match.carnet)}
+          FROM \`org_unit_versions\` v
+          WHERE v.\`org_unit_id\` = ${unitId}
+            AND v.\`valid_from_year\` = ${SEED_YEAR}
+            AND (v.\`director_carnet\` IS NULL OR v.\`director_carnet\` <> ${sqlString(match.carnet)})
+            AND NOT EXISTS (
+              SELECT 1 FROM \`org_unit_delegates\` d
+              WHERE d.\`org_unit_version_id\` = v.\`id\`
+                AND d.\`staff_carnet\` = ${sqlString(match.carnet)}
+            )
+        `),
+      );
+    } else {
+      logger._warn(
+        `Delegate not seeded for ${seedCode(unitId)}: ${p.name} <${p.email ?? 'no email'}> (${match.outcome})`,
+      );
+    }
+    report.push({
+      unitId,
+      code: seedCode(unitId),
+      name: p.name,
+      email: p.email,
+      outcome: match.outcome,
+      carnet: match.carnet,
+      inserted,
+    });
+  }
+  return report;
+};
+
+/** Removes exactly the delegate rows `seedOrgDelegates` would insert. */
+export const removeOrgDelegatesSeed = async (
+  runner: QueryRunner,
+  delegates: ReadonlyArray<SeedDelegate> = SEED_DELEGATES,
+): Promise<void> => {
+  for (const { unitId, match } of await resolveSeedDelegates(
+    runner,
+    delegates,
+  )) {
+    if (!match.carnet) continue;
+    await runner.query(`
+      DELETE d FROM \`org_unit_delegates\` d
+      JOIN \`org_unit_versions\` v ON v.\`id\` = d.\`org_unit_version_id\`
+      WHERE v.\`org_unit_id\` = ${unitId}
+        AND v.\`valid_from_year\` = ${SEED_YEAR}
+        AND d.\`staff_carnet\` = ${sqlString(match.carnet)}
+    `);
+  }
 };

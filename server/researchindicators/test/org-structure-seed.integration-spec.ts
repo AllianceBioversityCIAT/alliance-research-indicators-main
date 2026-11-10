@@ -7,7 +7,9 @@ import {
   findOrgSeedPostconditionProblems,
   findOrgSeedPreconditionProblems,
   matchDirector,
+  removeOrgDelegatesSeed,
   resolveSeedDirectors,
+  seedOrgDelegates,
   seedOrgStructure,
   seedOrgUnitChangeLog,
   seedOrgUnits,
@@ -98,7 +100,7 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
       ]);
     });
 
-    it('every entry has exactly ONE version [2026, open) and ONE seed log row', async () => {
+    it('every entry has exactly ONE version [2026, open) and ONE seed log row; only ORG-032 has a delegate', async () => {
       const perUnit = await rows(
         `SELECT u.id,
                 (SELECT COUNT(*) FROM org_unit_versions v WHERE v.org_unit_id = u.id) AS versions,
@@ -119,7 +121,7 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
           Number(row.open2026),
           Number(row.seeds),
           Number(row.delegates),
-        ]).toEqual([1, 1, 1, 0]);
+        ]).toEqual([1, 1, 1, Number(row.id) === 32 ? 1 : 0]); // ORG-032: Christopher Kettle (…006, requester 2026-11-09)
       }
     });
 
@@ -540,11 +542,113 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
     });
   });
 
+  // Requester decision 2026-11-09 for the two cells of the sheet that name two
+  // people. Expected people are written HERE, not read from the seed module.
+  describe('two-person cells (requester decision 2026-11-09)', () => {
+    const staffEmailOf = async (carnet: string | null) =>
+      carnet === null
+        ? null
+        : String(
+            (
+              await rows(
+                `SELECT email FROM alliance_user_staff WHERE carnet = '${carnet}'`,
+              )
+            )[0]?.email ?? '',
+          )
+            .trim()
+            .toLowerCase();
+
+    it('ORG-027 Climate Readiness: the director is Deissy Martinez Baron', async () => {
+      const [v] = await rows(
+        `SELECT director_carnet FROM org_unit_versions
+          WHERE org_unit_id = 27 AND valid_from_year = 2026`,
+      );
+      expect(await staffEmailOf(v.director_carnet)).toBe('d.m.baron@cgiar.org');
+    });
+
+    it('ORG-032 Biodiversity and Restoration: Louis Verchot stays director and Christopher Kettle is its only delegate', async () => {
+      const [v] = await rows(
+        `SELECT id, director_carnet FROM org_unit_versions
+          WHERE org_unit_id = 32 AND valid_from_year = 2026`,
+      );
+      expect(await staffEmailOf(v.director_carnet)).toBe('l.verchot@cgiar.org');
+      const delegates = await rows(
+        `SELECT staff_carnet FROM org_unit_delegates WHERE org_unit_version_id = ${v.id}`,
+      );
+      expect(
+        await Promise.all(delegates.map((d) => staffEmailOf(d.staff_carnet))),
+      ).toEqual(['c.kettle@cgiar.org']);
+    });
+
+    it('re-running the delegate seed inserts 0 rows (idempotent) and reports the match', async () => {
+      // Inside a rolled-back transaction: on a database where `…006` has not
+      // run, this call would otherwise insert the row (reviewer advisory, T-14).
+      const tx = dataSource.createQueryRunner();
+      await tx.startTransaction();
+      try {
+        const report = await seedOrgDelegates(tx);
+        expect(report.map((r) => [r.code, r.outcome, r.inserted])).toEqual([
+          ['ORG-032', 'matched', 0],
+        ]);
+      } finally {
+        await tx.rollbackTransaction();
+        await tx.release();
+      }
+    });
+
+    it('no seeded version lists its own director as a delegate (I-6)', async () => {
+      expect(
+        await scalar(
+          `SELECT COUNT(*) FROM org_unit_delegates d
+             JOIN org_unit_versions v ON v.id = d.org_unit_version_id
+            WHERE v.org_unit_id ${ids} AND v.director_carnet = d.staff_carnet`,
+        ),
+      ).toBe(0);
+    });
+
+    it('down then up restores the same delegate row (round trip inside a rolled-back transaction)', async () => {
+      const count = () =>
+        scalar(
+          `SELECT COUNT(*) FROM org_unit_delegates d
+             JOIN org_unit_versions v ON v.id = d.org_unit_version_id
+            WHERE v.org_unit_id = 32 AND v.valid_from_year = 2026`,
+        );
+      const tx = dataSource.createQueryRunner();
+      await tx.startTransaction();
+      try {
+        await removeOrgDelegatesSeed(tx);
+        expect(
+          Number(
+            (
+              await tx.query(
+                `SELECT COUNT(*) AS n FROM org_unit_delegates d
+                   JOIN org_unit_versions v ON v.id = d.org_unit_version_id
+                  WHERE v.org_unit_id = 32 AND v.valid_from_year = 2026`,
+              )
+            )[0].n,
+          ),
+        ).toBe(0);
+        const report = await seedOrgDelegates(tx);
+        expect(report[0].inserted).toBe(1);
+      } finally {
+        await tx.rollbackTransaction();
+        await tx.release();
+      }
+      expect(await count()).toBe(1);
+    });
+  });
+
   describe('migration file shape (Falsifier 3 guard)', () => {
     it('exports ONLY its migration class (a seed function export breaks every migration command)', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const exported = require('../src/db/migrations/1791000000004-seedOrgStructure');
       expect(Object.keys(exported)).toEqual(['SeedOrgStructure1791000000004']);
+    });
+
+    it('the delegate seed migration exports ONLY its class too', () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const exported = require('../src/db/migrations/1791000000006-seedOrgDelegates');
+      expect(Object.keys(exported)).toEqual(['SeedOrgDelegates1791000000006']);
     });
   });
 });
