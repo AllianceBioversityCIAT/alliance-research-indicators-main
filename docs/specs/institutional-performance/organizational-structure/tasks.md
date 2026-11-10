@@ -600,6 +600,20 @@ Every task depends on the one before it. They share the module's service, contro
   - [x] `tsc`, `npx eslint` on the changed files, `test:integration "org-structure|control-lists"` and server unit suite quoted.
   - [x] Independent Reviewer PASS (author ≠ auditor).
 
+
+---
+
+### T-15 — Validation close-out: advisory fixes A-1, A-2, T13-a, T14-a and the A-4 check
+
+- **Status:** done (2026-11-10, Reviewer PASS on round 1 — execution.md) · **Size:** XS · **Dependencies:** T-13, T-14 · **Added:** 2026-11-10 (requester: "A-1 corrigelo, A2 corregir, … a4 verificalo, … t13a corregir, … t14a corregir")
+- **Requirements covered:** advisories only. A-1 design tokens (root `CLAUDE.md` §4.2); A-2 reactivate error mapping (R-ORG-007); T13-a Swagger (NFR-ORG-006); T14-a seed delegate skip paths (R-ORG-015); A-4 level provider registered once (R-ORG-011).
+- **Scope:** panes `bg-white` → `bg-[var(--ac-white-1)]` + page spec; `reactivate` 409 on an open-ended last version + lifecycle spec; `@ApiForbiddenResponse` on B9–B13 + controller spec; 3 rolled-back integration cases for `seedOrgDelegates`; a compiled `AppModule` boot reading `org.level` consumers.
+- **Done criteria:**
+  - [x] Each fix seen red first (A-1, A-2, T13-a) or falsified (T14-a: the I-6 clause removed → red), then green.
+  - [x] A-4 observed on a full compiled boot.
+  - [x] Full server and client suites, client build and lint quoted.
+  - [x] Independent Reviewer PASS (author ≠ auditor).
+
 ---
 
 ## 3. Coverage closure (scenario and clause level)

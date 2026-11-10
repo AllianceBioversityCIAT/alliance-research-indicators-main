@@ -1,6 +1,6 @@
 # Validation Report — Institutional Performance / Organizational Structure
 
-> **Verdict (updated 2026-11-10): NOT archive-ready yet. 0 FAIL · 27 PASS · 4 WARN.** T-13 fixed the only FAIL. T-14 and the doc amendments closed 4 WARNs and all 7 figure findings. What is left is 4 WARNs that rest only on T-06's blanket statement, plus RB-4 and the advisory triage. See §13.
+> **Verdict (final, 2026-11-10): ARCHIVE-READY. 0 FAIL · 31 PASS · 0 WARN.** Every requirement is covered. Every advisory is fixed, verified or accepted by the requester. RB-4 is deferred and RB-3 is held: the work stays local, with no merge to `dev`. Constitution and graph sync are left to `/akili-archive`. See §14.
 
 ## 1. Document Control
 
@@ -174,3 +174,25 @@ The intentional deviations (D-ORG-20, D-ORG-22, D-ORG-23, D-ORG-24 pivot) are re
 **Verification after the update:** server `npm test` `2 failed, 473 passed, 475 total` (the 2 pre-existing suites); `test:integration "org-structure|control-lists"` `1 skipped, 14 passed` · `3 skipped, 280 passed, 283 total`; `tsc` 0; `npx eslint` on the changed files 0. `npm run migration:scan` cannot run: its script `scripts/scan-migration-placeholders.js` does not exist. That predates this spec. The new SQL was checked by hand.
 
 **Archive readiness:** remove the four WARNs by an explicit acceptance (one line each) or a check; decide RB-4; triage the advisories. Then run `/akili-archive docs/specs/institutional-performance/organizational-structure`.
+
+## 14. Close-out — 2026-11-10
+
+| Item | Now | Evidence |
+| --- | --- | --- |
+| R-ORG-012 AC.2, Center-Admin user | **PASS** | Requester: "funciona correctamente para un center admin" |
+| R-ORG-013 tree expand/collapse | **PASS** | Requester: "se ve bien el arbol al expandir y colapsar" |
+| R-ORG-014 column resize | **PASS** | Requester: "si redimensiono bien" |
+| NFR-ORG-005 arrow keys | **PASS** | Requester: "Funciona bien el colapsar-expandir con el teclado" |
+| NFR-ORG-001 p95 *inconclusive* | **PASS (accepted)** | Requester: "aceptado" |
+| RB-4 `findBySearch` precedence | **deferred** | Requester: "difierelo" |
+| A-1 `bg-white` → token | **fixed** (T-15) | red first (2 found), page spec green; dark-mode **contrast not measurable in jsdom**, so it needs a look in the browser |
+| A-2 reactivate 500 → 409 | **fixed** (T-15) | red first (`getStatus is not a function`), lifecycle spec green |
+| A-4 registered once on a full boot | **verified** | compiled `AppModule`: `["Organizational Structure › Level"]` |
+| T13-a 403 in Swagger | **fixed** (T-15) | red first (5), green |
+| T14-a delegate seed skip paths | **fixed** (T-15) | 3 rolled-back cases; I-6 falsifier red, then restored |
+| A-3, A-5, A-6, A-7, A-8, T13-b, T14-b | **accepted** | requester answer 3 |
+| Constitution and graph sync | pending | `/akili-archive` |
+
+**Verification:** server `npm test` `2 failed, 473 passed, 475 total` (the 2 pre-existing reds); client `358 passed` / `8418 passed`; client build complete; integration `1 skipped, 14 passed` · `3 skipped, 283 passed`; server `tsc` 0; `npx eslint` / client lint clean. Reviewer PASS on T-15.
+
+**Archive readiness:** ready. Column resize was confirmed ("si redimensiono bien"), and the dark-mode contrast of the panes was accepted as is ("dejalo asi"). Next: `/akili-archive docs/specs/institutional-performance/organizational-structure`.

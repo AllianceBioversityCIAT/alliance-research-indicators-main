@@ -705,3 +705,44 @@ OrgSaveOutcomeDto.action enum :: create,edit_in_place,new_version,code_change
 - **Full server suite (no worker active):** `Test Suites: 2 failed, 473 passed, 475 total` · `Tests: 3 failed, 4990 passed, 4993 total` (the 2 pre-existing reds).
 - **K-006 (a migration is verified only by running it):** `npm run migration:revert` → "Migration SeedOrgDelegates1791000000006 has been  reverted successfully."; `org_unit_delegates` count after revert `0`.
 - **K-006 run half:** `npm run migration:dev:execute` → "1 migrations are new migrations must be executed." "Migration SeedOrgDelegates1791000000006 has been  executed successfully."; `migrations` row id 413; delegate on ORG-032 = Christopher KETTLE. Integration after the advisories and the revert/run cycle: `Test Suites: 1 skipped, 14 passed` · `Tests: 3 skipped, 280 passed, 283 total`.
+
+## Validation close-out: requester answers and advisory fixes (2026-11-10)
+
+- **Requester answers (verbatim):**
+  - "1a. Efectivamente, he revisado y funciona correctamente para un center admin"
+  - "1b. Si, se ve bien el arbol al expandir y colapsar"
+  - "1c. Funciona bien el colapsar-expandir con el teclado"
+  - "1d. aceptado"
+  - "2. difierelo"
+  - "3. A-1 corrigelo, A2 corregir, A3 aceptar, a4 verificalo, a5 aceptar, a6 aceptar, a7 aceptar, a8 aceptar, t13a corregir, t13b aceptar, t14a corregir, t14b aceptar"
+- **What each answer closes:**
+  - R-ORG-012 AC.2: seen with a Center-Admin user (1a).
+  - R-ORG-013/014 tree expand/collapse (1b).
+  - NFR-ORG-005 arrow keys (1c).
+  - NFR-ORG-001 *inconclusive* accepted (1d).
+  - RB-4 deferred (2).
+  - A-3, A-5, A-6, A-7, A-8, T13-b and T14-b accepted (3).
+  - **Not covered by 1b:** column resize (R-ORG-014). The answer names the tree only.
+- **A-2 (reactivate on inconsistent rows → 500):**
+  - Change: `organizational-structure.service.ts` `reactivate` now returns 409 with "Organizational unit … is <status> but its last version has no end year; the data is inconsistent and must be corrected before it can be reactivated" before any write.
+  - Red first: `TypeError: error.getStatus is not a function` (a plain `Error`, i.e. a 500).
+  - Green: the lifecycle spec asserts 409, the exact text, and an untouched store.
+- **A-1 (`bg-white` in dark mode):**
+  - Change: both panes now use `bg-[var(--ac-white-1)]`, the client's surface token, which the dark theme redefines.
+  - Red first: the new page spec found `Received length: 2`.
+  - Green: client org-structure `Test Suites: 7 passed` · `Tests: 186 passed`; `npm run lint -- --quiet` "All files pass linting."
+- **T13-a (403 not in Swagger):**
+  - Change: `@ApiForbiddenResponse` on B9–B13.
+  - Red first: `Tests: 5 failed` (the 5 writes).
+  - Green: server module `Test Suites: 16 passed` · `Tests: 425 passed`; `tsc` 0; `npx eslint` 0.
+- **T14-a (untested skip paths of `seedOrgDelegates`):** 3 integration cases, each in a rolled-back transaction: unmatched person, unit without a 2026 version, and the version's own director (I-6).
+  - **Falsifier:** the I-6 clause was removed from the seed SQL; the test went red (`- 0 / + 1` inserted); the clause was restored (`git diff` empty).
+  - **The first attempt was a false green:** the `sed` pattern did not match the line, so nothing had been removed. It was redone by line number.
+  - Integration: `Test Suites: 1 skipped, 14 passed` · `Tests: 3 skipped, 283 passed, 286 total`.
+- **Interruption:** the requester restarted the machine mid-run. Docker (MySQL) was down after the restart and was started again (`ari_local_mysql` up). The T13-a decorator edit had landed before the restart and was verified after it.
+- **A-4 ("registered once" on a full boot):** compiled `AppModule` (`nest build`, then `NestFactory.create` + `app.init()`, no port): `A4 org.level consumers: ["Organizational Structure › Level"]`, a single entry. Not falsified: a duplicate registration would show as a second entry. The first attempt (ts-node) timed out at 400 s without a result.
+- **Full suites (no worker active):** server `Test Suites: 2 failed, 473 passed, 475 total` · `Tests: 3 failed, 4996 passed, 4999 total` (the 2 pre-existing reds); client `Test Suites: 358 passed` · `Tests: 8418 passed`; client build "Application bundle generation complete". Its template messages name other components only (`AssignPiDelegateComponent`, `PoolFundingAlignmentComponent`, `CreateOicrFormComponent`).
+- **Review — Reviewer (Sonnet, author was Opus): `STATUS: PASS`** — "All four fixes check out against the working tree. No blocking issues."
+  - **ADVISORY (open, needs the requester's eyes):** in the dark theme `--ac-white-1` is `#e5e5e5` (light grey) and the panes' text is `atc-grey-800` (`#c2c2c2` in dark), which may be low contrast. Not a regression: `bg-white` had the same problem. jsdom measures no contrast, so the test proves only the class.
+  - **ADVISORY (recorded):** `reactivate` indexes the last version, assuming at least one; a unit without versions cannot be built through the API (FK and create force one).
+- **Requester (2026-11-10):** "1. si redimensiono bien" → R-ORG-014 column resize confirmed. "2. dejalo asi" → the dark-mode contrast of the panes (`--ac-white-1` `#e5e5e5` with `#c2c2c2` text) is accepted as is.
