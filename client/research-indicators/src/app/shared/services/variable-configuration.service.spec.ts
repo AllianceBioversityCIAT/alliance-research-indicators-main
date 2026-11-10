@@ -115,6 +115,12 @@ describe('VariableConfigurationService', () => {
     expect(service.items()).toEqual([{ key: 'array.key' }]);
   });
 
+  it('does not list the hidden variables (PORTFOLIO_2026_SDG_TARGET_CODES)', async () => {
+    api.GET_AppConfigList.mockResolvedValueOnce({ data: [{ key: 'PORTFOLIO_2026_SDG_TARGET_CODES' }, { key: 'array.key' }] });
+    await service.loadList();
+    expect(service.items()).toEqual([{ key: 'array.key' }]);
+  });
+
   it('skips overlapping loadList calls while a request is in flight', async () => {
     let resolveList: (value: unknown) => void = () => undefined;
     api.GET_AppConfigList.mockReturnValueOnce(
