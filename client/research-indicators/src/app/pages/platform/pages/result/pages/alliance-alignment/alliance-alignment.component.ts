@@ -25,6 +25,7 @@ import { VersionWatcherService } from '@shared/services/version-watcher.service'
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { getContractStatusClasses } from '@shared/constants/status-classes.constants';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { Lever, LeverStrategicOutcome } from '@shared/interfaces/oicr-creation.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { ResultLeverSdgTargetPayload } from '@shared/interfaces/lever-sdg-target.interface';
