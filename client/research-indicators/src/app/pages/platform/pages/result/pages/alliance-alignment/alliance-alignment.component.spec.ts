@@ -2059,6 +2059,30 @@ describe('AllianceAlignmentComponent', () => {
       cache.metadata.set({ indicator_id: 4 });
       expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
     });
+
+    it('lists every project for a PRMS result, from the URL id, whatever its indicator', () => {
+      cache.metadata.set({ indicator_id: 4 });
+      cache.platformCode.set('PRMS');
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(false);
+    });
+
+    it('lists every project for a PRMS result from the metadata source when the URL has no prefix', () => {
+      cache.metadata.set({ indicator_id: 1, platform_code: 'PRMS' });
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(false);
+    });
+
+    it('keeps the filtered list for a STAR or other-source result that is not an OICR', () => {
+      cache.metadata.set({ indicator_id: 4, platform_code: 'STAR' });
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
+      cache.platformCode.set('TIP');
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
+    });
+
+    it('URL source wins over the metadata source', () => {
+      cache.metadata.set({ indicator_id: 4, platform_code: 'PRMS' });
+      cache.platformCode.set('STAR');
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
+    });
   });
 
   it('should not auto-add or lock the primary project lever', () => {
