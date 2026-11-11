@@ -308,7 +308,7 @@ describe('InnovationUseBuilder', () => {
   });
 
   describe('P-1 omitted fields (homologation.md §1.4 / §8.2, R-PRMS-007 AC.4, DC-5)', () => {
-    it('omits usd_budget, is_determined and innov_use_to_be_determined', () => {
+    it('omits usd_budget and is_determined', () => {
       const payload = builtRoot(
         useAggregate({
           actors: [disaggregatedUseActor],
@@ -319,10 +319,8 @@ describe('InnovationUseBuilder', () => {
 
       expect(payload).not.toHaveProperty('usd_budget');
       expect(payload).not.toHaveProperty('is_determined');
-      expect(payload).not.toHaveProperty('innov_use_to_be_determined');
       expect(json).not.toContain('usd_budget');
       expect(json).not.toContain('is_determined');
-      expect(json).not.toContain('innov_use_to_be_determined');
     });
   });
 
@@ -374,6 +372,10 @@ describe('InnovationUseBuilder', () => {
         (zero.current_innovation_use_numbers as Record<string, unknown>)
           .measures,
       ).toEqual([{ unit_of_measure: 'trials', quantity: 0 }]);
+      expect(
+        (zero.current_innovation_use_numbers as Record<string, unknown>)
+          .innov_use_to_be_determined,
+      ).toBe(false);
 
       const empty = useAggregate({
         actors: [disaggregatedUseActor],
@@ -401,6 +403,9 @@ describe('InnovationUseBuilder', () => {
       // Omitted, NOT sent as [] -- an empty array would assert "we checked and
       // there are none", which is a different claim than "we are not telling you".
       expect(numbers.measures).toBeUndefined();
+      // Every surviving measure was dropped, so measures is omitted and the
+      // required flag is true.
+      expect(numbers.innov_use_to_be_determined).toBe(true);
     });
   });
 
@@ -427,6 +432,7 @@ describe('InnovationUseBuilder', () => {
       expect(numbers.measures).toEqual([
         { unit_of_measure: 'trials', quantity: 2 },
       ]);
+      expect(numbers.innov_use_to_be_determined).toBe(false);
     });
 
     it('still builds when BOTH actors and measures are empty', () => {
@@ -437,7 +443,9 @@ describe('InnovationUseBuilder', () => {
       ).innovation_use as Record<string, unknown>;
 
       expect(built.innovation_use_level).toBeDefined();
-      expect(built.current_innovation_use_numbers).toEqual({});
+      expect(built.current_innovation_use_numbers).toEqual({
+        innov_use_to_be_determined: true,
+      });
     });
 
     it('STILL throws on a row that EXISTS but is malformed (per-row rules unchanged)', () => {
