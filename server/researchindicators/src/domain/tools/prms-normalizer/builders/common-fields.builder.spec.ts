@@ -577,6 +577,87 @@ describe('CommonFieldsBuilder', () => {
     });
   });
 
+  describe('contributing_partners acronym', () => {
+    it('omits acronym when it is null and still sends a real acronym', () => {
+      const payload = builder.build(
+        baseAggregate({
+          partners: [
+            {
+              institution_id: 12,
+              acronym: null,
+              name: 'Unnamed institute',
+            },
+            {
+              institution_id: 13,
+              acronym: 'FAO',
+              name: 'Food and Agriculture Organization',
+            },
+          ],
+        }),
+      );
+      const partners = payload.contributing_partners as Record<
+        string,
+        unknown
+      >[];
+
+      expect(partners[0]).toEqual({
+        institution_id: 12,
+        name: 'Unnamed institute',
+      });
+      expect(partners[0]).not.toHaveProperty('acronym');
+      expect(JSON.stringify(partners[0])).not.toContain('acronym');
+      expect(partners[1]).toEqual({
+        institution_id: 13,
+        acronym: 'FAO',
+        name: 'Food and Agriculture Organization',
+      });
+    });
+
+    it('omits an empty or whitespace-only acronym and sends a padded acronym unchanged', () => {
+      const payload = builder.build(
+        baseAggregate({
+          partners: [
+            {
+              institution_id: 21,
+              acronym: '',
+              name: 'Empty acronym',
+            },
+            {
+              institution_id: 22,
+              acronym: '   ',
+              name: 'Blank acronym',
+            },
+            {
+              institution_id: 23,
+              acronym: ' FAO ',
+              name: 'Food and Agriculture Organization',
+            },
+          ],
+        }),
+      );
+      const partners = payload.contributing_partners as Record<
+        string,
+        unknown
+      >[];
+
+      expect(partners[0]).toEqual({
+        institution_id: 21,
+        name: 'Empty acronym',
+      });
+      expect(partners[0]).not.toHaveProperty('acronym');
+      expect(partners[1]).toEqual({
+        institution_id: 22,
+        name: 'Blank acronym',
+      });
+      expect(partners[1]).not.toHaveProperty('acronym');
+      expect(partners[2]).toEqual({
+        institution_id: 23,
+        acronym: ' FAO ',
+        name: 'Food and Agriculture Organization',
+      });
+    });
+  });
+
   describe('is_partner_not_applicable (homologation.md §4.4, R-PRMS-003 AC.4)', () => {
     it('omits contributing_partners entirely rather than sending an empty array', () => {
       const payload = builder.build(
