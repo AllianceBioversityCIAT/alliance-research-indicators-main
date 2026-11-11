@@ -20,10 +20,9 @@
     <a
       class="block h-full w-full text-inherit no-underline hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2"
       data-testid="pfm-row-title"
-      [attr.title]="fullTitle()"
       [routerLink]="link().commands"
       [queryParams]="link().queryParams"
-      ><div class="overflow-hidden line-clamp-3 xl:line-clamp-2">{{ fullTitle() }}</div></a
+      ><div class="overflow-hidden line-clamp-3 xl:line-clamp-2" [appTruncatedTooltip]="fullTitle()" tooltipPosition="top">{{ fullTitle() }}</div></a
     >
   </div>
   </td>

@@ -25,6 +25,7 @@ import { VersionWatcherService } from '@shared/services/version-watcher.service'
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { getContractStatusClasses } from '@shared/constants/status-classes.constants';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { Lever, LeverStrategicOutcome } from '@shared/interfaces/oicr-creation.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { ResultLeverSdgTargetPayload } from '@shared/interfaces/lever-sdg-target.interface';
@@ -118,12 +119,12 @@ export default class AllianceAlignmentComponent {
   >();
   private readonly leverCustomNameSignals = new Map<string | number, WritableSignal<{ custom_lever_name: string }>>();
 
-  contractServiceParams = computed(() => {
-    const indicatorId = Number(this.cache.currentMetadata()?.indicator_id);
-    return {
-      'exclude-pooled-funding': indicatorId !== 5
-    };
-  });
+  // The source comes from the URL id (PRMS-123) first, so it is known before the metadata loads.
+  resultPlatformCode = computed(() => this.cache.getCurrentPlatformCode() || this.cache.currentMetadata()?.platform_code || '');
+  // PRMS results and OICRs (any source) list every project; any other result excludes pooled funding.
+  contractServiceParams = computed(() => ({
+    'exclude-pooled-funding': !(this.isOicrIndicator() || this.resultPlatformCode() === PLATFORM_CODES.PRMS)
+  }));
   isOicrIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 5);
   isPolicyChangeIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 4);
   isInnovationUseIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 6);

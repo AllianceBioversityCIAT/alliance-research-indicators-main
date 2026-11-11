@@ -89,7 +89,7 @@
             <span class="rounded-lg bg-[var(--ac-pfm-neutral-bg)] px-2 py-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">{{ p.code }}</span>
           </td>
           <td class="min-w-[14rem] max-w-[26rem]">
-            <div class="line-clamp-2 break-words" [attr.title]="p.name">{{ p.name || '—' }}</div>
+            <div class="line-clamp-2 break-words" [appTruncatedTooltip]="p.name" tooltipPosition="top" data-testid="pfm-project-name">{{ p.name || '—' }}</div>
           </td>
           <td class="min-w-[8rem]" data-testid="pfm-project-status">
             <app-custom-tag [statusId]="p.statusId" [statusName]="p.statusName" maxWidth="130px" [multiline]="true"></app-custom-tag>

@@ -24,6 +24,8 @@ import { PLATFORM_CODES } from '../../../../../../shared/constants/platform-code
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 import { TooltipModule } from 'primeng/tooltip';
+import { TruncatedTextTooltipDirective } from '@shared/directives/truncated-text-tooltip.directive';
+import { TableColumn } from '../../result-center.interface';
 import { openPublicLink } from '@shared/utils/public-link.util';
 import { buildResultLink, ResultLink } from '@shared/utils/result-link.util';
 import {
@@ -44,6 +46,7 @@ import {
     MenuModule,
     RouterLink,
     TooltipModule,
+    TruncatedTextTooltipDirective,
     CustomTagComponent,
     FiltersActionButtonsComponent,
     SearchExportControlsComponent,
@@ -150,6 +153,13 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
       columns = columns.filter(column => !excluded.has(column.field));
     }
     return columns;
+  }
+
+  // Full title for the tooltip of a clamped title cell; other columns get none.
+  getCellTooltip(column: TableColumn, result: Result): string {
+    if (column.field !== 'title' || !column.getValue) return '';
+    const value = column.getValue(result);
+    return Array.isArray(value) ? value.join(', ') : (value ?? '');
   }
 
   shouldShowPaginator(): boolean {

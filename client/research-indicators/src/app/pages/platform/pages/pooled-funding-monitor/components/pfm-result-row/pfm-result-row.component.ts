@@ -6,6 +6,7 @@ import { buildResultLink } from '@shared/utils/result-link.util';
 import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
 import { PfmMappingState, PfmPrmsStatus, PfmResultRow } from '../../pfm.interfaces';
 import { TooltipModule } from 'primeng/tooltip';
+import { TruncatedTextTooltipDirective } from '@shared/directives/truncated-text-tooltip.directive';
 import { FormatDatePipe } from '@shared/pipes/format-date.pipe';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { PRMS_STATUS_BORDER, statusColor } from '@shared/constants/pfm-status-colors';
@@ -39,7 +40,7 @@ const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
 @Component({
   selector: 'tr[app-pfm-result-row]',
   host: { class: 'text-[14px]', 'data-testid': 'pfm-result-row', '[attr.data-result-code]': 'row().result_code' },
-  imports: [RouterLink, CustomTagComponent, TooltipModule, FormatDatePipe],
+  imports: [RouterLink, CustomTagComponent, TooltipModule, TruncatedTextTooltipDirective, FormatDatePipe],
   templateUrl: './pfm-result-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

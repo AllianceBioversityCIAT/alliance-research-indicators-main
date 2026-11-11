@@ -30,6 +30,7 @@ import { FiltersActionButtonsComponent } from '@shared/components/filters-action
 import { SearchExportControlsComponent } from '@shared/components/search-export-controls/search-export-controls.component';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
+import { TruncatedTextTooltipDirective } from '@shared/directives/truncated-text-tooltip.directive';
 
 @Component({
   selector: 'app-my-projects',
@@ -56,7 +57,8 @@ import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
     ProjectGeneralInfoComponent,
     ProjectIndicatorFiltersComponent,
     FiltersActionButtonsComponent,
-    SearchExportControlsComponent
+    SearchExportControlsComponent,
+    TruncatedTextTooltipDirective
   ],
   templateUrl: './my-projects.component.html',
   styleUrl: './my-projects.component.scss'
