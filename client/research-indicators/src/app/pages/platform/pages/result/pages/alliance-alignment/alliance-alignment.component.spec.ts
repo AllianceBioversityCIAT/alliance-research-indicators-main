@@ -30,6 +30,10 @@ class ApiServiceMock {
 class CacheServiceMock {
   metadata = signal<Record<string, unknown>>({ indicator_id: 5 });
   currentResultId = jest.fn().mockReturnValue(1);
+  platformCode = signal('');
+  getCurrentPlatformCode() {
+    return this.platformCode();
+  }
   getCurrentNumericResultId = jest.fn().mockReturnValue(1);
   currentResultIndicatorSectionPath = jest.fn().mockReturnValue('next-section');
   currentMetadata() {
