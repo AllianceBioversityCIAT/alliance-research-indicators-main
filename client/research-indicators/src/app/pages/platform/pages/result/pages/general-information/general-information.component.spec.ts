@@ -38,7 +38,7 @@ import { GetResultsService } from '@shared/services/control-list/get-results.ser
 import { GetUserStaffService } from '@shared/services/control-list/get-user-staff.service';
 import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, effect } from '@angular/core';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 
 jest.mock('../../../../../../shared/services/control-list/get-results.service');
@@ -126,6 +126,19 @@ describe('GeneralInformationComponent', () => {
     expect(component.body().title).toBe('Saved title');
     expect(component.body().description).toBe('Typed during load');
     expect((component.body() as any).user_id).toBe('user-9');
+  });
+
+  it('loading inside the version watcher effect requests the section once, not in a loop', async () => {
+    (apiService as any).GET_GeneralInformation = jest.fn().mockResolvedValue({ data: { title: 'Loaded', description: 'From server' } });
+    TestBed.runInInjectionContext(() => effect(() => void component.getData()));
+
+    for (let i = 0; i < 3; i++) {
+      TestBed.flushEffects();
+      await fixture.whenStable();
+    }
+
+    expect(component.body().title).toBe('Loaded');
+    expect((apiService as any).GET_GeneralInformation).toHaveBeenCalledTimes(1);
   });
 
   it('H4: takes the loaded data as-is when nothing was edited during the load', async () => {

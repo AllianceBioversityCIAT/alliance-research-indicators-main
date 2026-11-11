@@ -1,4 +1,4 @@
-import { Component, inject, signal, WritableSignal } from '@angular/core';
+import { Component, inject, signal, untracked, WritableSignal } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
@@ -77,7 +77,9 @@ export default class GeneralInformationComponent {
   }
 
   async getData() {
-    const bodyAtRequest = this.body();
+    // Untracked: getData runs inside the version watcher's effect, and tracking body here made
+    // the body.set below re-run that effect, reloading the section in an endless loop.
+    const bodyAtRequest = untracked(this.body);
     const response = await this.api.GET_GeneralInformation(this.cache.getCurrentNumericResultId());
     if (response.data?.main_contact_person?.user_id) response.data.user_id = response.data.main_contact_person.user_id;
     this.body.set(this.keepEditsMadeWhileLoading(bodyAtRequest, this.body(), response.data));
