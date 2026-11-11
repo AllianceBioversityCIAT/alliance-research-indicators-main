@@ -555,11 +555,16 @@ export class CommonFieldsBuilder {
       aggregate.is_partner_not_applicable !== true &&
       aggregate.partners.length > 0
     ) {
-      data.contributing_partners = aggregate.partners.map((partner) => ({
-        institution_id: partner.institution_id,
-        acronym: partner.acronym,
-        name: partner.name,
-      }));
+      data.contributing_partners = aggregate.partners.map((partner) => {
+        const entry: Record<string, unknown> = {
+          institution_id: partner.institution_id,
+          name: partner.name,
+        };
+        if (partner.acronym != null && partner.acronym.trim() !== '') {
+          entry.acronym = partner.acronym;
+        }
+        return entry;
+      });
     }
 
     const publicEvidence = aggregate.evidence.filter(
