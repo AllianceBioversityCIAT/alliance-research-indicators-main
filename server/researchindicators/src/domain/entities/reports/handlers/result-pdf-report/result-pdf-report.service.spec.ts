@@ -16,6 +16,11 @@ import { ResultPdfIndicatorSectionRegistry } from './indicator-sections/result-p
 import { PdfViewerService } from '../../../../tools/pdf-viewer/pdf-viewer.service';
 import { PdfTemplates } from '../../../../tools/pdf-viewer/enums/pdf-templates.enum';
 import { ReportMsApp } from '../../../../tools/broker/report-ms.app';
+import { PortfoliosService } from '../../../portfolios/portfolios.service';
+import { ResultSdg } from '../../../result-sdgs/entities/result-sdg.entity';
+import { ResultStrategicObjective } from '../../../result-strategic-objectives/entities/result-strategic-objective.entity';
+import { ResultImpactOutcome } from '../../../result-impact-outcomes/entities/result-impact-outcome.entity';
+import { LeverRolesEnum } from '../../../lever-roles/enum/lever-roles.enum';
 
 describe('ResultPdfReportService', () => {
   let service: ResultPdfReportService;
@@ -23,7 +28,6 @@ describe('ResultPdfReportService', () => {
   const resultsService = {
     findGeneralInfo: jest.fn(),
     findMetadataResult: jest.fn(),
-    findResultAlignment: jest.fn(),
     findGeoLocation: jest.fn(),
   };
   const resultEvidencesService = {
@@ -44,6 +48,22 @@ describe('ResultPdfReportService', () => {
   const sdgTargetRepo = { find: jest.fn() };
   const institutionRepo = { find: jest.fn() };
   const resultRepo = { findOne: jest.fn() };
+  const resultSdgRepo = { find: jest.fn() };
+  const strategicObjectiveRepo = { find: jest.fn() };
+  const impactOutcomeRepo = { find: jest.fn() };
+  const portfoliosService = { findByYear: jest.fn() };
+  const PORTFOLIO_1 = {
+    id: 1,
+    name: 'Portfolio 1',
+    start_year: 2021,
+    end_year: 2025,
+  };
+  const PORTFOLIO_2 = {
+    id: 2,
+    name: 'Portfolio 2',
+    start_year: 2026,
+    end_year: 2030,
+  };
   const pdfViewerService = {
     postData: jest.fn(),
     renderPdf: jest.fn(),
@@ -65,13 +85,9 @@ describe('ResultPdfReportService', () => {
       result_official_code: 8245,
       indicator_id: 4,
       indicator_name: 'Capacity Sharing for Development',
+      report_year: 2025,
     });
-    resultsService.findResultAlignment.mockResolvedValue({
-      contracts: [],
-      primary_levers: [],
-      contributor_levers: [],
-      result_sdgs: [],
-    });
+    portfoliosService.findByYear.mockResolvedValue(PORTFOLIO_1);
     resultsService.findGeoLocation.mockResolvedValue({
       geo_scope_id: 1,
       regions: [],
@@ -90,6 +106,9 @@ describe('ResultPdfReportService', () => {
     sdgTargetRepo.find.mockResolvedValue([]);
     institutionRepo.find.mockResolvedValue([]);
     resultRepo.findOne.mockResolvedValue({ is_partner_not_applicable: false });
+    resultSdgRepo.find.mockResolvedValue([]);
+    strategicObjectiveRepo.find.mockResolvedValue([]);
+    impactOutcomeRepo.find.mockResolvedValue([]);
     indicatorSectionRegistry.buildSections.mockResolvedValue({});
   };
 
@@ -115,6 +134,10 @@ describe('ResultPdfReportService', () => {
               if (entity === ResultLeverSdgTarget) return sdgTargetRepo;
               if (entity === ResultInstitution) return institutionRepo;
               if (entity === Result) return resultRepo;
+              if (entity === ResultSdg) return resultSdgRepo;
+              if (entity === ResultStrategicObjective)
+                return strategicObjectiveRepo;
+              if (entity === ResultImpactOutcome) return impactOutcomeRepo;
               throw new Error(`Unexpected repository for ${entity?.name}`);
             }),
           },
@@ -125,6 +148,7 @@ describe('ResultPdfReportService', () => {
         },
         { provide: PdfViewerService, useValue: pdfViewerService },
         { provide: ReportMsApp, useValue: reportMsApp },
+        { provide: PortfoliosService, useValue: portfoliosService },
       ],
     }).compile();
 
@@ -241,6 +265,104 @@ describe('ResultPdfReportService', () => {
       { paperWidth: undefined, paperHeight: undefined },
     );
     expect(pdfUrl).toBe('https://s3.example/cap-sharing');
+  });
+
+  it('renders the inn_dev template when the report asked is Innovation Development', async () => {
+    mockReportDependencies();
+    pdfViewerService.postData.mockResolvedValue('uuid-9');
+    pdfViewerService.renderPdf.mockResolvedValue('<html>inn</html>');
+
+    await service.buildReport(10, PdfTemplates.INN_DEV, true);
+
+    expect(pdfViewerService.renderPdf).toHaveBeenCalledWith(
+      PdfTemplates.INN_DEV,
+      'uuid-9',
+    );
+  });
+
+  it('resolves the portfolio from the reporting year and reads Portfolio 1 levers', async () => {
+    mockReportDependencies();
+    reportMsApp.getPdfReport.mockResolvedValue('url');
+
+    await service.buildReport(10, PdfTemplates.CAP_SHARING);
+
+    expect(portfoliosService.findByYear).toHaveBeenCalledWith(2025);
+    expect(leverRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          lever_role_id: LeverRolesEnum.ALIGNMENT,
+        }),
+      }),
+    );
+    expect(strategicObjectiveRepo.find).not.toHaveBeenCalled();
+    const alignment =
+      reportMsApp.getPdfReport.mock.calls[0][2].alliance_alignment;
+    expect(alignment.portfolio).toEqual(PORTFOLIO_1);
+    expect(alignment.primary_levers).toEqual([]);
+  });
+
+  it('reads Research Areas, Strategic Objectives and Impact Outcomes on Portfolio 2', async () => {
+    mockReportDependencies();
+    portfoliosService.findByYear.mockResolvedValue(PORTFOLIO_2);
+    resultsService.findMetadataResult.mockResolvedValue({
+      result_official_code: 8245,
+      indicator_id: 4,
+      indicator_name: 'Policy Change',
+      report_year: 2026,
+    });
+    leverRepo.find.mockResolvedValue([
+      {
+        result_lever_id: 7,
+        lever_id: '12',
+        lever_role_id: 3,
+        is_primary: true,
+        lever: { short_name: 'Biodiversity' },
+      },
+    ]);
+    strategicObjectiveRepo.find.mockResolvedValue([
+      { strategic_objective: { id: 1, name: 'Objective' } },
+    ]);
+    impactOutcomeRepo.find.mockResolvedValue([
+      { impact_outcome: { id: 2, name: 'Outcome' } },
+    ]);
+    reportMsApp.getPdfReport.mockResolvedValue('url');
+
+    await service.buildReport(10, PdfTemplates.CAP_SHARING);
+
+    expect(portfoliosService.findByYear).toHaveBeenCalledWith(2026);
+    expect(leverRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          lever_role_id: LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+        }),
+      }),
+    );
+    const alignment =
+      reportMsApp.getPdfReport.mock.calls[0][2].alliance_alignment;
+    expect(alignment.portfolio.id).toBe(2);
+    expect(alignment.research_areas[0].short_name).toBe('Biodiversity');
+    expect(alignment.strategic_objectives).toEqual([
+      { id: 1, name: 'Objective' },
+    ]);
+    expect(alignment.impact_outcomes).toEqual([{ id: 2, name: 'Outcome' }]);
+    expect(alignment.primary_levers).toBeUndefined();
+  });
+
+  it('sends no portfolio when the result has no reporting year', async () => {
+    mockReportDependencies();
+    resultsService.findMetadataResult.mockResolvedValue({
+      result_official_code: 8245,
+      indicator_id: 1,
+      report_year: null,
+    });
+    reportMsApp.getPdfReport.mockResolvedValue('url');
+
+    await service.buildReport(10, PdfTemplates.CAP_SHARING);
+
+    expect(portfoliosService.findByYear).not.toHaveBeenCalled();
+    expect(
+      reportMsApp.getPdfReport.mock.calls[0][2].alliance_alignment.portfolio,
+    ).toBeNull();
   });
 
   it('throws BadRequestException for unsupported report names', async () => {
