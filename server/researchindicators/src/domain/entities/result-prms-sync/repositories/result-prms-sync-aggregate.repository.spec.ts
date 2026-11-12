@@ -563,4 +563,46 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     const star = await repository.loadByResultId(11);
     expect(builder.build(star!).external_reference).toBe('123');
   });
+
+  it('resolves acting staff by sec_users.carnet, then email', async () => {
+    query.mockResolvedValue([
+      {
+        email: 'pat.pusher@cgiar.org',
+        first_name: 'Pat',
+        last_name: 'Pusher',
+      },
+    ]);
+
+    await expect(repository.findActingStaffBySecUserId(7)).resolves.toEqual({
+      email: 'pat.pusher@cgiar.org',
+      first_name: 'Pat',
+      last_name: 'Pusher',
+    });
+
+    const sql = String(query.mock.calls[0][0]);
+    expect(query.mock.calls[0][1]).toEqual([7]);
+    expect(sql).toContain('secondary_db.sec_users');
+    expect(sql).toContain('LEFT JOIN alliance_user_staff aus');
+    expect(sql).toContain('su.carnet');
+    expect(sql).toContain('a.email = su.email');
+    expect(sql).toContain('su.email IS NOT NULL');
+    expect(sql).toContain("su.email <> ''");
+    expect(sql).toContain('ORDER BY a.is_active DESC, a.carnet ASC');
+    expect(sql).toContain('su.sec_user_id = ?');
+  });
+
+  it('returns null when the acting user has no staff email or name', async () => {
+    query.mockResolvedValue([
+      { email: null, first_name: null, last_name: null },
+    ]);
+
+    await expect(repository.findActingStaffBySecUserId(7)).resolves.toBeNull();
+  });
+
+  it('returns null when sec_users has no row for the acting user', async () => {
+    query.mockResolvedValue([]);
+
+    await expect(repository.findActingStaffBySecUserId(9)).resolves.toBeNull();
+    expect(query.mock.calls[0][1]).toEqual([9]);
+  });
 });
