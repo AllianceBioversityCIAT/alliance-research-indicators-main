@@ -224,4 +224,24 @@ describe('ReportingComponent', () => {
       expect(component.showResult()).toBe(false);
     });
   });
+
+  describe('"Why reporting matters" card', () => {
+    const indicatorsUnder = (title: string): string => {
+      fixture.detectChanges();
+      const groups: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('section[aria-label="Why reporting matters"] p'));
+      const group = groups.find(p => p.querySelector('strong')?.textContent?.trim() === title);
+      const heading = group?.querySelector('strong')?.textContent ?? '';
+      return (group?.textContent ?? '').replace(heading, '').replace(/\s+/g, ' ').trim();
+    };
+
+    it('keeps only Knowledge Products under Scientific Excellence', () => {
+      expect(indicatorsUnder('Scientific Excellence')).toBe('Knowledge Products');
+    });
+
+    it('lists Capacity Sharing and Innovation Development under Enabling System Change', () => {
+      expect(indicatorsUnder('Enabling System Change')).toBe(
+        'Capacity Sharing · Innovation Development · Innovation Use · Policy Change · OICRs'
+      );
+    });
+  });
 });
