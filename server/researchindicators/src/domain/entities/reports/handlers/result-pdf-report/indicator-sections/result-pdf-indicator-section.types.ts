@@ -1,5 +1,8 @@
 import { IndicatorsEnum } from '../../../../indicators/enum/indicators.enum';
-import { ResultPdfReportCapSharingSection } from '../result-pdf-report.types';
+import {
+  ResultPdfReportCapSharingSection,
+  ResultPdfReportInnovationDetailsSection,
+} from '../result-pdf-report.types';
 
 /**
  * Indicator-specific PDF payload keys. Add a new optional section here when a new
@@ -7,6 +10,7 @@ import { ResultPdfReportCapSharingSection } from '../result-pdf-report.types';
  */
 export type ResultPdfIndicatorSections = {
   cap_sharing?: ResultPdfReportCapSharingSection;
+  innovation_details?: ResultPdfReportInnovationDetailsSection;
 };
 
 export type ResultPdfIndicatorSectionHandler = {
