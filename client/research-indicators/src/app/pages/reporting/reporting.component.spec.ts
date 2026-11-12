@@ -243,5 +243,13 @@ describe('ReportingComponent', () => {
         'Capacity Sharing · Innovation Development · Innovation Use · Policy Change · OICRs'
       );
     });
+
+    it('no longer shows the "See diagram" pill', () => {
+      fixture.detectChanges();
+      const card: HTMLElement = fixture.nativeElement.querySelector('section[aria-label="Why reporting matters"]');
+      const links: HTMLAnchorElement[] = Array.from(card.querySelectorAll('a'));
+      expect(links.some(link => link.textContent?.includes('See diagram'))).toBe(false);
+      expect(card.textContent).not.toContain('See diagram');
+    });
   });
 });
