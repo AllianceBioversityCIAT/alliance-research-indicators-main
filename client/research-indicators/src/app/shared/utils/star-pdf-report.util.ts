@@ -3,11 +3,6 @@ import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 export const CAPACITY_SHARING_INDICATOR_ID = 1;
 export const INNOVATION_DEVELOPMENT_INDICATOR_ID = 2;
 
-/** Re-enable when inn_dev PDF reports are ready on the backend. */
-export const STAR_INN_DEV_PDF_ENABLED = false;
-
-export const STAR_PDF_COMING_SOON_TOOLTIP = 'Coming soon';
-
 export type StarPdfReportName = 'cap_sharing' | 'inn_dev';
 export type StarResultCodeValue = number | string;
 export type StarResultIdValue = string | number | null;
@@ -26,10 +21,6 @@ export function getStarPdfReportName(indicatorId: number | undefined): StarPdfRe
   if (indicatorId === CAPACITY_SHARING_INDICATOR_ID) return 'cap_sharing';
   if (indicatorId === INNOVATION_DEVELOPMENT_INDICATOR_ID) return 'inn_dev';
   return null;
-}
-
-export function isStarInnDevPdfTemporarilyDisabled(indicatorId: number | undefined): boolean {
-  return indicatorId === INNOVATION_DEVELOPMENT_INDICATOR_ID && !STAR_INN_DEV_PDF_ENABLED;
 }
 
 export function isStarPdfReportEligible(source: StarPdfReportSource): boolean {

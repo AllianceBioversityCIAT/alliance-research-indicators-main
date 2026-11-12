@@ -5,11 +5,9 @@ import {
   getStarReportViewerUrl,
   getStarReportYear,
   INNOVATION_DEVELOPMENT_INDICATOR_ID,
-  isStarInnDevPdfTemporarilyDisabled,
   isStarPdfReportEligible,
   isStarPdfReportEligibleFromResultId,
-  openStarPdfReportInNewTab,
-  STAR_INN_DEV_PDF_ENABLED
+  openStarPdfReportInNewTab
 } from './star-pdf-report.util';
 
 describe('star-pdf-report.util', () => {
@@ -17,11 +15,6 @@ describe('star-pdf-report.util', () => {
     expect(getStarPdfReportName(CAPACITY_SHARING_INDICATOR_ID)).toBe('cap_sharing');
     expect(getStarPdfReportName(INNOVATION_DEVELOPMENT_INDICATOR_ID)).toBe('inn_dev');
     expect(getStarPdfReportName(4)).toBeNull();
-  });
-
-  it('isStarInnDevPdfTemporarilyDisabled should reflect STAR_INN_DEV_PDF_ENABLED flag', () => {
-    expect(isStarInnDevPdfTemporarilyDisabled(INNOVATION_DEVELOPMENT_INDICATOR_ID)).toBe(!STAR_INN_DEV_PDF_ENABLED);
-    expect(isStarInnDevPdfTemporarilyDisabled(CAPACITY_SHARING_INDICATOR_ID)).toBe(false);
   });
 
   it('isStarPdfReportEligible should require STAR platform and supported indicator', () => {
