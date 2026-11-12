@@ -21,7 +21,6 @@ import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.se
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import {
   getStarReportViewerUrl,
-  isStarInnDevPdfTemporarilyDisabled,
   isStarPdfReportEligibleFromResultId,
   openStarPdfReportInNewTab,
   STAR_PDF_COMING_SOON_TOOLTIP
@@ -76,7 +75,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   starPdfReportDisabled = computed(() => {
     const indicatorId = this.cache.currentMetadata()?.indicator_id;
     const resultId = this.cache.currentResultId() || this.currentResultId();
-    return !isStarPdfReportEligibleFromResultId(indicatorId, resultId) || isStarInnDevPdfTemporarilyDisabled(indicatorId);
+    return !isStarPdfReportEligibleFromResultId(indicatorId, resultId);
   });
   readonly starPdfComingSoonTooltip = STAR_PDF_COMING_SOON_TOOLTIP;
   /** OICR results only, and only when the portfolio resolves to 1 or 2. */
@@ -188,7 +187,6 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   }
 
   openStarPdfReport(): void {
-    if (this.starPdfReportDisabled()) return;
     const metadata = this.cache.currentMetadata();
     const resultId = this.cache.currentResultId() || this.currentResultId();
     const versionFromUrl = this.route.snapshot.queryParamMap.get('version')?.trim() ?? '';

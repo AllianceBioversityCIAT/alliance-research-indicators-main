@@ -30,7 +30,6 @@ import { openPublicLink } from '@shared/utils/public-link.util';
 import { buildResultLink, ResultLink } from '@shared/utils/result-link.util';
 import {
   getStarReportViewerUrl,
-  isStarInnDevPdfTemporarilyDisabled,
   isStarPdfReportEligible,
   openStarPdfReportInNewTab
 } from '@shared/utils/star-pdf-report.util';
@@ -230,16 +229,11 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   }
 
   openStarPdfReport(result: Result): void {
-    if (this.isStarPdfReportDisabled(result)) return;
     openStarPdfReportInNewTab(this.getStarReportViewerUrl(result));
   }
 
   showStarPdfReport(result: Result): boolean {
     return isStarPdfReportEligible(result);
-  }
-
-  isStarPdfReportDisabled(result: Result): boolean {
-    return isStarInnDevPdfTemporarilyDisabled(result.indicator_id);
   }
 
   getStarReportViewerUrl(result: Result): string {

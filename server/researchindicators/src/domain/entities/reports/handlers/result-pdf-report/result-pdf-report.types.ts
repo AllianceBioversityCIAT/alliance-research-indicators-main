@@ -5,6 +5,7 @@ import {
 import { ResultUser } from '../../../result-users/entities/result-user.entity';
 import { ResultLanguage } from '../../../result-languages/entities/result-language.entity';
 import { ResultPdfIndicatorSections } from './indicator-sections/result-pdf-indicator-section.types';
+import { CreateResultInnovationDevDto } from '../../../result-innovation-dev/dto/create-result-innovation-dev.dto';
 
 export type ResultPdfReportStatus = {
   status_name: string;
@@ -63,12 +64,43 @@ export type ResultPdfReportAlignmentContract = {
   levers: ResultPdfReportContractLever;
 };
 
-export type ResultPdfReportLeverSdgTarget = {
+/** Portfolio row the result falls in by its reporting year (years live in the DB). */
+export type ResultPdfReportPortfolio = {
+  id: number;
+  name: string;
+  description?: string;
+  start_year: number;
+  end_year: number;
+};
+
+/** CLARISA SDG row, sent whole so the PDF can draw its icon and colour. */
+export type ResultPdfReportSdg = {
+  id: number;
+  clarisa_sdg_id: number;
+  smo_code?: number;
+  financial_code?: string;
+  short_name?: string;
+  full_name?: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+};
+
+export type ResultPdfReportSdgTarget = {
+  sdg_target_id: number;
+  sdg_target_code?: string;
+  sdg_target?: string;
+  clarisa_sdg?: ResultPdfReportSdg;
+};
+
+export type ResultPdfReportLeverSdgTarget = ResultPdfReportSdgTarget & {
   result_lever_sdg_target_id: number;
   result_lever_id: number;
-  sdg_target_id: number;
-  name?: string;
-  description?: string;
+};
+
+export type ResultPdfReportStrategicOutcome = {
+  lever_strategic_outcome_id: number;
+  strategic_outcome?: string;
 };
 
 export type ResultPdfReportAlignmentLever = {
@@ -78,17 +110,34 @@ export type ResultPdfReportAlignmentLever = {
   lever_role_id: number;
   is_primary: boolean;
   short_name?: string;
+  full_name?: string;
+  other_names?: string;
   icon?: string | null;
-  result_lever_strategic_outcomes?: unknown[];
+  custom_lever_name?: string;
+  result_lever_strategic_outcomes?: ResultPdfReportStrategicOutcome[];
   result_lever_sdg_targets?: ResultPdfReportLeverSdgTarget[];
+};
+
+/** Strategic Objective / Impact Outcome (Portfolio 2 catalogs). */
+export type ResultPdfReportAlignmentCatalogItem = {
+  id: number;
+  name: string;
+  description?: string;
 };
 
 export type ResultPdfReportAllianceAlignmentSection = {
   indicator_id: number;
+  portfolio: ResultPdfReportPortfolio | null;
   contracts: ResultPdfReportAlignmentContract[];
-  result_sdgs: unknown[];
-  primary_levers: ResultPdfReportAlignmentLever[];
-  contributor_levers: ResultPdfReportAlignmentLever[];
+  result_sdgs: ResultPdfReportSdg[];
+  /** Portfolio 1 */
+  primary_levers?: ResultPdfReportAlignmentLever[];
+  contributor_levers?: ResultPdfReportAlignmentLever[];
+  /** Portfolio 2 */
+  research_areas?: ResultPdfReportAlignmentLever[];
+  strategic_objectives?: ResultPdfReportAlignmentCatalogItem[];
+  impact_outcomes?: ResultPdfReportAlignmentCatalogItem[];
+  result_sdg_targets?: ResultPdfReportSdgTarget[];
 };
 
 export type ResultPdfReportEvidenceSection = {
@@ -162,6 +211,62 @@ export type ResultPdfReportCapSharingSection = {
   attending_organization_label?: string;
   organization_institutions?: ResultPdfReportPartnerInstitution[];
 };
+
+export type ResultPdfReportInnovationCatalogItem = {
+  id?: number;
+  code?: number;
+  level?: number;
+  name?: string;
+  definition?: string;
+  additional_guidance?: string;
+};
+
+export type ResultPdfReportLinkedResult = {
+  link_result_id: number;
+  other_result_id: number;
+  link_result_role_id: number;
+  result_code?: number | string;
+  linked_result_title?: string;
+  result_type_label?: string;
+  qa_status_label?: string;
+  reporting_project_name?: string;
+};
+
+/**
+ * `innovation_details` for the `inn_dev` template: the innovation-dev GET plus every
+ * catalog label resolved here, because the PDF viewer never reads a STAR catalog.
+ */
+/** Catalog labels resolved for `innovation_details`; the PDF prints these as-is. */
+export type ResultPdfReportInnovationDetailsLabels = {
+  innovation_nature?: ResultPdfReportInnovationCatalogItem;
+  innovation_type?: ResultPdfReportInnovationCatalogItem;
+  innovation_readiness?: ResultPdfReportInnovationCatalogItem;
+  anticipated_users_label?: string;
+  is_new_or_improved_variety_label?: string;
+  actor_type_labels?: Record<number, string>;
+  institution_type_labels?: Record<number, string>;
+  sub_institution_type_labels?: Record<number, string>;
+  institution_labels?: Record<number, string>;
+  is_knowledge_sharing_label?: string;
+  dissemination_qualification_label?: string;
+  tool_function_labels?: string[];
+  is_used_beyond_original_context_label?: string;
+  expansion_potential_label?: string;
+};
+
+/**
+ * `innovation_details` for the `inn_dev` template: the innovation-dev GET plus every
+ * catalog label resolved here, because the PDF viewer never reads a STAR catalog.
+ */
+export type ResultPdfReportInnovationDetailsSection = Omit<
+  CreateResultInnovationDevDto,
+  'knowledge_sharing_form'
+> & {
+  knowledge_sharing_form?: Omit<
+    CreateResultInnovationDevDto['knowledge_sharing_form'],
+    'link_to_result'
+  > & { link_to_result?: ResultPdfReportLinkedResult[] };
+} & ResultPdfReportInnovationDetailsLabels;
 
 export type ResultPdfReportPayload = {
   general_information: ResultPdfReportGeneralInformationSection;
