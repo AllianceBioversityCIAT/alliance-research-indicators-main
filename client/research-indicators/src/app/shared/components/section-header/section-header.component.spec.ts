@@ -539,16 +539,28 @@ describe('SectionHeaderComponent', () => {
     openSpy.mockRestore();
   });
 
-  it('openStarPdfReport should not open when inn_dev PDF is temporarily disabled', () => {
+  it('openStarPdfReport should open the report viewer for an Innovation Development result', () => {
     const openSpy = jest.spyOn(globalThis, 'open').mockReturnValue({ opener: {} } as Window);
     (cacheService.currentResultId as any).set('STAR-8');
     (cacheService.currentMetadata as any).set({ indicator_id: 2, result_official_code: 8, report_year: 2026 });
+    (component.route.snapshot as any).queryParamMap = {
+      get: jest.fn().mockReturnValue(null)
+    };
 
     component.openStarPdfReport();
 
-    expect(openSpy).not.toHaveBeenCalled();
-    expect(component.starPdfReportDisabled()).toBe(true);
+    expect(openSpy).toHaveBeenCalledWith('/reports/result/STAR-8', '_blank', 'noopener,noreferrer');
     openSpy.mockRestore();
+  });
+
+  it('renders the Innovation Development PDF button enabled, not the greyed-out icon', () => {
+    (cacheService.currentResultId as any).set('STAR-8');
+    (cacheService.currentMetadata as any).set({ indicator_id: 2, result_official_code: 8, report_year: 2026 });
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('[aria-label="Open PDF report for STAR-8"]');
+    expect(button).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('span.opacity-40 .pi-file-pdf')).toBeNull();
   });
 
   it('openStarPdfReport should omit version when URL has no version query param', () => {

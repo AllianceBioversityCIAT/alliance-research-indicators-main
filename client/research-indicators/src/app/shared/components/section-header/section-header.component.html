@@ -43,18 +43,12 @@
       <app-download-oicr-template [onlyIcon]="true"></app-download-oicr-template>
       }
       @if (showStarPdfReport()) {
-      @if (starPdfReportDisabled()) {
-      <span aria-hidden="true" class="inline-flex px-2 opacity-40 text-[#777C83]">
-        <i class="pi pi-file-pdf !text-[17px]"></i>
-      </span>
-      } @else {
       <p-button variant="text" pTooltip="Open STAR PDF report" tooltipPosition="left" (onClick)="openStarPdfReport()"
         [attr.aria-label]="'Open PDF report for ' + cache.currentResultId()">
         <ng-template pTemplate="icon">
           <i class="pi pi-file-pdf text-[#035BA9] !text-[17px]"></i>
         </ng-template>
       </p-button>
-      }
       }
       <p-button variant="text" pTooltip="Submission history" tooltipPosition="left"
         (onClick)="cache.showSubmissionHistory.set(true)">

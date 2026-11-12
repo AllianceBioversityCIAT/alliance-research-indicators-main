@@ -21,7 +21,6 @@ import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.se
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import {
   getStarReportViewerUrl,
-  isStarInnDevPdfTemporarilyDisabled,
   isStarPdfReportEligibleFromResultId,
   openStarPdfReportInNewTab
 } from '@shared/utils/star-pdf-report.util';
@@ -70,7 +69,6 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     const resultId = this.cache.currentResultId() || this.currentResultId();
     return isStarPdfReportEligibleFromResultId(this.cache.currentMetadata()?.indicator_id, resultId);
   });
-  starPdfReportDisabled = computed(() => isStarInnDevPdfTemporarilyDisabled(this.cache.currentMetadata()?.indicator_id));
   /** OICR results only, and not Portfolio 2 — that portfolio has no template yet. */
   showOicrTemplateDownload = computed(() => {
     const metadata = this.cache.currentMetadata();
@@ -180,7 +178,6 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   }
 
   openStarPdfReport(): void {
-    if (this.starPdfReportDisabled()) return;
     const metadata = this.cache.currentMetadata();
     const resultId = this.cache.currentResultId() || this.currentResultId();
     const versionFromUrl = this.route.snapshot.queryParamMap.get('version')?.trim() ?? '';

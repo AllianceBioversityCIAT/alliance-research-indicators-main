@@ -882,15 +882,14 @@ describe('ResultsCenterTableComponent', () => {
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'PRMS', indicator_id: 1 })).toBe(false);
   });
 
-  it('isStarPdfReportDisabled should disable inn_dev PDF temporarily', () => {
-    expect(component.isStarPdfReportDisabled({ ...mockResult, platform_code: 'STAR', indicator_id: 2 })).toBe(true);
-    expect(component.isStarPdfReportDisabled({ ...mockResult, platform_code: 'STAR', indicator_id: 1 })).toBe(false);
-  });
+  it('openStarPdfReport should open the report viewer for an Innovation Development result', () => {
+    const openedWindow = { opener: {} };
+    const openSpy = jest.spyOn(globalThis, 'open').mockReturnValue(openedWindow as any);
 
-  it('openStarPdfReport should not open when inn_dev PDF is temporarily disabled', () => {
-    const openSpy = jest.spyOn(globalThis, 'open').mockReturnValue({ opener: {} } as Window);
     component.openStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 2 });
-    expect(openSpy).not.toHaveBeenCalled();
+
+    expect(openSpy).toHaveBeenCalledWith('/reports/result/STAR-7', '_blank', 'noopener,noreferrer');
+    expect(openedWindow.opener).toBeNull();
     openSpy.mockRestore();
   });
 

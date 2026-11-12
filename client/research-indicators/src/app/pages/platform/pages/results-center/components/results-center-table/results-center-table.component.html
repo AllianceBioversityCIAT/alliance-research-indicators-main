@@ -148,18 +148,12 @@
           <td class="{{ column.minWidth }} {{ column.maxWidth }} align-center" (click)="$event.stopPropagation()"
             (keydown.enter)="$event.stopPropagation()">
             @if (showStarPdfReport(result)) {
-            @if (isStarPdfReportDisabled(result)) {
-            <span aria-hidden="true" class="inline-flex cursor-default opacity-40 text-[#777C83]">
-              <i class="pi pi-file-pdf !text-[18px]"></i>
-            </span>
-            } @else {
             <button type="button" data-public-link-action (click)="openStarPdfReport(result); $event.stopPropagation()"
               pTooltip="Open STAR PDF report" tooltipPosition="left"
               [attr.aria-label]="'Open PDF report for STAR-' + result.result_official_code"
               class="cursor-pointer border-0 bg-transparent p-0 text-[#035BA9]">
               <i class="pi pi-file-pdf !text-[18px]"></i>
             </button>
-            }
             } @else if (result.public_link) {
             <button type="button" data-public-link-action
               (click)="openPublicLink(result.public_link); $event.stopPropagation()" [pTooltip]="result.public_link"
