@@ -14,6 +14,7 @@ import { ResultStrategicObjectivesModule } from '../../result-strategic-objectiv
 import { ResultImpactOutcomesModule } from '../../result-impact-outcomes/result-impact-outcomes.module';
 import { StrategicObjectivesModule } from '../../strategic-objectives/strategic-objectives.module';
 import { ClarisaLeversModule } from '../../../tools/clarisa/entities/clarisa-levers/clarisa-levers.module';
+import { ResultPoolFundingAlignmentRepository } from '../../bilateral/repositories/result-pool-funding-alignment.repository';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ClarisaLeversModule } from '../../../tools/clarisa/entities/clarisa-lev
   ],
   providers: [
     ResultAlignmentOperationsService,
+    ResultPoolFundingAlignmentRepository,
     ResultSectionOrchestratorService,
     AlignmentHandlerRegistry,
     Portfolio1AlignmentHandler,

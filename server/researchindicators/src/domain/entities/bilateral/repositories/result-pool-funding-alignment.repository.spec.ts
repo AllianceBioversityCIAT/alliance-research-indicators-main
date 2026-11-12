@@ -267,4 +267,51 @@ describe('ResultPoolFundingAlignmentRepository', () => {
       ]);
     });
   });
+
+  describe('clearLivePoolFunding', () => {
+    it('soft-deletes the three alignment tables and hard-deletes indicator mappings on the passed manager', async () => {
+      const repository = buildRepository();
+      const repositoryQuery = jest
+        .spyOn(repository, 'query')
+        .mockResolvedValue([]);
+      const manager = { query: jest.fn().mockResolvedValue(undefined) };
+
+      await repository.clearLivePoolFunding(manager as any, 42, 7);
+
+      expect(repositoryQuery).not.toHaveBeenCalled();
+      expect(manager.query).toHaveBeenCalledTimes(4);
+
+      const [spSql, spParams] = manager.query.mock.calls[0];
+      expect(spSql).toContain('UPDATE result_pool_funding_alignment_sp');
+      expect(spSql).toContain('sp.is_active = FALSE');
+      expect(spSql).toContain('sp.deleted_at = NOW()');
+      expect(spSql).toContain('sp.updated_by = ?');
+      expect(spSql).toContain('a.result_id = ?');
+      expect(spParams).toEqual([7, 42]);
+
+      const [alignmentSql, alignmentParams] = manager.query.mock.calls[1];
+      expect(alignmentSql).toContain('UPDATE result_pool_funding_alignment');
+      expect(alignmentSql).not.toContain('alignment_sp');
+      expect(alignmentSql).toContain('is_active = FALSE');
+      expect(alignmentSql).toContain('deleted_at = NOW()');
+      expect(alignmentSql).toContain('updated_by = ?');
+      expect(alignmentSql).toContain('result_id = ?');
+      expect(alignmentParams).toEqual([7, 42]);
+
+      const [tocSql, tocParams] = manager.query.mock.calls[2];
+      expect(tocSql).toContain('UPDATE result_pool_funding_toc_alignment');
+      expect(tocSql).toContain('is_active = FALSE');
+      expect(tocSql).toContain('deleted_at = NOW()');
+      expect(tocSql).toContain('updated_by = ?');
+      expect(tocSql).toContain('result_id = ?');
+      expect(tocParams).toEqual([7, 42]);
+
+      const [mappingSql, mappingParams] = manager.query.mock.calls[3];
+      expect(mappingSql).toContain(
+        'DELETE FROM result_pool_funding_indicator_mapping WHERE result_id = ?',
+      );
+      expect(mappingSql).not.toContain('is_active');
+      expect(mappingParams).toEqual([42]);
+    });
+  });
 });

@@ -2815,6 +2815,84 @@ describe('ResultSidebarComponent', () => {
     });
   });
 
+  describe('PRMS code line when the Pool Funding block is hidden', () => {
+    const hiddenWithCode = (code: number | null): AlignmentResponse => ({
+      result_code: 'RES-001',
+      eligible: false,
+      has_pool_funding_alignment_eligible: false,
+      has_contribution: false,
+      selected_levers: [],
+      is_synced_to_prms: true,
+      is_read_only: false,
+      prms_result_code: code,
+      display_only: false
+    });
+
+    const setAlignment = (value: AlignmentResponse) => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(value);
+    };
+
+    const codeLine = (): HTMLElement | null => fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]');
+
+    it('shows only the PRMS code line when the block is hidden and a code exists', () => {
+      expect(codeLine()).toBeNull();
+
+      setAlignment(hiddenWithCode(54321));
+      fixture.detectChanges();
+
+      expect(component.hasPoolFundingOption()).toBe(false);
+      expect(component.showPrmsCodeOnly()).toBe(true);
+      expect(codeLine()?.textContent.replace(/\s+/g, ' ').trim()).toBe('PRMS code #54321');
+      expect(codeLine()?.className).toContain('text-[#a9adb2]');
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-prms-sync-card')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-optional-divider"]')).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('CGIAR Portfolio Contribution');
+    });
+
+    it('renders nothing when the block is hidden and there is no PRMS code', () => {
+      setAlignment(hiddenWithCode(null));
+      fixture.detectChanges();
+
+      expect(component.hasPoolFundingOption()).toBe(false);
+      expect(component.showPrmsCodeOnly()).toBe(false);
+      expect(codeLine()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-prms-sync-card')).toBeNull();
+    });
+
+    it('renders nothing when the section flag is disabled even if a PRMS code exists', () => {
+      setAlignment(hiddenWithCode(54321));
+      fixture.detectChanges();
+      expect(component.showPrmsCodeOnly()).toBe(true);
+
+      sectionEnabled.set(false);
+      fixture.detectChanges();
+
+      expect(component.hasPoolFundingOption()).toBe(false);
+      expect(component.showPrmsCodeOnly()).toBe(false);
+      expect(codeLine()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-prms-sync-card')).toBeNull();
+    });
+
+    it('renders nothing for OICR (indicator_id === 5) even when a PRMS code exists', () => {
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: 5 });
+      setAlignment({
+        ...hiddenWithCode(54321),
+        eligible: true,
+        has_pool_funding_alignment_eligible: true
+      });
+      fixture.detectChanges();
+
+      expect(component.hasPoolFundingOption()).toBe(false);
+      expect(component.showPrmsCodeOnly()).toBe(false);
+      expect(codeLine()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-prms-sync-card')).toBeNull();
+    });
+  });
+
   describe('PRMS sync status panel', () => {
     const panelAlignment: AlignmentResponse = {
       result_code: 'RES-001',
