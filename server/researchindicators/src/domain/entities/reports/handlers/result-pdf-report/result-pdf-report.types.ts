@@ -54,6 +54,11 @@ export type ResultPdfReportAlignmentContract = {
   contract_id: string;
   contract_role_id: number;
   is_primary: boolean;
+  /**
+   * Drives the "Contributing to CGIAR Portfolio" tag. Same rule STAR uses on screen:
+   * the contract's own flag OR an active bilateral project mapping.
+   */
+  is_pool_funding_contributor: boolean;
   agreement_id: string;
   description?: string;
   contract_status?: string;
