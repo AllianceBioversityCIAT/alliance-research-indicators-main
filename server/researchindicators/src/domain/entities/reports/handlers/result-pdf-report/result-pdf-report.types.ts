@@ -245,7 +245,11 @@ export type ResultPdfReportInnovationDetailsLabels = {
   is_new_or_improved_variety_label?: string;
   actor_type_labels?: Record<number, string>;
   institution_type_labels?: Record<number, string>;
+  /** CLARISA institution-type description by id; ids without one are omitted. */
+  institution_type_descriptions?: Record<number, string>;
   sub_institution_type_labels?: Record<number, string>;
+  /** CLARISA institution-type description by id; ids without one are omitted. */
+  sub_institution_type_descriptions?: Record<number, string>;
   institution_labels?: Record<number, string>;
   is_knowledge_sharing_label?: string;
   dissemination_qualification_label?: string;
