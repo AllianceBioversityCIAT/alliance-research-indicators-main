@@ -75,6 +75,51 @@ const leadContactMissing = (staff: PrmsStaffSnapshot | null): boolean => {
   return `${staff.first_name} ${staff.last_name}`.trim() === '';
 };
 
+/**
+ * Same completeness bar as `requireStaff`, for the acting submitter.
+ * Whitespace-only fields count as blank.
+ */
+const staffIncomplete = (
+  staff: {
+    email?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+  } | null,
+): boolean => {
+  if (!staff) {
+    return true;
+  }
+  if (staff.email == null || String(staff.email).trim() === '') {
+    return true;
+  }
+  return `${staff.first_name ?? ''} ${staff.last_name ?? ''}`.trim() === '';
+};
+
+/**
+ * Same bar as `requireStaff`: a blank email or a blank name cannot be sent
+ * as `submitted_by`. Whitespace-only fields count as blank.
+ */
+const usableStaff = (
+  staff:
+    | {
+        email?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+      }
+    | null
+    | undefined,
+): PrmsStaffSnapshot | null => {
+  if (!staff) {
+    return null;
+  }
+  const snapshot: PrmsStaffSnapshot = {
+    email: String(staff.email ?? '').trim(),
+    first_name: String(staff.first_name ?? '').trim(),
+    last_name: String(staff.last_name ?? '').trim(),
+  };
+  return staffIncomplete(snapshot) ? null : snapshot;
+};
+
 export interface PrmsSyncResponseData {
   outcome: PrmsSyncOutcome;
   attempt_number: number | null;
@@ -272,6 +317,7 @@ export class ResultPrmsSyncService {
       if (options.origin === 'TIP_SYNC') {
         payload = this.buildTipSyncPayload(aggregate, options);
       } else {
+        await this.applyActingSubmitter(aggregate, options, userId);
         payload = this.payloadBuilder.build(aggregate);
       }
     } catch (error) {
@@ -370,6 +416,61 @@ export class ResultPrmsSyncService {
       tocMapping: options.tocMapping,
       optionalDescription: true,
     });
+  }
+
+  /**
+   * STAR only. `submitted_by` is the staff of the same `sec_user_id` that
+   * `claimAttempt` writes to `result_prms_sync_log.created_by`. The only
+   * hop is sec_users.carnet, then one alliance_user_staff row by email.
+   * Request-user name fields are not a source. Payload `created_by` and
+   * `lead_contact` stay as loaded. If that staff cannot be resolved, the
+   * approval submitter stays and the push still proceeds.
+   */
+  private async applyActingSubmitter(
+    aggregate: PrmsSyncAggregate,
+    options: SyncOptions,
+    userId: number,
+  ): Promise<void> {
+    const resolved = await this.resolveActingSubmitterStaff(userId);
+    if (!resolved.staff) {
+      const detail = resolved.errorMessage ? `: ${resolved.errorMessage}` : '';
+      this.logger._warn(
+        `PRMS sync submitted_by: acting user staff could not be resolved for sec_user_id=${
+          userId ?? 'none'
+        }${detail}; keeping the approval submitter`,
+      );
+      return;
+    }
+    aggregate.submitted_by = {
+      staff: resolved.staff,
+      submitted_date: options.now ?? new Date(),
+      comment: aggregate.submitted_by?.comment ?? null,
+    };
+  }
+
+  /**
+   * A rejected lookup is an unresolved staff (null), never a failed push.
+   * The caller warns once and keeps the approval submitter.
+   */
+  private async resolveActingSubmitterStaff(userId: number): Promise<{
+    staff: PrmsStaffSnapshot | null;
+    errorMessage?: string;
+  }> {
+    if (userId == null) {
+      return { staff: null };
+    }
+    try {
+      return {
+        staff: usableStaff(
+          await this.aggregateRepository.findActingStaffBySecUserId(userId),
+        ),
+      };
+    } catch (error) {
+      return {
+        staff: null,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
   /**

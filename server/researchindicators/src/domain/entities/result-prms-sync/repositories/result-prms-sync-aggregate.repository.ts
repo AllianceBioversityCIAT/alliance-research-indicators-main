@@ -73,6 +73,45 @@ export class ResultPrmsSyncAggregateRepository {
     private readonly appConfig: AppConfig,
   ) {}
 
+  /**
+   * Staff for the user who pressed push. Same hop as the approval submitter:
+   * `sec_users.carnet` first, then one `alliance_user_staff` row by email
+   * (active first, lowest carnet). The request `User` has no carnet column.
+   */
+  async findActingStaffBySecUserId(
+    secUserId: number,
+  ): Promise<PrmsStaffSnapshot | null> {
+    const secondary = this.appConfig.ARI_SECONDARY_MYSQL_NAME;
+    const rows: Array<{
+      email?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+    }> = await this.dataSource.query(
+      `
+      SELECT
+        aus.email,
+        aus.first_name,
+        aus.last_name
+      FROM ${secondary}.sec_users su
+      LEFT JOIN alliance_user_staff aus
+        ON aus.carnet = COALESCE(
+          su.carnet,
+          (SELECT a.carnet
+             FROM alliance_user_staff a
+            WHERE a.email = su.email
+              AND su.email IS NOT NULL
+              AND su.email <> ''
+            ORDER BY a.is_active DESC, a.carnet ASC
+            LIMIT 1)
+        )
+      WHERE su.sec_user_id = ?
+      LIMIT 1
+      `,
+      [secUserId],
+    );
+    return asStaff(rows[0] ?? {});
+  }
+
   async loadByResultId(resultId: number): Promise<PrmsSyncAggregate | null> {
     const secondary = this.appConfig.ARI_SECONDARY_MYSQL_NAME;
     // homologation.md §4 created_by.email: hop r.created_by → sec_users, then

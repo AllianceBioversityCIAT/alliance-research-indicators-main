@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { SelectedLeverResponse } from '../dto/update-pool-funding-alignment.dto';
 import { SpRole } from '../dto/sp-role.type';
 import { ResultPoolFundingAlignment } from '../entities/result-pool-funding-alignment.entity';
@@ -104,6 +104,43 @@ export class ResultPoolFundingAlignmentRepository extends Repository<ResultPoolF
           sp_role: (row.sp_role ?? null) as SpRole | null,
         })),
     };
+  }
+
+  /**
+   * Clears the live result's Pool Funding section on `manager`.
+   * The first three statements are logical deletes. Indicator mappings are
+   * hard-deleted: `uq_rpfim_result_indicator_active` includes `is_active`, so
+   * an inactive twin collides. Same four statements as the start of
+   * `GreenChecksRepository.carryOverPoolFunding`.
+   */
+  async clearLivePoolFunding(
+    manager: EntityManager,
+    resultId: number,
+    userId: number | null,
+  ): Promise<void> {
+    await manager.query(
+      `UPDATE result_pool_funding_alignment_sp sp
+        INNER JOIN result_pool_funding_alignment a ON a.id = sp.alignment_id
+        SET sp.is_active = FALSE, sp.deleted_at = NOW(), sp.updated_by = ?
+        WHERE sp.is_active = TRUE AND a.result_id = ?`,
+      [userId, resultId],
+    );
+    await manager.query(
+      `UPDATE result_pool_funding_alignment
+        SET is_active = FALSE, deleted_at = NOW(), updated_by = ?
+        WHERE is_active = TRUE AND result_id = ?`,
+      [userId, resultId],
+    );
+    await manager.query(
+      `UPDATE result_pool_funding_toc_alignment
+        SET is_active = FALSE, deleted_at = NOW(), updated_by = ?
+        WHERE is_active = TRUE AND result_id = ?`,
+      [userId, resultId],
+    );
+    await manager.query(
+      `DELETE FROM result_pool_funding_indicator_mapping WHERE result_id = ?`,
+      [resultId],
+    );
   }
 
   private toBoolean(value: boolean | number | string): boolean {

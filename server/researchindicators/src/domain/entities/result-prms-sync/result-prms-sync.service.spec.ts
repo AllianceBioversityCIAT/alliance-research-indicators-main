@@ -88,7 +88,10 @@ describe('ResultPrmsSyncService', () => {
     settleIfInFlight: jest.Mock;
     insertRefusedByStar: jest.Mock;
   };
-  let aggregateRepository: { loadByResultId: jest.Mock };
+  let aggregateRepository: {
+    loadByResultId: jest.Mock;
+    findActingStaffBySecUserId: jest.Mock;
+  };
   let payloadBuilder: { build: jest.Mock };
   let normalizer: { ingest: jest.Mock };
   let appConfigService: { getEnv: jest.Mock };
@@ -119,6 +122,11 @@ describe('ResultPrmsSyncService', () => {
     };
     aggregateRepository = {
       loadByResultId: jest.fn().mockResolvedValue({ result_id: 42 }),
+      findActingStaffBySecUserId: jest.fn().mockResolvedValue({
+        email: 'acting.staff@cgiar.org',
+        first_name: 'Acting',
+        last_name: 'Staff',
+      }),
     };
     payloadBuilder = { build: jest.fn().mockReturnValue(envelope()) };
     normalizer = {
@@ -162,7 +170,15 @@ describe('ResultPrmsSyncService', () => {
       normalizer as unknown as PrmsNormalizerService,
       appConfigService as unknown as AppConfigService,
       { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
-      { user_id: 7 } as unknown as CurrentUserUtil,
+      {
+        user_id: 7,
+        user: {
+          sec_user_id: 7,
+          email: 'pat.pusher@cgiar.org',
+          first_name: 'Pat',
+          last_name: 'Pusher',
+        },
+      } as unknown as CurrentUserUtil,
       outboundHistoryRepository as unknown as PrmsWebhookDeliveryRepository,
     );
   });
@@ -993,7 +1009,11 @@ describe('ResultPrmsSyncService', () => {
         ...overrides,
       });
 
-    const realService = (): ResultPrmsSyncService =>
+    const realService = (
+      currentUser: { user_id?: number | null; user?: unknown } = {
+        user_id: 7,
+      },
+    ): ResultPrmsSyncService =>
       new ResultPrmsSyncService(
         logRepository as unknown as ResultPrmsSyncLogRepository,
         aggregateRepository as unknown as ResultPrmsSyncAggregateRepository,
@@ -1008,7 +1028,7 @@ describe('ResultPrmsSyncService', () => {
         normalizer as unknown as PrmsNormalizerService,
         appConfigService as unknown as AppConfigService,
         { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
-        { user_id: 7 } as unknown as CurrentUserUtil,
+        currentUser as unknown as CurrentUserUtil,
         outboundHistoryRepository as unknown as PrmsWebhookDeliveryRepository,
       );
 
@@ -1157,11 +1177,12 @@ describe('ResultPrmsSyncService', () => {
       await expectStoredAlignmentNotEmitted(null);
     });
 
-    it('without origin leaves the snapshot unset, passes no overrides, and keeps submission_history submitted_by', async () => {
+    it('without origin leaves the snapshot unset, passes no overrides, and keeps the approval submitted_by when the acting user cannot be resolved', async () => {
       const snapshot = eligibleFacts();
       logRepository.loadGateSnapshot.mockResolvedValue(snapshot);
       const aggregate = buildableAggregate();
       aggregateRepository.loadByResultId.mockResolvedValue(aggregate);
+      aggregateRepository.findActingStaffBySecUserId.mockResolvedValue(null);
       acceptIngest('1001');
 
       const result = await realService().sync(42);
@@ -1290,6 +1311,236 @@ describe('ResultPrmsSyncService', () => {
 
       expect(reason).toBe("Missing mandatory field 'lead_contact_person'");
       expect(normalizer.ingest).not.toHaveBeenCalled();
+    });
+
+    const LOG_USER_ID = 81;
+    const LOG_STAFF = {
+      email: 'pat.pusher@cgiar.org',
+      first_name: 'Pat',
+      last_name: 'Pusher',
+    };
+    const REQUEST_USER = {
+      sec_user_id: 7,
+      email: 'request.only@cgiar.org',
+      first_name: 'Request',
+      last_name: 'Only',
+    };
+    const APPROVER = {
+      email: 'ann.approver@cgiar.org',
+      first_name: 'Ann',
+      last_name: 'Approver',
+    };
+    const PUSH_AT = new Date('2026-11-12T13:05:00.000Z');
+
+    const starAggregate = (
+      overrides: Partial<PrmsSyncAggregate> = {},
+    ): PrmsSyncAggregate =>
+      buildableAggregate({
+        created_by: STORED_B,
+        lead_contact: LEAD_L,
+        submitted_by: {
+          staff: APPROVER,
+          submitted_date: HISTORY_AT,
+          comment: 'approved in STAR',
+        },
+        ...overrides,
+      });
+
+    it('STAR push submitted_by is the staff of the same sec_user_id written as the log created_by', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(starAggregate());
+      aggregateRepository.findActingStaffBySecUserId.mockResolvedValue(
+        LOG_STAFF,
+      );
+      acceptIngest('1001');
+
+      const result = await realService({
+        user_id: LOG_USER_ID,
+        user: REQUEST_USER,
+      }).sync(42, { now: PUSH_AT });
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      const logCreatedBy = logRepository.claimAttempt.mock.calls[0][1].userId;
+      expect(logCreatedBy).toBe(LOG_USER_ID);
+      expect(logRepository.settleIfInFlight.mock.calls[0][0].userId).toBe(
+        logCreatedBy,
+      );
+      expect(
+        aggregateRepository.findActingStaffBySecUserId,
+      ).toHaveBeenCalledWith(logCreatedBy);
+      const data = ingestedData();
+      expect(data.submitted_by).toEqual({
+        email: LOG_STAFF.email,
+        name: 'Pat Pusher',
+        submitted_date: PUSH_AT.toISOString(),
+        comment: 'approved in STAR',
+      });
+      expect(data.created_by).toEqual({
+        email: STORED_B.email,
+        name: 'Legacy Beta',
+      });
+      expect(data.lead_contact_person).toEqual({
+        email: LEAD_L.email,
+        name: 'Lead Contact',
+      });
+      expect(JSON.stringify(data.submitted_by)).not.toContain(
+        REQUEST_USER.email,
+      );
+      expect(data.submitted_by).not.toEqual(
+        expect.objectContaining({ email: APPROVER.email }),
+      );
+      expect(data.submitted_by).not.toEqual(
+        expect.objectContaining({ email: STORED_B.email }),
+      );
+    });
+
+    it('STAR push with no approval row builds submitted_by from the log user staff', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        starAggregate({ submitted_by: null }),
+      );
+      aggregateRepository.findActingStaffBySecUserId.mockResolvedValue(
+        LOG_STAFF,
+      );
+      acceptIngest('1001');
+
+      await realService({
+        user_id: LOG_USER_ID,
+        user: REQUEST_USER,
+      }).sync(42, { now: PUSH_AT });
+
+      expect(
+        aggregateRepository.findActingStaffBySecUserId,
+      ).toHaveBeenCalledWith(
+        logRepository.claimAttempt.mock.calls[0][1].userId,
+      );
+      const submitted = ingestedData().submitted_by as Record<string, unknown>;
+      expect(submitted).toEqual({
+        email: LOG_STAFF.email,
+        name: 'Pat Pusher',
+        submitted_date: PUSH_AT.toISOString(),
+      });
+      expect(submitted).not.toHaveProperty('comment');
+      expect(JSON.stringify(submitted)).not.toContain(REQUEST_USER.email);
+      expect(ingestedData().created_by).toEqual({
+        email: STORED_B.email,
+        name: 'Legacy Beta',
+      });
+    });
+
+    it('keeps the approval submitted_by when no acting-user staff can be resolved', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(starAggregate());
+      aggregateRepository.findActingStaffBySecUserId.mockResolvedValue({
+        email: 'only-email@cgiar.org',
+        first_name: '',
+        last_name: '',
+      });
+      acceptIngest('1001');
+
+      await realService({
+        user_id: LOG_USER_ID,
+        user: REQUEST_USER,
+      }).sync(42, { now: PUSH_AT });
+
+      const data = ingestedData();
+      expect(data.submitted_by).toEqual({
+        email: APPROVER.email,
+        name: 'Ann Approver',
+        submitted_date: HISTORY_AT.toISOString(),
+        comment: 'approved in STAR',
+      });
+      expect(data.created_by).toEqual({
+        email: STORED_B.email,
+        name: 'Legacy Beta',
+      });
+      expect(data.lead_contact_person).toEqual({
+        email: LEAD_L.email,
+        name: 'Lead Contact',
+      });
+      expect(JSON.stringify(data.submitted_by)).not.toContain(
+        PUSH_AT.toISOString(),
+      );
+      expect(JSON.stringify(data)).not.toContain(REQUEST_USER.email);
+      const warnings = warnSpy.mock.calls.map((call) => String(call[0]));
+      expect(
+        warnings.filter((message) =>
+          message.includes('acting user staff could not be resolved'),
+        ),
+      ).toHaveLength(1);
+    });
+
+    it('keeps the approval submitted_by and settles when the staff lookup rejects', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(starAggregate());
+      aggregateRepository.findActingStaffBySecUserId.mockRejectedValue(
+        new Error('db'),
+      );
+      acceptIngest('1001');
+
+      const result = await realService({
+        user_id: LOG_USER_ID,
+        user: REQUEST_USER,
+      }).sync(42, { now: PUSH_AT });
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(normalizer.ingest).toHaveBeenCalledTimes(1);
+      const data = ingestedData();
+      expect(data.submitted_by).toEqual({
+        email: APPROVER.email,
+        name: 'Ann Approver',
+        submitted_date: HISTORY_AT.toISOString(),
+        comment: 'approved in STAR',
+      });
+      expect(logRepository.settleIfInFlight).toHaveBeenCalledTimes(1);
+      expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).toBe(
+        PrmsSyncOutcome.ACCEPTED,
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy.mock.calls[0][0])).toContain('db');
+      expect(String(warnSpy.mock.calls[0][0])).toContain(
+        'acting user staff could not be resolved',
+      );
+    });
+
+    it('TIP_SYNC keeps submitted_by from options.author when the request user is someone else', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({
+          platform_code: 'TIP',
+          result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          result_official_code: 19191,
+        }),
+      );
+      aggregateRepository.loadByResultId.mockResolvedValue(tipKpAggregate());
+      acceptIngest('TIP-19191');
+
+      await realService({
+        user_id: LOG_USER_ID,
+        user: REQUEST_USER,
+      }).sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+        now: PUSH_AT,
+      });
+
+      expect(
+        aggregateRepository.findActingStaffBySecUserId,
+      ).not.toHaveBeenCalled();
+      const data = ingestedData();
+      expect(data.submitted_by).toEqual({
+        email: AUTHOR_A.email,
+        name: 'Submitter Alpha',
+        submitted_date: CREATED_AT.toISOString(),
+      });
+      expect(data.created_by).toEqual({
+        email: AUTHOR_A.email,
+        name: 'Submitter Alpha',
+      });
+      expect(JSON.stringify(data)).not.toContain(REQUEST_USER.email);
+      expect(JSON.stringify(data)).not.toContain(LOG_STAFF.email);
+      expect(JSON.stringify(data)).not.toContain(PUSH_AT.toISOString());
     });
   });
 });

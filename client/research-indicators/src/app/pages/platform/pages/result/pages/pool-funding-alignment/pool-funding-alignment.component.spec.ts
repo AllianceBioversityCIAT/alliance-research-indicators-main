@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
+import { computed, NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
@@ -4007,5 +4007,297 @@ describe('PoolFundingAlignmentComponent - defensive branches', () => {
       component.formData.update(f => ({ ...f, toc_drafts: [draft('SPZZ')] }));
       expect(component.isDirty()).toBe(true);
     });
+  });
+});
+
+// Result A (SP13 Primary) then result B (nothing saved). The version watcher
+// re-enters loadAlignment while A's GET is still in flight; if that response
+// lands after B's, it must not seed B's form.
+describe('PoolFundingAlignmentComponent — previous result alignment does not leak', () => {
+  const alignmentFor = (resultCode: string, spCode: string | null): AlignmentResponse => ({
+    result_code: resultCode,
+    eligible: true,
+    has_pool_funding_alignment_eligible: true,
+    has_contribution: spCode ? true : null,
+    selected_science_programs: spCode ? [{ code: spCode, name: 'Genebank', role: 'PRIMARY' }] : [],
+    selected_levers: [],
+    is_synced_to_prms: false,
+    is_read_only: false
+  });
+
+  const flush = async (): Promise<void> => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  async function setup(): Promise<{
+    component: PoolFundingAlignmentComponent;
+    currentResultId: ReturnType<typeof signal<number>>;
+    pending: Map<string, Array<(value: AlignmentResponse | null) => void>>;
+    reload: () => void;
+    sciencePrograms: ReturnType<typeof signal<PoolFundingScienceProgram[]>>;
+    mappingStatus: ReturnType<typeof signal<PoolFundingMappingStatus | null>>;
+    currentAlignment: ReturnType<typeof signal<AlignmentResponse | null>>;
+    patchAlignment: jest.Mock;
+  }> {
+    const currentResultId = signal(111);
+    const pending = new Map<string, Array<(value: AlignmentResponse | null) => void>>();
+    const sciencePrograms = signal<PoolFundingScienceProgram[]>([]);
+    const mappingStatus = signal<PoolFundingMappingStatus | null>('mapped');
+    const currentAlignment = signal<AlignmentResponse | null>(null);
+    const patchAlignment = jest.fn();
+    const getAlignment = jest.fn(
+      (code: string) =>
+        new Promise<AlignmentResponse | null>(resolve => {
+          const queue = pending.get(code) ?? [];
+          queue.push(resolve);
+          pending.set(code, queue);
+        })
+    );
+    let reload: () => void = () => undefined;
+
+    await TestBed.configureTestingModule({
+      imports: [PoolFundingAlignmentComponent, HttpClientTestingModule],
+      providers: [
+        {
+          provide: BilateralService,
+          useValue: {
+            currentAlignment,
+            loadingAlignment: signal(false),
+            savingAlignment: signal(false),
+            editable: signal(true),
+            sciencePrograms,
+            mappingStatus,
+            loadingSciencePrograms: signal(false),
+            tocCatalog: signal<BilateralTocCatalogResponse | null>(null),
+            loadingTocCatalog: signal(false),
+            tocCatalogError: signal(false),
+            getAlignment,
+            getSciencePrograms: jest.fn().mockResolvedValue([]),
+            getTocCatalog: jest.fn().mockResolvedValue(null),
+            patchAlignment,
+            catalogForSp: () => null,
+            draftsFromSaved,
+            writeDtoFromDrafts
+          }
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            currentResultId,
+            getCurrentNumericResultId: computed(() => currentResultId()),
+            currentMetadata: signal({ result_title: 'Result B', indicator_id: 2 }),
+            currentResultIsLoading: signal(false),
+            isSidebarCollapsed: () => false,
+            hasSmallScreen: () => false,
+            showSectionHeaderActions: () => false,
+            isExternalResult: () => false
+          }
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              paramMap: { get: () => null },
+              queryParamMap: { get: () => null as string | null }
+            }
+          }
+        },
+        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+        { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
+        { provide: SubmissionService, useValue: { isEditableStatus: signal(true) } },
+        { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject<unknown>().asObservable()) } },
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => {
+              reload = () => cb(null);
+              cb(null);
+            })
+          }
+        }
+      ],
+      schemas: [NO_ERRORS_SCHEMA]
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(PoolFundingAlignmentComponent);
+    return { component: fixture.componentInstance, currentResultId, pending, reload, sciencePrograms, mappingStatus, currentAlignment, patchAlignment };
+  }
+
+  const resolveNext = (
+    pending: Map<string, Array<(value: AlignmentResponse | null) => void>>,
+    code: string,
+    value: AlignmentResponse | null
+  ): void => {
+    const resolve = pending.get(code)?.shift();
+    if (!resolve) throw new Error(`no pending alignment for ${code}`);
+    resolve(value);
+  };
+
+  it('keeps B empty when A’s SP13 alignment resolves after B, then makes SP03 the Primary', async () => {
+    const { component, currentResultId, pending, reload } = await setup();
+    expect(component.resultCode()).toBe('111');
+    expect(component.formData().primary_sp_code).toBeNull();
+
+    currentResultId.set(222);
+    reload();
+    expect(component.resultCode()).toBe('222');
+
+    resolveNext(pending, '222', alignmentFor('222', null));
+    await flush();
+    resolveNext(pending, '111', alignmentFor('111', 'SP13'));
+    await flush();
+
+    expect(component.formData().selected_sps).toEqual([]);
+    expect(component.formData().primary_sp_code).toBeNull();
+    expect(component.primarySelectedSp()).toBeNull();
+
+    component.onContributionChange(true);
+    component.toggleSp({ code: 'SP03', name: 'Sustainable Farming', icon_key: 'SP03', allocation: 40 });
+
+    expect(component.formData().primary_sp_code).toBe('SP03');
+    expect(component.primarySelectedSp()?.official_code).toBe('SP03');
+    expect(component.formData().selected_sps.map(sp => sp.official_code)).toEqual(['SP03']);
+  });
+
+  it('clears the previous result’s SPs, primary, drafts and errors as soon as another result starts loading', async () => {
+    const { component, currentResultId, pending, reload } = await setup();
+
+    resolveNext(pending, '111', alignmentFor('111', 'SP13'));
+    await flush();
+    expect(component.formData().primary_sp_code).toBe('SP13');
+    component.inlineErrors.set({ has_contribution: 'stale' });
+    component.rejectedSpCodes.set(['SP13']);
+    component.blockErrors.set({ SP13: { _: 'stale' } });
+    component.versionLockedFrom409.set(true);
+
+    currentResultId.set(222);
+    reload();
+
+    expect(component.formData()).toEqual({
+      has_contribution: null,
+      selected_sps: [],
+      primary_sp_code: null,
+      toc_drafts: []
+    });
+    expect(component.inlineErrors()).toBeNull();
+    expect(component.rejectedSpCodes()).toEqual([]);
+    expect(component.blockErrors()).toEqual({});
+    expect(component.versionLockedFrom409()).toBe(false);
+  });
+
+  // STAR-698 case (2) — SP13 is already on screen, then B's own GET returns an
+  // empty alignment. Seeding that response must not put SP13 back.
+  it('stays empty after B’s empty alignment arrives, when the form already held SP13', async () => {
+    const { component, currentResultId, pending, reload } = await setup();
+
+    resolveNext(pending, '111', alignmentFor('111', 'SP13'));
+    await flush();
+    expect(component.primarySelectedSp()?.official_code).toBe('SP13');
+
+    currentResultId.set(222);
+    reload();
+    resolveNext(pending, '222', alignmentFor('222', null));
+    await flush();
+
+    expect(component.formData().has_contribution).toBeNull();
+    expect(component.formData().selected_sps).toEqual([]);
+    expect(component.formData().primary_sp_code).toBeNull();
+    expect(component.primarySelectedSp()).toBeNull();
+  });
+
+  // STAR-698 version switch — same result id, live alignment empty, 2026 snapshot
+  // still SP13. The snapshot response resolving last must not restore the Primary.
+  it('drops snapshot SP13 when the live alignment of the same result resolves first', async () => {
+    const { component, pending, reload } = await setup();
+
+    reload();
+    const queue = pending.get('111');
+    if (!queue || queue.length < 2) throw new Error('expected two in-flight reads of 111');
+    const live = queue.pop();
+    const snapshot = queue.shift();
+    if (!live || !snapshot) throw new Error('expected snapshot and live reads');
+
+    live(alignmentFor('111', null));
+    await flush();
+    snapshot(alignmentFor('111', 'SP13'));
+    await flush();
+
+    expect(component.formData().primary_sp_code).toBeNull();
+    expect(component.formData().selected_sps).toEqual([]);
+    expect(component.primarySelectedSp()).toBeNull();
+
+    reload();
+    resolveNext(pending, '111', alignmentFor('111', 'SP13'));
+    await flush();
+    expect(component.formData().primary_sp_code).toBe('SP13');
+
+    reload();
+    resolveNext(pending, '111', alignmentFor('111', null));
+    await flush();
+    expect(component.formData().primary_sp_code).toBeNull();
+    expect(component.primarySelectedSp()).toBeNull();
+  });
+
+  it('empties the SP picker when another result starts loading and does not auto-select the previous program', async () => {
+    const { component, currentResultId, reload, sciencePrograms, mappingStatus } = await setup();
+    const programA: PoolFundingScienceProgram = { code: 'SP13', name: 'Genebank', icon_key: 'SP13', allocation: 1 };
+    sciencePrograms.set([programA]);
+    mappingStatus.set('mapped');
+    expect(component.showSpPicker()).toBe(true);
+    expect(component.isSingleSp()).toBe(true);
+
+    currentResultId.set(222);
+    reload();
+
+    expect(component.sciencePrograms()).toEqual([]);
+    expect(component.mappingStatus()).toBeNull();
+    expect(component.showSpPicker()).toBe(false);
+
+    component.onContributionChange(true);
+
+    expect(component.formData().has_contribution).toBe(true);
+    expect(component.formData().selected_sps).toEqual([]);
+    expect(component.formData().primary_sp_code).toBeNull();
+  });
+
+  it('does not seed A’s save onto B when the save resolves after navigation', async () => {
+    const { component, currentResultId, pending, reload, currentAlignment, patchAlignment } = await setup();
+
+    resolveNext(pending, '111', alignmentFor('111', null));
+    await flush();
+    currentAlignment.set(alignmentFor('111', null));
+    component.formData.set({
+      has_contribution: true,
+      selected_sps: [{ code: 'SP13', name: 'Genebank', official_code: 'SP13' }],
+      primary_sp_code: 'SP13',
+      toc_drafts: []
+    });
+    expect(component.canSave()).toBe(true);
+
+    let resolvePatch: (value: PatchAlignmentResult) => void = () => undefined;
+    patchAlignment.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolvePatch = resolve;
+        })
+    );
+
+    const saving = component.onSave();
+    currentResultId.set(222);
+    reload();
+    resolveNext(pending, '222', alignmentFor('222', null));
+    await flush();
+
+    resolvePatch({ ok: true, data: alignmentFor('111', 'SP13') });
+    await saving;
+
+    expect(patchAlignment).toHaveBeenCalledWith('111', expect.anything());
+    expect(component.resultCode()).toBe('222');
+    expect(component.formData().selected_sps).toEqual([]);
+    expect(component.formData().primary_sp_code).toBeNull();
   });
 });
