@@ -370,6 +370,53 @@ describe('result-pdf-report.mapper', () => {
       expect(result.result_sdgs).toEqual([]);
     });
 
+    it('sends the portfolio years the "Portfolio 2026–2030" tag needs, with a numeric id', () => {
+      const result = mapAllianceAlignmentSection(
+        source({ portfolio: portfolio2 }),
+      );
+      expect(result.portfolio).toEqual(
+        expect.objectContaining({ id: 2, start_year: 2026, end_year: 2030 }),
+      );
+    });
+
+    it('flags a contract as contributing to CGIAR Portfolio by its own flag or an active bilateral mapping, as STAR does', () => {
+      const contract = (agreement: string, flag: unknown) => ({
+        result_contract_id: 1,
+        result_id: 1,
+        contract_id: agreement,
+        contract_role_id: 1,
+        is_primary: agreement === 'A1',
+        is_active: true,
+        agresso_contract: {
+          agreement_id: agreement,
+          is_pool_funding_contributor: flag,
+        },
+      });
+      const result = mapAllianceAlignmentSection(
+        source({
+          contracts: [
+            contract('A1', true),
+            contract('A2', 1),
+            contract('A3', false),
+            contract('A4', 0),
+          ],
+          poolFundingAgreementIds: new Set(['A3']),
+        }),
+      );
+
+      expect(
+        result.contracts.map((c) => [
+          c.contract_id,
+          c.is_pool_funding_contributor,
+        ]),
+      ).toEqual([
+        ['A1', true],
+        ['A2', true],
+        ['A3', true],
+        ['A4', false],
+      ]);
+    });
+
     it('a result with no portfolio is sent as Portfolio 1 with portfolio null', () => {
       const result = mapAllianceAlignmentSection(source({ portfolio: null }));
       expect(result.portfolio).toBeNull();
