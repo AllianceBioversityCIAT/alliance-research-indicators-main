@@ -403,9 +403,9 @@ describe('InnovationUseBuilder', () => {
       // Omitted, NOT sent as [] -- an empty array would assert "we checked and
       // there are none", which is a different claim than "we are not telling you".
       expect(numbers.measures).toBeUndefined();
-      // Every surviving measure was dropped, so measures is omitted and the
-      // required flag is true.
-      expect(numbers.innov_use_to_be_determined).toBe(true);
+      // Measures are omitted, but the required flag is always false (owner
+      // decision 2026-11-13, independent of measures).
+      expect(numbers.innov_use_to_be_determined).toBe(false);
     });
   });
 
@@ -443,8 +443,10 @@ describe('InnovationUseBuilder', () => {
       ).innovation_use as Record<string, unknown>;
 
       expect(built.innovation_use_level).toBeDefined();
+      // Both collections are empty; the flag is still false (owner decision
+      // 2026-11-13, independent of measures).
       expect(built.current_innovation_use_numbers).toEqual({
-        innov_use_to_be_determined: true,
+        innov_use_to_be_determined: false,
       });
     });
 
