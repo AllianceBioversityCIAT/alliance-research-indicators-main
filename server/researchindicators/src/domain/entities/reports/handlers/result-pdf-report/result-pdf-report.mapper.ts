@@ -276,12 +276,18 @@ const mapAlignmentLever = (
   });
 };
 
+/** MySQL booleans can arrive as 1/0; the flag column is the first half of the rule. */
+const isFlagSet = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true';
+
 const mapAlignmentContract = (
   contract: ResultContract,
   bucketUrl: string,
   leverByDepartmentId: AllianceAlignmentPdfSource['leverByDepartmentId'],
+  poolFundingAgreementIds: ReadonlySet<string>,
 ) => {
   const agresso = contract.agresso_contract;
+  const agreementId = agresso?.agreement_id ?? contract.contract_id;
   const departmentKey = agresso?.departmentId?.trim();
   const leverFromDepartment = departmentKey
     ? leverByDepartmentId.get(departmentKey)
@@ -293,7 +299,10 @@ const mapAlignmentContract = (
     contract_id: contract.contract_id,
     contract_role_id: contract.contract_role_id,
     is_primary: contract.is_primary,
-    agreement_id: agresso?.agreement_id ?? contract.contract_id,
+    is_pool_funding_contributor:
+      isFlagSet(agresso?.is_pool_funding_contributor) ||
+      poolFundingAgreementIds.has(agreementId),
+    agreement_id: agreementId,
     description: agresso?.description,
     contract_status: agresso?.contract_status,
     project_lead_description: agresso?.project_lead_description,
@@ -328,6 +337,11 @@ export type AllianceAlignmentPdfSource = {
   /** Resolved from the reporting year against the `portfolios` table. */
   portfolio: Portfolio | null;
   contracts: ResultContract[];
+  /**
+   * Agreement ids of `contracts` with an active `bilateral_project_mapping` row — the
+   * second half of `effectivePoolFundingContributorSql`. Optional: none means no mapping.
+   */
+  poolFundingAgreementIds?: ReadonlySet<string>;
   /** `result_levers` at role ALIGNMENT (Portfolio 1 levers). */
   levers: ResultLever[];
   /** `result_levers` at role RESEARCH_AREAS_ALIGNMENT (Portfolio 2). */
@@ -369,7 +383,12 @@ export const mapAllianceAlignmentSection = (
         })
       : null,
     contracts: source.contracts.map((contract) =>
-      mapAlignmentContract(contract, bucketUrl, source.leverByDepartmentId),
+      mapAlignmentContract(
+        contract,
+        bucketUrl,
+        source.leverByDepartmentId,
+        source.poolFundingAgreementIds ?? new Set(),
+      ),
     ),
     result_sdgs: isOicr
       ? []

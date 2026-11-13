@@ -129,8 +129,16 @@ describe('InnDevPdfSectionHandler', () => {
     repoOf(ClarisaInstitutionType).find.mockImplementation(({ where }) =>
       Promise.resolve(
         [
-          { code: 37, name: 'National extension service' },
-          { code: 38, name: 'Regional extension unit' },
+          {
+            code: 37,
+            name: 'National extension service',
+            description: 'Public agencies that provide extension',
+          },
+          {
+            code: 38,
+            name: 'Regional extension unit',
+            description: 'Decentralized extension office',
+          },
         ].filter((row) => where.code.value.includes(row.code)),
       ),
     );
@@ -158,7 +166,13 @@ describe('InnDevPdfSectionHandler', () => {
         is_new_or_improved_variety_label: 'Yes',
         actor_type_labels: { 1: 'Farmer', 5: 'Other' },
         institution_type_labels: { 37: 'National extension service' },
+        institution_type_descriptions: {
+          37: 'Public agencies that provide extension',
+        },
         sub_institution_type_labels: { 38: 'Regional extension unit' },
+        sub_institution_type_descriptions: {
+          38: 'Decentralized extension office',
+        },
         institution_labels: {
           1: 'International Center for Tropical Agriculture (CIAT)',
         },
@@ -168,6 +182,30 @@ describe('InnDevPdfSectionHandler', () => {
         tool_function_labels: ['Capacity building', 'Research and analysis'],
         is_used_beyond_original_context_label: 'No',
         expansion_potential_label: 'Yes, with adaptations',
+      }),
+    );
+  });
+
+  it('leaves out institution type descriptions the catalog does not have, so the PDF prints the name only', async () => {
+    repoOf(ResultInnovationDev).findOne.mockResolvedValue({ result_id: 10 });
+    resultInnovationDevService.findOne.mockResolvedValue(INNOVATION);
+    repoOf(ClarisaInstitutionType).find.mockImplementation(({ where }) =>
+      Promise.resolve(
+        [
+          { code: 37, name: 'National extension service', description: null },
+          { code: 38, name: 'Regional extension unit', description: '  ' },
+        ].filter((row) => where.code.value.includes(row.code)),
+      ),
+    );
+
+    const { innovation_details } = await handler.buildSections(10);
+
+    expect(innovation_details).toEqual(
+      expect.objectContaining({
+        institution_type_labels: { 37: 'National extension service' },
+        institution_type_descriptions: {},
+        sub_institution_type_labels: { 38: 'Regional extension unit' },
+        sub_institution_type_descriptions: {},
       }),
     );
   });

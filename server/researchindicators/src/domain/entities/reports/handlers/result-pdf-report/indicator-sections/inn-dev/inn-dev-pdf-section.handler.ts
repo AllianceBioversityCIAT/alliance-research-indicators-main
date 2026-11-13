@@ -28,6 +28,7 @@ import {
 import { ResultPdfIndicatorSectionHandler } from '../result-pdf-indicator-section.types';
 
 type NamedRow = { name?: string };
+type DescribedRow = { description?: string | null };
 
 const uniqueIds = (values: (number | null | undefined)[]): number[] => [
   ...new Set(
@@ -151,7 +152,15 @@ export class InnDevPdfSectionHandler
       ),
       actor_type_labels: this.toLabelMap(actorTypes, 'code'),
       institution_type_labels: this.toLabelMap(institutionTypeRows, 'code'),
+      institution_type_descriptions: this.toDescriptionMap(
+        institutionTypeRows,
+        'code',
+      ),
       sub_institution_type_labels: this.toLabelMap(
+        subInstitutionTypeRows,
+        'code',
+      ),
+      sub_institution_type_descriptions: this.toDescriptionMap(
         subInstitutionTypeRows,
         'code',
       ),
@@ -260,6 +269,21 @@ export class InnDevPdfSectionHandler
   ): Record<number, string> {
     return Object.fromEntries(
       rows.map((row) => [Number(row[key]), row.name ?? '']),
+    );
+  }
+
+  /**
+   * Catalog descriptions by id. Rows without a description are left out, so the PDF
+   * falls back to printing the name only.
+   */
+  private toDescriptionMap<T extends DescribedRow>(
+    rows: T[],
+    key: keyof T,
+  ): Record<number, string> {
+    return Object.fromEntries(
+      rows
+        .filter((row) => row.description?.trim())
+        .map((row) => [Number(row[key]), row.description as string]),
     );
   }
 }

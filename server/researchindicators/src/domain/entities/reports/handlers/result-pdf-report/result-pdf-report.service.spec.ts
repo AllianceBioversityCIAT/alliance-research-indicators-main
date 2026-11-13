@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { ResultPdfReportService } from './result-pdf-report.service';
 import { ResultsService } from '../../../results/results.service';
 import { ResultEvidencesService } from '../../../result-evidences/result-evidences.service';
@@ -21,6 +21,7 @@ import { ResultSdg } from '../../../result-sdgs/entities/result-sdg.entity';
 import { ResultStrategicObjective } from '../../../result-strategic-objectives/entities/result-strategic-objective.entity';
 import { ResultImpactOutcome } from '../../../result-impact-outcomes/entities/result-impact-outcome.entity';
 import { LeverRolesEnum } from '../../../lever-roles/enum/lever-roles.enum';
+import { BilateralProjectMapping } from '../../../bilateral-project-mapping/entities/bilateral-project-mapping.entity';
 
 describe('ResultPdfReportService', () => {
   let service: ResultPdfReportService;
@@ -51,6 +52,7 @@ describe('ResultPdfReportService', () => {
   const resultSdgRepo = { find: jest.fn() };
   const strategicObjectiveRepo = { find: jest.fn() };
   const impactOutcomeRepo = { find: jest.fn() };
+  const bilateralMappingRepo = { find: jest.fn() };
   const portfoliosService = { findByYear: jest.fn() };
   const PORTFOLIO_1 = {
     id: 1,
@@ -109,6 +111,7 @@ describe('ResultPdfReportService', () => {
     resultSdgRepo.find.mockResolvedValue([]);
     strategicObjectiveRepo.find.mockResolvedValue([]);
     impactOutcomeRepo.find.mockResolvedValue([]);
+    bilateralMappingRepo.find.mockResolvedValue([]);
     indicatorSectionRegistry.buildSections.mockResolvedValue({});
   };
 
@@ -138,6 +141,8 @@ describe('ResultPdfReportService', () => {
               if (entity === ResultStrategicObjective)
                 return strategicObjectiveRepo;
               if (entity === ResultImpactOutcome) return impactOutcomeRepo;
+              if (entity === BilateralProjectMapping)
+                return bilateralMappingRepo;
               throw new Error(`Unexpected repository for ${entity?.name}`);
             }),
           },
@@ -363,6 +368,69 @@ describe('ResultPdfReportService', () => {
     expect(
       reportMsApp.getPdfReport.mock.calls[0][2].alliance_alignment.portfolio,
     ).toBeNull();
+  });
+
+  it('flags each alignment contract as contributing to CGIAR Portfolio by its flag or an active bilateral mapping', async () => {
+    mockReportDependencies();
+    contractRepo.find.mockResolvedValue([
+      {
+        contract_id: 'A1',
+        is_primary: true,
+        agresso_contract: {
+          agreement_id: 'A1',
+          is_pool_funding_contributor: 1,
+        },
+      },
+      {
+        contract_id: 'A2',
+        is_primary: false,
+        agresso_contract: {
+          agreement_id: 'A2',
+          is_pool_funding_contributor: 0,
+        },
+      },
+      {
+        contract_id: 'A3',
+        is_primary: false,
+        agresso_contract: {
+          agreement_id: 'A3',
+          is_pool_funding_contributor: 0,
+        },
+      },
+    ]);
+    bilateralMappingRepo.find.mockResolvedValue([
+      { agresso_agreement_id: 'A2' },
+    ]);
+    reportMsApp.getPdfReport.mockResolvedValue('https://s3.example/pdf');
+
+    await service.buildReport(10, PdfTemplates.INN_DEV);
+
+    expect(bilateralMappingRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          agresso_agreement_id: In(['A1', 'A2', 'A3']),
+          is_active: true,
+        },
+      }),
+    );
+    const { contracts } =
+      reportMsApp.getPdfReport.mock.calls[0][2].alliance_alignment;
+    expect(
+      contracts.map((c) => [c.contract_id, c.is_pool_funding_contributor]),
+    ).toEqual([
+      ['A1', true],
+      ['A2', true],
+      ['A3', false],
+    ]);
+  });
+
+  it('skips the bilateral mapping query when the result has no alignment contracts', async () => {
+    mockReportDependencies();
+    reportMsApp.getPdfReport.mockResolvedValue('https://s3.example/pdf');
+
+    await service.buildReport(10, PdfTemplates.CAP_SHARING);
+
+    expect(bilateralMappingRepo.find).not.toHaveBeenCalled();
   });
 
   it('throws BadRequestException for unsupported report names', async () => {

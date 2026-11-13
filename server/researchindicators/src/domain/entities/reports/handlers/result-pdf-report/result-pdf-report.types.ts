@@ -54,6 +54,11 @@ export type ResultPdfReportAlignmentContract = {
   contract_id: string;
   contract_role_id: number;
   is_primary: boolean;
+  /**
+   * Drives the "Contributing to CGIAR Portfolio" tag. Same rule STAR uses on screen:
+   * the contract's own flag OR an active bilateral project mapping.
+   */
+  is_pool_funding_contributor: boolean;
   agreement_id: string;
   description?: string;
   contract_status?: string;
@@ -245,7 +250,11 @@ export type ResultPdfReportInnovationDetailsLabels = {
   is_new_or_improved_variety_label?: string;
   actor_type_labels?: Record<number, string>;
   institution_type_labels?: Record<number, string>;
+  /** CLARISA institution-type description by id; ids without one are omitted. */
+  institution_type_descriptions?: Record<number, string>;
   sub_institution_type_labels?: Record<number, string>;
+  /** CLARISA institution-type description by id; ids without one are omitted. */
+  sub_institution_type_descriptions?: Record<number, string>;
   institution_labels?: Record<number, string>;
   is_knowledge_sharing_label?: string;
   dissemination_qualification_label?: string;

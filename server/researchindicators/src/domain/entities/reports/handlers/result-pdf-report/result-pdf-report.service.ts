@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, IsNull } from 'typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
+import { BilateralProjectMapping } from '../../../bilateral-project-mapping/entities/bilateral-project-mapping.entity';
 import { ResultsService } from '../../../results/results.service';
 import { ResultEvidencesService } from '../../../result-evidences/result-evidences.service';
 import { ResultIpRightsService } from '../../../result-ip-rights/result-ip-rights.service';
@@ -87,15 +88,20 @@ export class ResultPdfReportService {
       this.findPartnerFlags(resultId),
     ]);
 
-    const [portfolio, leverByDepartmentId, indicatorSections] =
-      await Promise.all([
-        this.findPortfolio(metadata.report_year),
-        this.buildLeverLookupByDepartment(contractsWithAgresso),
-        this.indicatorSectionRegistry.buildSections(
-          resultId,
-          metadata.indicator_id,
-        ),
-      ]);
+    const [
+      portfolio,
+      leverByDepartmentId,
+      indicatorSections,
+      poolFundingAgreementIds,
+    ] = await Promise.all([
+      this.findPortfolio(metadata.report_year),
+      this.buildLeverLookupByDepartment(contractsWithAgresso),
+      this.indicatorSectionRegistry.buildSections(
+        resultId,
+        metadata.indicator_id,
+      ),
+      this.findMappedAgreementIds(contractsWithAgresso),
+    ]);
     const alignmentRows = await this.findAlignmentRows(resultId, portfolio);
 
     const reportData = {
@@ -107,6 +113,7 @@ export class ResultPdfReportService {
         indicatorId: metadata.indicator_id,
         portfolio,
         contracts: contractsWithAgresso,
+        poolFundingAgreementIds,
         ...alignmentRows,
         bucketUrl: this.appConfig.BUCKET_URL,
         leverByDepartmentId,
@@ -148,6 +155,34 @@ export class ResultPdfReportService {
         agresso_contract: true,
       },
     });
+  }
+
+  /**
+   * Agreement ids among `contracts` that have an active bilateral project mapping — the
+   * EXISTS half of `effectivePoolFundingContributorSql`, so the PDF tags the same
+   * contracts as "Contributing to CGIAR Portfolio" that STAR does.
+   */
+  private async findMappedAgreementIds(
+    contracts: ResultContract[],
+  ): Promise<Set<string>> {
+    const agreementIds = [
+      ...new Set(
+        contracts
+          .map(
+            (contract) =>
+              contract.agresso_contract?.agreement_id ?? contract.contract_id,
+          )
+          .filter(Boolean),
+      ),
+    ];
+    if (!agreementIds.length) return new Set();
+    const mappings = await this.dataSource
+      .getRepository(BilateralProjectMapping)
+      .find({
+        where: { agresso_agreement_id: In(agreementIds), is_active: true },
+        select: { agresso_agreement_id: true },
+      });
+    return new Set(mappings.map((row) => row.agresso_agreement_id));
   }
 
   /** Same rule as `get_portfolio_id_by_result`: the active portfolio spanning the reporting year. */
