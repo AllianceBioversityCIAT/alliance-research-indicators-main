@@ -12,11 +12,11 @@
 | **Approval Mode** | `gated` |
 | **Parent Spec** | `docs/specs/institutional-performance` (`family.md`, child 3 of 5) |
 | **Source idea** | `Idea-1_Strategy-and-Organizational-Structure-Configuration.md` (OneDrive · Strategy Refresh · KPI Validation · STAR Module ideas) |
-| **Status** | draft, revision 4 — awaiting approval |
-| **Last updated** | 2026-09-26 |
+| **Status** | draft, revision 5 — awaiting approval |
+| **Last updated** | 2026-11-13 |
 | **Branch** | `institutional-kpis` (from `staging`) |
 | **JPD idea** | [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258) |
-| **Depends on** | `institutional-performance/organizational-structure` (owner units) |
+| **Depends on** | `institutional-performance/organizational-structure` (Institutional Objective owner unit) — `done` 2026-11-10 |
 | **Parallel-safe** | no — touches `impact_outcomes`, `strategic_objectives` (shared with result alignment) |
 | **Shared rules** | F-1 … F-9 (`../family.md` §4) |
 
@@ -26,6 +26,7 @@
 | 2 | 2026-09-25 | Removed lifecycle, source, import and inconsistency report; CRUD focus |
 | 3 | 2026-09-26 | Three modules; versioned org structure; table standard; delete protection |
 | 4 | 2026-09-26 | Split into three child specs; this file now covers the Strategy Framework only. Control lists and org structure moved to their own proposals; shared rules moved to `family.md` |
+| 5 | 2026-11-13 | Refreshed against the delivered siblings. **Dimension owner units removed** (the org structure has no *Manages institutional KPIs* flag; decision 2026-11-13: drop the requirement). Fact 3.1 verified; fact 3.5 added; IOB owner unit stored by permanent ID |
 
 ## 2. Intent
 
@@ -35,7 +36,8 @@ Configure the Alliance Strategy 2026–2030 framework once in STAR, under Portfo
 
 | # | Fact | Evidence |
 | --- | --- | --- |
-| 3.1 | No STAR entity models Enablers, Performance Areas, Dimensions, framework Indicators or Institutional Objectives. | entity folder listing `server/…/src/domain/entities/` (2026-09-25). `UNVERIFIED — confirm at source before relying on it` that the existing `indicators` entity is only the result-type indicator |
+| 3.1 | No STAR entity models Enablers, Performance Areas, Dimensions, framework Indicators or Institutional Objectives. The existing `indicators` entity is only the result-type catalogue (name, descriptions, type, icon, position; no targets or owners). | entity folder listing `server/…/src/domain/entities/` (2026-09-25); `indicators/entities/indicator.entity.ts` read 2026-11-13 |
+| 3.5 | The Organizational Structure is delivered: one global tree with permanent `org_unit_id`, versions per year (name, acronym, level, parent, director, delegates). It has no *Manages institutional KPIs* flag. | `organizational-structure/entities/org-unit-version.entity.ts`; archive `../../archive/2026-11-10-institutional-performance--organizational-structure/` |
 | 3.2 | STAR already stores the 5 IO and 5 SO of Portfolio 2 (name, description, `portfolio_id`), with no code or tagline. | migrations `1782400514019-CreateStrategicObjectivesTable.ts`, `1782418327772-createImpactOutcomesTable.ts` |
 | 3.3 | Those rows are live: results align to them, and the AI formalizer persists `strategic_objectives`. | migration `1782486943935-CreateResultStrategicAndResultOutcomesTables.ts`; `docs/specs/results/ai-formalize-strategic-objectives/proposal.md` §3 |
 | 3.4 | `Portfolio` already relates to `ImpactOutcome`, `StrategicObjective` and `ClarisaLever`. | `domain/entities/portfolios/entities/portfolio.entity.ts:61-70` |
@@ -58,9 +60,9 @@ Configure the Alliance Strategy 2026–2030 framework once in STAR, under Portfo
 | Strategic Objective | Code*, Primary IO*, Title*, Tagline, Guidance, Short description, Other contributing IOs | Extends `strategic_objectives` |
 | Enabler | Code*, Related PA, Title*, Tagline, Full description, Rationale | Several enablers may point to one PA |
 | Performance Area | Code*, Name*, Definition; derived: related enablers, # DIM · # IND | Counts calculated |
-| Dimension | Code*, PA*, Name*, Description, Owner units (org entries flagged *Manages institutional KPIs*) | Code proposed from parent |
+| Dimension | Code*, PA*, Name*, Description | Code proposed from parent. No owner units (removed in rev 5) |
 | Indicator | Code*, Dimension*, Name*, Description; derived: PA | KPIs and mappings attach here |
-| Institutional Objective | Code* (unique per year), Year*, Statement*, Owner unit, Linked indicators | Per year 2026–2030; carry forward |
+| Institutional Objective | Code* (unique per year), Year*, Statement*, Owner unit, Linked indicators | Per year 2026–2030; carry forward. Owner unit is any org entry active in that year, stored by permanent ID (F-9) |
 
 Views: **Framework** tab with Tree (Strategy / Monitoring toggle) and Table (level chips); **Institutional Objectives** tab with table and side form. Copy the framework to a new portfolio; export `.xlsx`.
 
@@ -74,7 +76,7 @@ Seed (F-8): 5 IO · 5 SO · 5 EN · 4 PA · 14 DIM · 30 IND from `Alliance-Stra
 ## 7. Affected Users, Systems, And Specs
 | Area | Impact |
 | --- | --- |
-| Server | `impact_outcomes` / `strategic_objectives` extended (additive nullable columns) + `strategic_objective_contributing_ios`; new `enablers`, `performance_areas`, `dimensions`, `dimension_owner_units`, `framework_indicators`, `institutional_objectives`, `institutional_objective_indicators`; read service; `.xlsx` export; migrations + seed; Swagger |
+| Server | `impact_outcomes` / `strategic_objectives` extended (additive nullable columns) + `strategic_objective_contributing_ios`; new `enablers`, `performance_areas`, `dimensions`, `framework_indicators`, `institutional_objectives`, `institutional_objective_indicators`; read service; `.xlsx` export; migrations + seed; Swagger |
 | Client | new page with two tabs, tree/table, per-type forms |
 | Specs | `results/ai-formalize-strategic-objectives` (must not regress); siblings `organizational-structure`, `institutional-indicators` |
 | Jira | **PARI-258** (this work). Related, to be reconciled by the BA: PARI-218, PARI-224, PARI-230, PARI-219 |

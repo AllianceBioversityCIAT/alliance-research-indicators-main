@@ -22,7 +22,7 @@ Idea 1 (reference data) was split into three children because each one is useful
 
 - **Control Lists** holds the vocabularies that the other two read, including the organizational levels. Since 2026-10-13 every list is global and read by its key (`changes/control-lists-global-scope`).
 - **Organizational Structure** holds the versioned org units that own dimensions, objectives and, later, KPIs and mapped records. It is **one living tree, not tied to a portfolio** (2026-10-08); portfolio-scoped children refer to its units by permanent ID.
-- **Strategy Framework** holds the strategy and monitoring hierarchies plus the annual Institutional Objectives. It uses owner units from the structure.
+- **Strategy Framework** holds the strategy and monitoring hierarchies plus the annual Institutional Objectives. Its Institutional Objectives use owner units from the structure (Dimensions have no owner units since 2026-11-13).
 
 Ideas 2 (KPI planning) and 3 (KPI reporting) follow. A mapping module (results and other records → indicators and org units) is expected after this family's reference data; it is not yet a row here.
 
