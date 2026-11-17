@@ -92,5 +92,18 @@
   - **Coverage:** two picker-rule edge cases are not pinned: the precomputed flag `true` with no passing mapping, and a project with no `project_mappings_array`.
 - **Requirements covered:** R-MFE-004 (allocations rule), R-MFE-006 (`list()` half), R-MFE-011 AC.1 (loader half) and AC.2 (the limit is a parameter, unset in `list()`)
 - **Running totals vs budget:** tasks 2/6 · LOC ~+590 · review rounds 4/8
-- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 10 calls, 74 830 tokens, ended complete · Reviewer B akili-reviewer/opus: not reported by host, ended complete
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 10 calls, 74 830 tokens, ended complete · Reviewer B akili-reviewer/opus 8 calls, 69 599 tokens, ended complete
 - **Gate:** auto-approved (owner's standing direction)
+
+### Premise settlement — P-17 and P-18 (2026-11-17, Leader inline, read-only)
+
+The owner connected the VPN. The same read-only script (`SET SESSION TRANSACTION READ ONLY`) ran against `ARI_MYSQL_*`:
+
+```
+[{"is_active":1,"deleted_null":1,"n":197},{"is_active":0,"deleted_null":0,"n":1}]
+[{"reporting_year":2026,"n":198}]
+```
+
+- **P-17 — verified.** The one Inactive row has `deleted_at`, so the backfill leaves no Inactive row with a blank date. T-01's open done criterion is now met.
+- **P-18 — volume verified:** 198 rows, all in 2026. That is far below any streaming threshold, so the in-memory plan holds and T-03 step 1 is discharged. The ≤ 15 s timing with a cold CLARISA fetch stays for H-1.
+- Ledger rows P-17 and P-18 were updated in `design.md` §13.

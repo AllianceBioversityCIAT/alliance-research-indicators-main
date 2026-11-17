@@ -50,7 +50,7 @@ graph TD
 
 ### T-01 — Server: status audit columns, entity, and writes on real transitions
 
-- **Status:** done (P-17 carried to H-1) · **Size:** M · **Dependencies:** none
+- **Status:** done · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-MFE-007 (AC.1–AC.5), R-MFE-008 (AC.1–AC.3)
 - **Design references:** §3, §5 "Status audit", DD-6, DD-16, P-4, P-5, P-6, P-17
 - **Files touched (intended):**
@@ -98,7 +98,7 @@ graph TD
 - **Review:** `full` — migration and status-workflow write.
 - **Effort:** `max` (migration, data).
 - **Done criteria:**
-  - [ ] P-17 count recorded (step 1) — not run, shared DB `ETIMEDOUT`; carried to H-1
+  - [x] P-17 count recorded (step 1) — settled 2026-11-17 after T-01 (execution.md, Premise settlement)
   - [x] AC.1–AC.5 of R-MFE-007 each owned by a passing test; falsifiers (a)–(b) observed red
   - [x] R-MFE-008 AC.1–AC.3 shown on the scratch table with `updated_at` unchanged; falsifier (c) observed
   - [x] folder suite green; eslint clean; build green
