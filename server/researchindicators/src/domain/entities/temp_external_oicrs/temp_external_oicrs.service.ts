@@ -73,7 +73,8 @@ export class TempExternalOicrsService extends BaseServiceSimple<
   /**
    * Options for "Select existing OICR": every active TEMP_external_oicrs row (2024 and
    * earlier) plus every OICR in `results` reported BEFORE the OICR reporting year
-   * (OICR.REPORTING_YEAR) — OICRs of that same year are not offered.
+   * (OICR.REPORTING_YEAR) — OICRs of that same year are not offered. Only PUBLISHED
+   * OICRs from `results` are offered; TEMP rows are not filtered by status.
    */
   async findExternalOicrs(): Promise<ExistingOicrOption[]> {
     const [external, results, statuses] = await Promise.all([
@@ -138,8 +139,14 @@ export class TempExternalOicrsService extends BaseServiceSimple<
           AND r.is_active = TRUE
           AND r.is_snapshot = FALSE
           AND r.report_year_id < ?
+          AND r.result_status_id = ?
         ORDER BY r.report_year_id DESC, r.result_official_code DESC`,
-      [ExternalOicrSourceEnum.RESULT, IndicatorsEnum.OICR, reportingYear],
+      [
+        ExternalOicrSourceEnum.RESULT,
+        IndicatorsEnum.OICR,
+        reportingYear,
+        ResultStatusEnum.PUBLISHED,
+      ],
     );
     return rows.map((row) => ({ ...row, id: Number(row.id) }));
   }
