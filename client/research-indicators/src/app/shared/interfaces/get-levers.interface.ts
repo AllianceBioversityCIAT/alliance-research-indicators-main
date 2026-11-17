@@ -17,6 +17,10 @@ export interface GetLevers {
   category?: string;
   parent_id?: number;
   portfolio_id?: number;
+  /** Saved alignment rows only: primary vs contributing Research Area (OICR step 2). */
+  is_primary?: boolean;
+  /** Saved alignment rows only: team or area name typed for the "Other" Research Area. */
+  custom_lever_name?: string | null;
 }
 
 export type GetLeversParams = PortfolioScopedParams;
