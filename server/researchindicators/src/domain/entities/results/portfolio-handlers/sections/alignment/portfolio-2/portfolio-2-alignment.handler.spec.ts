@@ -33,6 +33,10 @@ describe('Portfolio2AlignmentHandler', () => {
   let strategicObjectivesService: jest.Mocked<
     Pick<StrategicObjectivesService, 'findActiveByIdsForPortfolio'>
   >;
+  let resultSdgTargetsService: {
+    replaceForResult: jest.Mock;
+    findByResult: jest.Mock;
+  };
   let clarisaLeversService: jest.Mocked<
     Pick<ClarisaLeversService, 'findActiveByIdsForPortfolio'>
   >;
@@ -55,6 +59,10 @@ describe('Portfolio2AlignmentHandler', () => {
     clarisaLeversService = {
       findActiveByIdsForPortfolio: jest.fn(),
     };
+    resultSdgTargetsService = {
+      replaceForResult: jest.fn().mockResolvedValue([]),
+      findByResult: jest.fn().mockResolvedValue([]),
+    };
 
     handler = new Portfolio2AlignmentHandler(
       {} as DataSource,
@@ -64,10 +72,7 @@ describe('Portfolio2AlignmentHandler', () => {
       resultImpactOutcomesService as unknown as ResultImpactOutcomesService,
       strategicObjectivesService as unknown as StrategicObjectivesService,
       clarisaLeversService as unknown as ClarisaLeversService,
-      {
-        replaceForResult: jest.fn().mockResolvedValue([]),
-        findByResult: jest.fn().mockResolvedValue([]),
-      } as unknown as ResultSdgTargetsService,
+      resultSdgTargetsService as unknown as ResultSdgTargetsService,
     );
   });
 
@@ -860,6 +865,30 @@ describe('Portfolio2AlignmentHandler', () => {
       expect(result.impact_outcomes).toBeUndefined();
     });
 
+    it('loads the catalog row of each selected Research Area, Strategic Objective and SDG Target, active or not', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.OICR },
+      };
+
+      await handler.find(context);
+
+      expect(resultLeversService.find).toHaveBeenCalledWith(
+        baseContext.resultId,
+        LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+        { lever: true },
+      );
+      expect(resultStrategicObjectivesService.find).toHaveBeenCalledWith(
+        baseContext.resultId,
+        ResultStrategicObjectiveRolesEnum.ALIGNMENT,
+        { strategic_objective: true },
+      );
+      expect(resultSdgTargetsService.findByResult).toHaveBeenCalledWith(
+        baseContext.resultId,
+        { sdg_target: { clarisa_sdg: true } },
+      );
+    });
+
     it('should include impact outcomes when indicator is OICR', async () => {
       const context: PortfolioHandlerContext = {
         ...baseContext,
@@ -871,6 +900,7 @@ describe('Portfolio2AlignmentHandler', () => {
       expect(resultImpactOutcomesService.find).toHaveBeenCalledWith(
         baseContext.resultId,
         ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        { impact_outcome: true },
       );
       expect(result.impact_outcomes).toHaveLength(1);
     });
@@ -886,6 +916,7 @@ describe('Portfolio2AlignmentHandler', () => {
       expect(resultImpactOutcomesService.find).toHaveBeenCalledWith(
         baseContext.resultId,
         ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        { impact_outcome: true },
       );
       expect(result.impact_outcomes).toHaveLength(1);
     });
@@ -901,6 +932,7 @@ describe('Portfolio2AlignmentHandler', () => {
       expect(resultImpactOutcomesService.find).toHaveBeenCalledWith(
         baseContext.resultId,
         ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        { impact_outcome: true },
       );
       expect(result.impact_outcomes).toHaveLength(1);
     });

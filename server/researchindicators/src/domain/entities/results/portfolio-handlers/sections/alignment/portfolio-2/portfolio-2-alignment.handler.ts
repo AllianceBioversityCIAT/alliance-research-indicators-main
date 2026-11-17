@@ -255,21 +255,27 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     delete responseData.primary_levers;
     delete responseData.contributor_levers;
 
+    // Catalog rows ride along with each selection, active or not, so the client
+    // can still show an item whose control-list entry was later deactivated.
     const researchAreas = await this.resultLeversService.find(
       context.resultId,
       LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+      { lever: true },
     );
     responseData.research_areas = researchAreas;
 
     if (context.result?.indicator_id === IndicatorsEnum.OICR) {
       responseData.result_sdg_targets =
-        await this.resultSdgTargetsService.findByResult(context.resultId);
+        await this.resultSdgTargetsService.findByResult(context.resultId, {
+          sdg_target: { clarisa_sdg: true },
+        });
     }
 
     const strategicObjectives =
       await this.resultStrategicObjectivesService.find(
         context.resultId,
         ResultStrategicObjectiveRolesEnum.ALIGNMENT,
+        { strategic_objective: true },
       );
     responseData.strategic_objectives = strategicObjectives;
 
@@ -283,6 +289,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
       const impactOutcomes = await this.resultImpactOutcomesService.find(
         context.resultId,
         ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        { impact_outcome: true },
       );
       responseData.impact_outcomes = impactOutcomes;
     }
