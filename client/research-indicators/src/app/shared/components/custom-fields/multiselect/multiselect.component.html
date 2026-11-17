@@ -101,7 +101,7 @@
   }
 
   @if (!this.hideSelected && !this.hideTemplate) {
-  @if (this.currentResultIsLoading() || !(this.optionsSig().length)) {
+  @if (this.currentResultIsLoading() || (!(this.optionsSig().length) && !selectedRowsSelfLabelled())) {
   @for (row of list; track trackSelectedOptionRow($index, row)) {
   <p-skeleton width="100%" height="41px" styleClass="mb-2" />
   }
