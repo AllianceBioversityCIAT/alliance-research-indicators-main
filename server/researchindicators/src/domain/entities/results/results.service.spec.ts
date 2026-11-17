@@ -1526,12 +1526,12 @@ describe('ResultsService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should throw ConflictException when result status is not DRAFT', async () => {
+    it('should throw ConflictException when result status is PUBLISHED', async () => {
       // Arrange
       const resultId = 1;
       const foundResult = {
         result_id: resultId,
-        result_status_id: ResultStatusEnum.SUBMITTED, // Not DRAFT
+        result_status_id: ResultStatusEnum.PUBLISHED,
         created_by: 123,
       } as any;
 
@@ -1542,7 +1542,7 @@ describe('ResultsService', () => {
         ConflictException,
       );
       await expect(service.deleteResult(resultId)).rejects.toThrow(
-        'Only results in editing status can be deleted',
+        'Published results cannot be deleted',
       );
 
       expect(mockMainRepo.findOne).toHaveBeenCalledWith({
@@ -1557,6 +1557,27 @@ describe('ResultsService', () => {
       expect(
         mockOpenSearchResultApi.uploadSingleToOpenSearch,
       ).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ResultStatusEnum.DRAFT,
+      ResultStatusEnum.SUBMITTED,
+      ResultStatusEnum.REVISED,
+      ResultStatusEnum.APPROVED,
+      ResultStatusEnum.REJECTED,
+      ResultStatusEnum.SCIENCE_EDITION,
+      ResultStatusEnum.KM_CURATION,
+    ])('deletes a result in any non-published status (%p)', async (status) => {
+      const foundResult = {
+        result_id: 7,
+        result_status_id: status,
+        created_by: 123,
+      } as any;
+      mockMainRepo.findOne.mockResolvedValue(foundResult);
+      mockMainRepo.deleteResult.mockResolvedValue(undefined);
+
+      await expect(service.deleteResult(7)).resolves.toBe(foundResult);
+      expect(mockMainRepo.deleteResult).toHaveBeenCalledWith(7);
     });
 
     it('should successfully delete result when status is DRAFT', async () => {
@@ -1657,36 +1678,6 @@ describe('ResultsService', () => {
         { result_id: foundResult.result_id },
         ElasticOperationEnum.DELETE,
       );
-    });
-
-    it('should test different non-DRAFT status values', async () => {
-      // Arrange
-      const resultId = 1;
-      const testCases = [
-        ResultStatusEnum.SUBMITTED,
-        ResultStatusEnum.APPROVED,
-        ResultStatusEnum.REJECTED,
-        ResultStatusEnum.REVISED,
-        // Add other status values if they exist
-      ];
-
-      for (const status of testCases) {
-        const foundResult = {
-          result_id: resultId,
-          result_status_id: status,
-          created_by: 123,
-        } as any;
-
-        mockMainRepo.findOne.mockResolvedValue(foundResult);
-
-        // Act & Assert
-        await expect(service.deleteResult(resultId)).rejects.toThrow(
-          ConflictException,
-        );
-
-        // Clear mocks for next iteration
-        jest.clearAllMocks();
-      }
     });
   });
 
