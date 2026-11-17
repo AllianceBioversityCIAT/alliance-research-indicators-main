@@ -15,6 +15,7 @@ import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DownloadOicrTemplateComponent } from '../download-oicr-template/download-oicr-template.component';
 import { RolesService } from '@shared/services/cache/roles.service';
+import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { lastPfmScope } from '@shared/utils/pfm-last-scope.util';
 import { isHomeEntryFromUrl, isPfmMonitorEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
@@ -59,6 +60,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   api = inject(ApiService);
   submissionService = inject(SubmissionService);
   whatsNewService = inject(WhatsNewService);
+  private readonly resultsCenterService = inject(ResultsCenterService);
 
   private currentProject = signal<GetProjectDetail>({});
   private contractId = signal('');
@@ -112,6 +114,9 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
                 try {
                   const res = await this.api.DELETE_Result(this.cache.getCurrentNumericResultId());
                   if (res.successfulRequest) {
+                    // Results Center skips a fetch whose filters match the last one, so
+                    // without this it would show the cached list with the deleted result.
+                    this.resultsCenterService.invalidateResultsListFetchCache();
                     this.actions.hideGlobalAlert(0);
                     this.actions.showToast({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
                     this.router.navigate(['/results-center']);
