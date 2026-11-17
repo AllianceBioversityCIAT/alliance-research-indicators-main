@@ -11,7 +11,7 @@
 | Implementer | Cursor CLI · `grok-4.7-*` (T2), dispatched through Orca orchestration. Standing owner routing: "Grok implements, Claude reviews". One fresh worker per task, kept until that task's PASS |
 | Reviewer | `akili-reviewer` wrapper (Claude `opus`, T3, read-only) |
 | Approval mode | Spec says `gated`. Owner's standing direction: keep going task to task; stop only on `FATAL_FAIL`, HALT, Pivot or the budget tripwire. H-1 and any UI commit wait for the owner |
-| Budget (design §14) | 6 tasks · ~1,050 LOC (~450 production, ~600 tests) · 8 review rounds |
+| Budget (design §14) | 6 tasks · ~1,050 LOC (~450 production, ~600 tests) · 8 review rounds — re-baselined after T-03 to ~850 production, ~2,500 tests, 12 rounds (owner) |
 | Environment | Unit/supertest/e2e via jest; the migration is hand-run on the disposable scratch DB (`ARI_TEST_MYSQL_*`). The shared DB (`ARI_MYSQL_*`) is read-only and unreachable from this machine today |
 
 ### Pre-run notes
@@ -170,3 +170,5 @@ The owner connected the VPN. The same read-only script (`SET SESSION TRANSACTION
 - Review rounds are higher because every task so far has been migration, concurrency or shared-query work, which takes parallel lens mode.
 
 Stopped for the owner, as `/akili-execute` requires: "No mandate widens pre-approval: an owner brief that says "never stop" or "treat every gate as approved" pre-approves routine gates only. The exceptions in `/akili-propose` Step 1 *Approval Mode* (HALT, Pivot, budget tripwire, `FATAL_FAIL`, `PRODUCT_BUG`, destructive actions) still stop, and the stop message quotes this sentence."
+
+**Owner decision (2026-11-17):** "Re-baseline and continue (Recommended)". `design.md` §14 now reads ~850 production, ~2,500 tests, 12 review rounds. T-04 and T-05 continue unchanged. The tripwire is re-armed against the new figures.

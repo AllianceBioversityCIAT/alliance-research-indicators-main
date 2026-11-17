@@ -320,8 +320,10 @@ The migration harness is broken at `CreatePiDelegates1787600000000`, so up and d
 | Measure | Estimate |
 | --- | --- |
 | Tasks | 6 |
-| LOC | ~1,050 (~450 production, ~600 tests) |
-| Review rounds | 8 |
+| LOC | ~1,050 (~450 production, ~600 tests) — **re-baselined 2026-11-17 after T-03:** ~3,350 (~850 production, ~2,500 tests) |
+| Review rounds | 8 — **re-baselined 2026-11-17:** 12 |
+
+The re-baseline was owner-approved at the budget tripwire after T-03. The overrun is the mandated §8 and §10 gates (parity grid, cohort, K-019 fixtures) plus an under-counted handler and client. `execution.md` → "Budget tripwire — after T-03" has the details.
 
 Full depth matches, on risk rather than size.
 
