@@ -17,6 +17,8 @@ export interface GetLevers {
   category?: string;
   parent_id?: number;
   portfolio_id?: number;
+  /** Set when the selected item's control-list entry is inactive (see catalog-relation.util). */
+  is_catalog_inactive?: boolean;
 }
 
 export type GetLeversParams = PortfolioScopedParams;
