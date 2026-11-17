@@ -1,5 +1,7 @@
 # Proposal — Institutional Performance / Strategy Framework
 
+> **Revision 6 (2026-11-17) narrows this proposal; where §2–§13 below differ, revision 6 wins.** Scope is the monitoring framework (Performance Areas → Dimensions → Indicators, each Indicator with one or more responsible **people** from the staff list) and the annual Institutional Objectives linked to Indicators, with **no owner**. Impact Outcomes, Strategic Objectives, Enablers, the Strategy tree and *Copy to new portfolio* are deferred. The pages are **ODS Admin › Framework** (an inline outline editor per the dev lead's mockup, plus a table view) and **ODS Admin › Institutional Objectives**, for a new **ODS Admin** role and System Admins. The strategy is stored in **one self-referencing table** with levels as data, so it can grow in levels (2026-11-17). Seed (dev lead, 2026-11-17): `2026_Strategic-Objectives-Tracking-Tool.xlsx` is the main source — 4 PA · 13 DIM · 31 IND (it includes *Cost Efficiency* and *Strength of Institutional Partnerships*, replacing the exclusions in §5) · 28 objectives · 36 links; descriptions from the strategy workbook where the element matches; responsible people from the Master Monitoring Framework v2. Full detail: [`requirements.md`](requirements.md) §0.
+
 > **Answer first:** a new page, *Center admin › Portfolio Management › Strategy Framework*, where Center Admins and System Admins add, edit and delete the Portfolio 2 strategy hierarchy (Impact Outcomes → Strategic Objectives, Enablers), the monitoring hierarchy (Performance Areas → Dimensions → Indicators) and the annual Institutional Objectives. The existing `impact_outcomes` / `strategic_objectives` rows are **extended**, not duplicated. Indicators are the level that KPIs (Idea 2) and the future mapping module attach to.
 
 ## 1. Document Control
@@ -12,8 +14,8 @@
 | **Approval Mode** | `gated` |
 | **Parent Spec** | `docs/specs/institutional-performance` (`family.md`, child 3 of 5) |
 | **Source idea** | `Idea-1_Strategy-and-Organizational-Structure-Configuration.md` (OneDrive · Strategy Refresh · KPI Validation · STAR Module ideas) |
-| **Status** | draft, revision 5 — awaiting approval |
-| **Last updated** | 2026-11-13 |
+| **Status** | approved 2026-11-13, revision 5; **revision 6 (scope narrowed) decided by the dev lead 2026-11-17** |
+| **Last updated** | 2026-11-17 |
 | **Branch** | `institutional-kpis` (from `staging`) |
 | **JPD idea** | [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258) |
 | **Depends on** | `institutional-performance/organizational-structure` (Institutional Objective owner unit) — `done` 2026-11-10 |
@@ -27,6 +29,7 @@
 | 3 | 2026-09-26 | Three modules; versioned org structure; table standard; delete protection |
 | 4 | 2026-09-26 | Split into three child specs; this file now covers the Strategy Framework only. Control lists and org structure moved to their own proposals; shared rules moved to `family.md` |
 | 5 | 2026-11-13 | Refreshed against the delivered siblings. **Dimension owner units removed** (the org structure has no *Manages institutional KPIs* flag; decision 2026-11-13: drop the requirement). Fact 3.1 verified; fact 3.5 added; IOB owner unit stored by permanent ID |
+| 6 | 2026-11-17 | **Scope narrowed** by the dev lead: monitoring framework + Institutional Objectives only; IO/SO/EN deferred; new ODS Admin role and menu; objectives without owner; responsible people on Indicators; seed sources pinned (see banner) |
 
 ## 2. Intent
 
