@@ -1957,4 +1957,44 @@ describe('MultiselectComponent', () => {
       });
     });
   });
+  describe('a selected item whose control-list entry is inactive', () => {
+    const active = { id: 1, name: 'Active option' };
+    const inactive = { id: 9, name: 'Retired option', is_catalog_inactive: true };
+
+    const render = (selected: unknown[]) => {
+      const fixture = TestBed.createComponent(MultiselectComponent);
+      const comp = fixture.componentInstance;
+      comp.optionValue = 'id';
+      comp.optionLabel = 'name';
+      comp.signalOptionValue = 'testField';
+      mockService.list.mockReturnValue([active]);
+      mockCacheService.currentResultIsLoading.set(false);
+      mockUtilsService.getNestedProperty.mockReturnValue(selected);
+      comp.ngOnInit();
+      (comp as any).optionsSig = signal([active]);
+      comp.signal = signal({ testField: selected });
+      fixture.detectChanges();
+      return { fixture, comp };
+    };
+
+    it('is offered as an option only while it is selected', () => {
+      const { comp } = render([active, inactive]);
+      expect(comp.availableOptions().map((o: any) => o.id)).toEqual([1, 9]);
+
+      mockUtilsService.getNestedProperty.mockReturnValue([active]);
+      comp.signal.set({ testField: [active] });
+      expect(comp.availableOptions().map((o: any) => o.id)).toEqual([1]);
+    });
+
+    it('marks the inactive selected row and leaves active rows unmarked', () => {
+      const { fixture } = render([active, inactive]);
+      const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.selected-items .item'));
+
+      expect(rows).toHaveLength(2);
+      expect(rows[0].querySelector('[data-testid="multiselect-inactive-tag"]')).toBeNull();
+      const tag = rows[1].querySelector('[data-testid="multiselect-inactive-tag"]') as HTMLElement;
+      expect(tag).not.toBeNull();
+      expect(tag.textContent?.trim()).toContain('Inactive');
+    });
+  });
 });
