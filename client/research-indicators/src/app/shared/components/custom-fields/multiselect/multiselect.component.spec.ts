@@ -1986,6 +1986,26 @@ describe('MultiselectComponent', () => {
       expect(comp.availableOptions().map((o: any) => o.id)).toEqual([1]);
     });
 
+    it('still shows the selected rows when the whole catalog is inactive and the list comes back empty', () => {
+      const fixture = TestBed.createComponent(MultiselectComponent);
+      const comp = fixture.componentInstance;
+      comp.optionValue = 'id';
+      comp.optionLabel = 'name';
+      comp.signalOptionValue = 'testField';
+      mockService.list.mockReturnValue([]);
+      mockCacheService.currentResultIsLoading.set(false);
+      mockUtilsService.getNestedProperty.mockReturnValue([inactive]);
+      comp.ngOnInit();
+      (comp as any).optionsSig = signal([]);
+      comp.signal = signal({ testField: [inactive] });
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('.selected-items .item');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].textContent).toContain('Retired option');
+      expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
+    });
+
     it('marks the inactive selected row and leaves active rows unmarked', () => {
       const { fixture } = render([active, inactive]);
       const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.selected-items .item'));
