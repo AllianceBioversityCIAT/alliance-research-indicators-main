@@ -281,10 +281,12 @@ describe('ResultAlignmentOperationsService', () => {
       expect(resultContractsService.find).toHaveBeenCalledWith(
         resultId,
         ContractRolesEnum.ALIGNMENT,
+        { agresso_contract: true },
       );
       expect(resultLeversService.find).toHaveBeenCalledWith(
         resultId,
         LeverRolesEnum.ALIGNMENT,
+        { lever: true },
       );
       expect(result.primary_levers).toHaveLength(1);
       expect(result.primary_levers[0].result_lever_strategic_outcomes).toEqual(
@@ -298,6 +300,32 @@ describe('ResultAlignmentOperationsService', () => {
         sdgTargets[1],
       ]);
       expect(result.result_sdgs).toEqual([{ clarisa_sdg_id: 3 }]);
+    });
+
+    it('loads the catalog row of every selected item so the client can show it even when the catalog marks it inactive', async () => {
+      resultContractsService.find.mockResolvedValue([]);
+      resultLeversService.find.mockResolvedValue([
+        { result_lever_id: 1, lever_id: '4', is_primary: true },
+      ] as any);
+      resultLeverSdgTargetsService.findByMultiplesResultLeverIds.mockResolvedValue(
+        [],
+      );
+      resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds.mockResolvedValue(
+        [],
+      );
+      resultSdgsService.find.mockResolvedValue([]);
+
+      await service.find(resultId);
+
+      expect(
+        resultLeverSdgTargetsService.findByMultiplesResultLeverIds,
+      ).toHaveBeenCalledWith([1], { sdg_target: { clarisa_sdg: true } });
+      expect(
+        resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds,
+      ).toHaveBeenCalledWith([1], { lever_strategic_outcome: true });
+      expect(resultSdgsService.find).toHaveBeenCalledWith(resultId, undefined, {
+        clarisa_sdg: true,
+      });
     });
   });
 
