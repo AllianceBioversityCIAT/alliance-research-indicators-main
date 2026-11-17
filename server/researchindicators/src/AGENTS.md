@@ -183,7 +183,7 @@ Throw Nest HTTP exceptions (`UnauthorizedException`, `BadRequestException`, `Con
 
 ## 7. Persistence rules
 
-- **MySQL** via TypeORM 0.3, utf8mb4 / `utf8mb4_unicode_520_ci`.
+- **MySQL** via TypeORM 0.3, utf8mb4. Connection collation `utf8mb4_0900_ai_ci` (`orm.config.ts` `extra.charset`, since 2026-10-22); most tables are `0900`, some legacy tables stay `utf8mb4_unicode_520_ci` / `utf8mb4_unicode_ci` — comparing a `CAST`/`CONVERT` expression with one of their text columns raises MySQL 1267, and mocked unit tests cannot catch it.
 - Datasource targets in `db/config/mysql/orm.config.ts`: `CORE` (driven by `ARI_MYSQL_*`) and `TEST` (driven by `ARI_TEST_MYSQL_*`).
 - Migrations are **append-only**. Generate with `npm run migration:generate -- ./src/db/migrations/<name>`. Revert one with `npm run migration:revert`.
 - All domain entities extend `AuditableEntity` (`domain/shared/global-dto/auditable.entity.ts`). Services must populate audit fields from `request.user`.

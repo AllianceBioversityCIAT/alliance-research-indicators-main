@@ -13,11 +13,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { filter, Subscription } from 'rxjs';
 import { environment } from '../../../../../../../environments/environment';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
-import {
-  RESULT_ENTRY_SOURCE_QUERY,
-  RESULT_ENTRY_SOURCE_VALUE_HOME,
-  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
-} from '@shared/constants/result-entry-source';
+import { RESULT_ENTRY_SOURCE_QUERY, isKnownResultEntrySource } from '@shared/constants/result-entry-source';
 
 @Component({
   selector: 'app-version-selector',
@@ -110,7 +106,7 @@ export class VersionSelectorComponent implements OnDestroy {
       }
     } else {
       const live = this.cache.liveVersionData();
-      if (live && live.result_status_id !== 6) {
+      if (live && live.result_status_id !== 6 && !this.tipHidesLive(this.cache.versionsList())) {
         this.selectedResultId.set(live.result_id);
       } else {
         const firstApproved = this.cache.versionsList()[0];
@@ -142,7 +138,7 @@ export class VersionSelectorComponent implements OnDestroy {
       return;
     }
 
-    if (!versionParam && liveData && liveData.result_status_id !== 6) {
+    if (!versionParam && liveData && liveData.result_status_id !== 6 && !this.tipHidesLive(versionsArray)) {
       if (this.selectedResultId() !== liveData.result_id) {
         this.selectedResultId.set(liveData.result_id);
       }
@@ -156,7 +152,7 @@ export class VersionSelectorComponent implements OnDestroy {
       return;
     }
 
-    if (!versionParam && !liveData && versionsArray.length > 0 && !this.hasAutoNavigated) {
+    if (!versionParam && (!liveData || this.tipHidesLive(versionsArray)) && versionsArray.length > 0 && !this.hasAutoNavigated) {
       const firstApproved = versionsArray[0];
       this.selectedResultId.set(firstApproved.result_id);
       if (currentChild === 'general-information') {
@@ -188,7 +184,13 @@ export class VersionSelectorComponent implements OnDestroy {
   }
 
   get hasLiveVersion() {
-    return this.liveVersion() !== null && this.liveVersion()?.result_status_id !== 6;
+    return this.liveVersion() !== null && this.liveVersion()?.result_status_id !== 6 && !this.tipHidesLive(this.approvedVersions());
+  }
+
+  // TIP results are edited in TIP, never here: like an Approved STAR result, show only their
+  // year versions. A TIP result with no version keeps its live row so the selector is not empty.
+  private tipHidesLive(versions: TransformResultCodeResponse[]): boolean {
+    return this.cache.getCurrentPlatformCode() === PLATFORM_CODES.TIP && versions.length > 0;
   }
 
   get liveVersionData(): TransformResultCodeResponse {
@@ -300,13 +302,13 @@ export class VersionSelectorComponent implements OnDestroy {
   editInPlatform() {
     const platformCode = this.cache.getCurrentPlatformCode();
     let url = '';
-    
+
     if (platformCode === PLATFORM_CODES.PRMS) {
       url = this.prmsUrl;
     } else if (platformCode === PLATFORM_CODES.TIP) {
       url = this.tipUrl;
     }
-    
+
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
@@ -324,7 +326,7 @@ export class VersionSelectorComponent implements OnDestroy {
 
   private entrySourceQueryParamRecord(): { [RESULT_ENTRY_SOURCE_QUERY]?: string } {
     const from = this.route.snapshot.queryParamMap.get(RESULT_ENTRY_SOURCE_QUERY);
-    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(from)) {
       return { [RESULT_ENTRY_SOURCE_QUERY]: from };
     }
     return {};

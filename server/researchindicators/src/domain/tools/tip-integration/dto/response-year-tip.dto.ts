@@ -5,10 +5,30 @@ import { CreateResultDto } from '../../../entities/results/dto/create-result.dto
 import { ResultAlignmentDto } from '../../../entities/results/dto/result-alignment.dto';
 import { SaveGeoLocationDto } from '../../../entities/results/dto/save-geo-location.dto';
 import { UpdateGeneralInformation } from '../../../entities/results/dto/update-general-information.dto';
+import { ExternalMappersDto } from '../../../shared/global-dto/external-mappers.dto';
+
+export class TipTocMappingDto {
+  science_program_id?: string;
+  aow_compose_code?: string;
+  toc_result_id?: number;
+  toc_internal_id?: string;
+  result_title?: string;
+  toc_result_indicator_id?: string;
+  result_indicator_description?: string;
+  result_indicator_type_name?: string;
+  target_contribution?: number | string | null;
+}
 
 export class TipProjectDto {
   agreement_id: string;
   description: string;
+  is_primary?: boolean;
+  is_contributing_to_pool_funding?: boolean;
+  toc_mapping?: TipTocMappingDto | null;
+}
+
+export class TipMappedResult extends ExternalMappersDto {
+  poolFunding: TipTocMappingDto | null;
 }
 
 export class TipSubmitterDto {

@@ -217,6 +217,15 @@ describe('ResultComponent branch coverage - constructor and metadata', () => {
     expect((component as any).getCurrentResultIdentifier(undefined, 77)).toBe(77);
   });
 
+  it('falls back to the numeric id for the alignment pre-fetch when the id param is not a string', () => {
+    const getAlignment = jest.spyOn((component as any).bilateralService, 'getAlignment').mockResolvedValue(null as any);
+    params$.next({ id: 55 });
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    expect(mockCache.setCurrentResultId).toHaveBeenCalledWith(55);
+    expect(getAlignment).toHaveBeenCalledWith('55');
+  });
+
   it('does not set currentResultId when id is missing', () => {
     params$.next({});
     fixture.detectChanges();

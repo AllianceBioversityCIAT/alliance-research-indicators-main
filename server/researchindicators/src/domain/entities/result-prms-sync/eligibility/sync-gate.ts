@@ -35,6 +35,16 @@ export interface SyncGateSnapshot {
    * `reporting_year` gate passes (D-6).
    */
   reporting_year?: number;
+  /**
+   * `results.platform_code`. Optional so existing snapshot literals compile
+   * (JD-12). Absent is not TIP.
+   */
+  platform_code?: string | null;
+  /**
+   * Who is asking the gate. Absent is the HTTP route (`'HTTP'`, DD-1).
+   * Only server code sets `'TIP_SYNC'`; the column is not stored.
+   */
+  origin?: 'HTTP' | 'TIP_SYNC';
 }
 
 export type SyncGateEntryId =
@@ -73,6 +83,14 @@ const UNMAPPABLE_INDICATORS = new Set<number>([
   IndicatorsEnum.KNOWLEDGE_PRODUCT,
   IndicatorsEnum.OICR,
 ]);
+
+/**
+ * TIP equivalences apply only to the TIP sync's push (R-TPP-003, DD-1).
+ * Platform alone would also lift the HTTP route; origin alone would lift STAR.
+ */
+export function isTipSyncPush(snapshot: SyncGateSnapshot): boolean {
+  return snapshot.origin === 'TIP_SYNC' && snapshot.platform_code === 'TIP';
+}
 
 /** PRMS `policy_type.id = 1` — Program, Budget, or Investment (D-2). */
 const PRMS_POLICY_TYPE_PROGRAM_BUDGET_OR_INVESTMENT = 1;
@@ -134,7 +152,11 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     description:
       'Result is not Approved; only results with result_status_id = 6 can be sent to PRMS',
     fails: (snapshot) =>
-      snapshot.result_status_id !== ResultStatusEnum.APPROVED,
+      snapshot.result_status_id !== ResultStatusEnum.APPROVED &&
+      !(
+        isTipSyncPush(snapshot) &&
+        snapshot.result_status_id === ResultStatusEnum.COMPLETED_IN_TIP
+      ),
     persistsRow: true,
   },
   {
@@ -160,6 +182,12 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     fails: (snapshot) => {
       if (snapshot.indicator_id == null) {
         return true;
+      }
+      if (
+        isTipSyncPush(snapshot) &&
+        snapshot.indicator_id === IndicatorsEnum.KNOWLEDGE_PRODUCT
+      ) {
+        return false;
       }
       if (UNMAPPABLE_INDICATORS.has(snapshot.indicator_id)) {
         return true;

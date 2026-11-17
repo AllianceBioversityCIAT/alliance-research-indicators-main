@@ -128,8 +128,28 @@
         <app-multiselect label="Research Areas" [signal]="body" optionLabel="full_name" optionValue="lever_id"
           signalOptionValue="research_areas" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
           [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
-          [serviceParams]="serviceParams" [optionFilter]="researchAreaOptionFilter"
-          placeholder="Select the research areas">
+          [serviceParams]="serviceParams" placeholder="Select the research areas">
+          <!-- Same look as Contribution to SDG, without an image. No description in the DB, so the name is not bold. -->
+          <ng-template #item let-area>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+            </p>
+          </ng-template>
+          <ng-template #rows let-area>
+            <div class="flex w-full min-w-0 flex-1 flex-col gap-3">
+              <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+                <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+              </p>
+              @if (isOtherResearchArea(area)) {
+              <!-- Same field as Create OICR step 2, nested under the selected "Other" area. -->
+              <div class="ml-1 border-l-2 border-[var(--ac-grey-200)] pl-4">
+                <app-input label="Name of the team or area creating the result" [signal]="getCustomNameSignal(area)"
+                  optionValue="custom_lever_name" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+                  placeholder="Write the team or area name"></app-input>
+              </div>
+              }
+            </div>
+          </ng-template>
         </app-multiselect>
 
         <app-multiselect label="Strategic Objectives" [signal]="body" optionLabel="name" optionValue="id"
@@ -137,6 +157,23 @@
           [disabledSelectedScroll]="true" [filterBy]="'name,description'" serviceName="strategicObjectives"
           [serviceParams]="serviceParams" [enableVirtualScroll]="false" scrollHeight="205px"
           placeholder="Select the strategic objectives">
+          <!-- Same look as Contribution to SDG, without an image: bold name, then ": description" -->
+          <ng-template #item let-objective>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ objective?.name }}</span>
+              @if (objective?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ objective.description }}</span>
+              }
+            </p>
+          </ng-template>
+          <ng-template #rows let-objective>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ objective?.name }}</span>
+              @if (objective?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ objective.description }}</span>
+              }
+            </p>
+          </ng-template>
         </app-multiselect>
 
         @if (shouldShowImpactOutcomes()) {
@@ -145,6 +182,23 @@
           [disabledSelectedScroll]="true" [filterBy]="'name,description'" serviceName="impactOutcomes"
           [serviceParams]="serviceParams" [enableVirtualScroll]="false" scrollHeight="205px"
           placeholder="Select the impact outcomes">
+          <!-- Same look as Strategic Objectives: bold name, then ": description" (full, even when long) -->
+          <ng-template #item let-outcome>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ outcome?.name }}</span>
+              @if (outcome?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ outcome.description }}</span>
+              }
+            </p>
+          </ng-template>
+          <ng-template #rows let-outcome>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-[550]">{{ outcome?.name }}</span>
+              @if (outcome?.description) {
+              <span class="font-['Barlow'] font-normal">: {{ outcome.description }}</span>
+              }
+            </p>
+          </ng-template>
         </app-multiselect>
         }
 

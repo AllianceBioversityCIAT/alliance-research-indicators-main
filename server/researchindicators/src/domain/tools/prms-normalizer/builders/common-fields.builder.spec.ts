@@ -1,4 +1,5 @@
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { PrmsSyncAggregate } from '../dto/prms-sync-aggregate';
 import {
   CommonFieldsBuilder,
@@ -576,6 +577,87 @@ describe('CommonFieldsBuilder', () => {
     });
   });
 
+  describe('contributing_partners acronym', () => {
+    it('omits acronym when it is null and still sends a real acronym', () => {
+      const payload = builder.build(
+        baseAggregate({
+          partners: [
+            {
+              institution_id: 12,
+              acronym: null,
+              name: 'Unnamed institute',
+            },
+            {
+              institution_id: 13,
+              acronym: 'FAO',
+              name: 'Food and Agriculture Organization',
+            },
+          ],
+        }),
+      );
+      const partners = payload.contributing_partners as Record<
+        string,
+        unknown
+      >[];
+
+      expect(partners[0]).toEqual({
+        institution_id: 12,
+        name: 'Unnamed institute',
+      });
+      expect(partners[0]).not.toHaveProperty('acronym');
+      expect(JSON.stringify(partners[0])).not.toContain('acronym');
+      expect(partners[1]).toEqual({
+        institution_id: 13,
+        acronym: 'FAO',
+        name: 'Food and Agriculture Organization',
+      });
+    });
+
+    it('omits an empty or whitespace-only acronym and sends a padded acronym unchanged', () => {
+      const payload = builder.build(
+        baseAggregate({
+          partners: [
+            {
+              institution_id: 21,
+              acronym: '',
+              name: 'Empty acronym',
+            },
+            {
+              institution_id: 22,
+              acronym: '   ',
+              name: 'Blank acronym',
+            },
+            {
+              institution_id: 23,
+              acronym: ' FAO ',
+              name: 'Food and Agriculture Organization',
+            },
+          ],
+        }),
+      );
+      const partners = payload.contributing_partners as Record<
+        string,
+        unknown
+      >[];
+
+      expect(partners[0]).toEqual({
+        institution_id: 21,
+        name: 'Empty acronym',
+      });
+      expect(partners[0]).not.toHaveProperty('acronym');
+      expect(partners[1]).toEqual({
+        institution_id: 22,
+        name: 'Blank acronym',
+      });
+      expect(partners[1]).not.toHaveProperty('acronym');
+      expect(partners[2]).toEqual({
+        institution_id: 23,
+        acronym: ' FAO ',
+        name: 'Food and Agriculture Organization',
+      });
+    });
+  });
+
   describe('is_partner_not_applicable (homologation.md §4.4, R-PRMS-003 AC.4)', () => {
     it('omits contributing_partners entirely rather than sending an empty array', () => {
       const payload = builder.build(
@@ -774,6 +856,70 @@ describe('CommonFieldsBuilder', () => {
       );
 
       expect(payload.toc_mapping).not.toHaveProperty('target_contribution');
+    });
+  });
+
+  describe('TIP toc_mapping override (R-TPP-004)', () => {
+    const tipMapping = {
+      science_program_id: 'SP02',
+      aow_compose_code: 'SP02-AOW01',
+      toc_result_id: 19191,
+      result_title: 'TIP result title',
+      result_indicator_description: 'TIP indicator description',
+      result_indicator_type_name: 'TIP indicator type',
+      target_contribution: 7,
+      toc_internal_id: 'internal-not-sent',
+      toc_result_indicator_id: 'indicator-not-sent',
+    };
+
+    const sevenTipKeys = {
+      science_program_id: 'SP02',
+      aow_compose_code: 'SP02-AOW01',
+      toc_result_id: 19191,
+      result_title: 'TIP result title',
+      result_indicator_description: 'TIP indicator description',
+      result_indicator_type_name: 'TIP indicator type',
+      target_contribution: 7,
+    };
+
+    it('emits exactly the seven TIP keys and no stored-alignment keys', () => {
+      const payload = builder.build(baseAggregate(), {
+        tocMapping: tipMapping,
+      });
+
+      expect(payload.toc_mapping).toEqual(sevenTipKeys);
+    });
+
+    it('omits an empty aow_compose_code and a null target_contribution', () => {
+      const payload = builder.build(baseAggregate(), {
+        tocMapping: {
+          science_program_id: 'SP02',
+          aow_compose_code: '',
+          target_contribution: null,
+        },
+      });
+
+      expect(payload.toc_mapping).toEqual({ science_program_id: 'SP02' });
+    });
+
+    it('refuses a TIP tocMapping with no science_program_id', () => {
+      const build = () =>
+        builder.build(baseAggregate(), {
+          tocMapping: { aow_compose_code: 'SP02-AOW01' },
+        });
+
+      expect(build).toThrow(PrmsPayloadBuildError);
+      expect(build).toThrow(
+        "Missing mandatory field 'toc_mapping.science_program_id'",
+      );
+      expect.assertions(3);
+      try {
+        build();
+      } catch (error) {
+        expect((error as PrmsPayloadBuildError).field).toBe(
+          'toc_mapping.science_program_id',
+        );
+      }
     });
   });
 
@@ -1144,6 +1290,76 @@ describe('CommonFieldsBuilder', () => {
       const data = builder.build(baseAggregate({ prms_result_code: null }));
 
       expect('result_code' in data).toBe(false);
+    });
+  });
+
+  describe('external_reference by platform (R-PPI-003)', () => {
+    it('sends the bare official code for a STAR result', () => {
+      const data = builder.build(
+        baseAggregate({
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.STAR,
+        }),
+      );
+
+      expect(data.external_reference).toBe('123');
+    });
+
+    it('prefixes a TIP result with TIP-', () => {
+      const data = builder.build(
+        baseAggregate({
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.TIP,
+        }),
+      );
+
+      expect(data.external_reference).toBe('TIP-123');
+    });
+
+    it.each([
+      [ReportingPlatformEnum.PRMS, 'PRMS-123'],
+      [ReportingPlatformEnum.AICCRA, 'AICCRA-123'],
+      [ReportingPlatformEnum.BILATERAL, 'BILATERAL-123'],
+    ] as const)('prefixes %s as %s', (platform, reference) => {
+      const data = builder.build(
+        baseAggregate({
+          result_official_code: 123,
+          platform_code: platform,
+        }),
+      );
+
+      expect(data.external_reference).toBe(reference);
+    });
+  });
+
+  describe('optional description (DD-10)', () => {
+    it.each([null, '', '   '])(
+      'omits the description key when optionalDescription is true and the value is %j',
+      (description) => {
+        const data = builder.build(baseAggregate({ description }), {
+          optionalDescription: true,
+        });
+
+        expect('description' in data).toBe(false);
+      },
+    );
+
+    it('sends the description text when optionalDescription is true and the text is present', () => {
+      const data = builder.build(
+        baseAggregate({ description: 'A real TIP abstract' }),
+        { optionalDescription: true },
+      );
+
+      expect(data.description).toBe('A real TIP abstract');
+    });
+
+    it('still throws naming description when there is no override and the description is null', () => {
+      const aggregate = baseAggregate({ description: null });
+
+      expect(() => builder.build(aggregate)).toThrow(PrmsPayloadBuildError);
+      expect(() => builder.build(aggregate)).toThrow(
+        "Missing mandatory field 'description'",
+      );
     });
   });
 });

@@ -1,0 +1,59 @@
+<section
+  class="flex h-full flex-col rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
+  data-testid="pfm-prms-status-card"
+  aria-labelledby="pfm-prms-status-title">
+  @let s = slices();
+  <h2 id="pfm-prms-status-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">PRMS status</h2>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Results in PRMS, by review status. Click a slice to see them.</p>
+
+  @if (s.total === 0) {
+    <app-pfm-empty-state data-testid="pfm-prms-status-empty" />
+  } @else {
+    <div class="mt-4 flex justify-center">
+      <svg viewBox="0 0 120 120" class="h-[170px] w-[170px] -rotate-90" role="img" [attr.aria-label]="s.total + ' results in PRMS'" data-testid="pfm-prms-donut">
+        @for (it of s.items; track it.key) {
+          @if (it.value > 0) {
+            <circle
+              cx="60"
+              cy="60"
+              [attr.r]="r"
+              fill="none"
+              stroke-width="18"
+              class="cursor-pointer transition-opacity duration-200 hover:opacity-80"
+              [attr.stroke]="it.fill"
+              [attr.stroke-dasharray]="it.dash"
+              [attr.stroke-dashoffset]="it.dashOffset"
+              [pTooltip]="it.tip"
+              tooltipPosition="top"
+              [attr.data-testid]="'pfm-prms-slice-' + it.key"
+              (click)="open.emit(it.chip)"></circle>
+          }
+        }
+        <g class="rotate-90 [transform-origin:60px_60px]">
+          <text x="60" y="58" text-anchor="middle" class="fill-[var(--ac-pfm-accent-navy)] text-[24px] font-bold" data-testid="pfm-prms-total">{{ s.total | number }}</text>
+          <text x="60" y="74" text-anchor="middle" class="fill-[var(--ac-pfm-neutral-fg)] text-[9px]">results</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Compact legend: colour + category only; the count and share are in the tooltip. -->
+    <ul class="m-0 mt-4 flex list-none flex-wrap justify-center gap-x-4 gap-y-1 p-0" data-testid="pfm-prms-legend">
+      @for (it of s.items; track it.key) {
+        <li>
+          <button
+            type="button"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border-0 bg-transparent px-1 py-0.5 text-[12px] text-[var(--ac-pfm-accent-navy)] transition-colors duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
+            [disabled]="it.value === 0"
+            [pTooltip]="it.legendTip"
+            tooltipPosition="top"
+            [attr.aria-label]="it.tip"
+            [attr.data-testid]="'pfm-prms-legend-' + it.key"
+            (click)="open.emit(it.chip)">
+            <span class="h-2.5 w-2.5 flex-none rounded-full" [style.background-color]="it.fill" aria-hidden="true"></span>
+            {{ it.label }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -326,6 +326,26 @@ describe('MyPiDelegatesComponent', () => {
     expect(modals.isModalOpen('assignPiDelegate')?.isOpen).toBe(true);
   });
 
+  it('Assign from a project row opens the modal pre-scoped to that project', () => {
+    fixture.detectChanges();
+
+    component.onAssignFromProject({ projectCode: 'PRJ-1' });
+
+    const modals = TestBed.inject(AllModalsService);
+    expect(modals.assignPiDelegateContext()).toEqual({ source: 'byProject', projectCode: 'PRJ-1' });
+    expect(modals.isModalOpen('assignPiDelegate')?.isOpen).toBe(true);
+  });
+
+  it('Assign from a person row opens the modal pre-scoped to that person', () => {
+    fixture.detectChanges();
+
+    component.onAssignFromPerson({ delegateUserId: 55 });
+
+    const modals = TestBed.inject(AllModalsService);
+    expect(modals.assignPiDelegateContext()).toEqual({ source: 'byPerson', delegateUserId: 55 });
+    expect(modals.isModalOpen('assignPiDelegate')?.isOpen).toBe(true);
+  });
+
   it('info banner is ABSENT (the description block supersedes it)', () => {
     fixture.detectChanges();
     const banner = fixture.nativeElement.querySelector('.pi-delegates-banner');

@@ -377,4 +377,25 @@ describe('UserSearchStepComponent', () => {
       expect(searchMock).toHaveBeenCalledWith('roj');
     });
   });
+  it('initials() uppercases first letters and tolerates missing names', () => {
+    expect(component.initials(row({ first_name: 'ana', last_name: 'sandoval' }))).toBe('AS');
+    expect(component.initials(row({ first_name: '', last_name: 'sandoval' }))).toBe('S');
+    expect(component.initials(row({ first_name: 'ana', last_name: undefined as never }))).toBe('A');
+  });
+
+  it('blockedReason() falls back to the default for an unmapped reason', () => {
+    expect(component.blockedReason(blockedRow({ blocked_reason: 'something_new' as never }))).toBe('This account cannot be simulated.');
+  });
+
+  it('treats a successful response with null data as an empty result', async () => {
+    fixture.detectChanges();
+    searchMock.mockResolvedValueOnce(mainResponse<ImpersonationUserRow[]>(null as never));
+
+    component.onInput('zzzzz');
+    await waitForDebounce();
+    await fixture.whenStable();
+
+    expect(component.results()).toEqual([]);
+    expect(component.status()).toBe('empty');
+  });
 });

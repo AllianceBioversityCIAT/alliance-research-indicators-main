@@ -79,6 +79,7 @@ import { OrganizationalStructureModule } from '../entities/organizational-struct
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 import { PiDelegatesModule } from '../entities/pi-delegates/pi-delegates.module';
+import { PooledFundingMonitorModule } from '../entities/pooled-funding-monitor/pooled-funding-monitor.module';
 import { UsersModule } from '../entities/users/users.module';
 import { ImpersonationModule } from '../entities/impersonation/impersonation.module';
 
@@ -461,6 +462,10 @@ const children: Routes = [
   {
     path: 'pi-delegates',
     module: PiDelegatesModule,
+  },
+  {
+    path: 'pooled-funding-monitor',
+    module: PooledFundingMonitorModule,
   },
   {
     path: 'users',

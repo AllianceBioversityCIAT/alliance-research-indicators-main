@@ -29,6 +29,7 @@ import { DeliveryCorrelationOutcome } from '../enum/delivery-correlation-outcome
 @Index('idx_result_prms_sync_history_delivery_id', ['delivery_id'])
 @Index('idx_result_prms_sync_history_occurred_at', ['occurred_at'])
 @Index('idx_result_prms_sync_history_code_year', [
+  'platform_code',
   'result_official_code',
   'result_year',
 ])
@@ -69,6 +70,14 @@ export class PrmsWebhookDelivery extends AuditableEntity {
     nullable: false,
   })
   correlation_outcome!: DeliveryCorrelationOutcome;
+
+  @Column({
+    type: 'varchar',
+    name: 'platform_code',
+    length: 50,
+    nullable: true,
+  })
+  platform_code?: string | null;
 
   @Column({
     type: 'varchar',

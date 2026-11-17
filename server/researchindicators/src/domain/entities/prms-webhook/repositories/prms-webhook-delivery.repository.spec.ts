@@ -123,6 +123,7 @@ const delivery = (
   occurred_at: OCCURRED_AT,
   environment: 'TEST',
   correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+  platform_code: 'STAR',
   result_official_code: '1441061',
   prms_result_id: 9001,
   prms_result_code: 555,
@@ -187,6 +188,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         occurred_at: OCCURRED_AT,
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+        platform_code: 'STAR',
         result_official_code: '1441061',
         result_year: null,
         prms_result_id: 9001,
@@ -245,6 +247,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         OCCURRED_AT,
         'TEST',
         DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+        'STAR',
         '1441061',
         9001,
         555,
@@ -507,6 +510,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       userId: 7,
       occurredAt: OCCURRED_AT,
       environment: 'TEST',
+      platformCode: 'STAR',
       resultOfficialCode: '1441061',
       resultYear: 2026,
       prmsResultCode: 9199,
@@ -542,6 +546,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         occurred_at: OCCURRED_AT,
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+        platform_code: 'STAR',
         result_official_code: '1441061',
         result_year: 2026,
         prms_result_id: null,
@@ -577,10 +582,13 @@ describe('PrmsWebhookDeliveryRepository', () => {
 
       const insertSql = String(dataSourceQuery.mock.calls[0][0]);
       const insertParams = dataSourceQuery.mock.calls[0][1] as unknown[];
+      // STAR old-vs-new (NFR-PPI-001): the bare code stays the value HEAD
+      // bound. `platform_code` 'STAR' is the new column in front of it.
       expect(insertParams).toEqual([
         OCCURRED_AT,
         'TEST',
         DeliveryCorrelationOutcome.CORRELATED,
+        'STAR',
         '1441061',
         2026,
         9199,
@@ -590,6 +598,24 @@ describe('PrmsWebhookDeliveryRepository', () => {
         7,
       ]);
       expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
+    });
+
+    it('a TIP push writes platform_code TIP and the bare code, not the prefixed reference', async () => {
+      dataSourceQuery.mockImplementationOnce((sql: string, params: unknown[]) =>
+        table.execute(sql, params),
+      );
+
+      await repository.recordOutboundPendingReview(
+        outboundInput({ platformCode: 'TIP', resultOfficialCode: '123' }),
+      );
+
+      expect(table.rows[0]).toMatchObject({
+        platform_code: 'TIP',
+        result_official_code: '123',
+      });
+      const insertParams = dataSourceQuery.mock.calls[0][1] as unknown[];
+      expect(insertParams[3]).toBe('TIP');
+      expect(insertParams[4]).toBe('123');
     });
 
     it('a NULL resultOfficialCode / prmsResultCode / userId is bound as NULL, not coerced', async () => {
@@ -643,6 +669,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
             (m) => m[1],
           );
           expect(columns).toEqual(['result_official_code', 'result_year']);
+          expect(where).toMatch(/platform_code = 'STAR'/);
           expect(where).toMatch(/delivery_id IS NULL/);
           expect(where).toMatch(/raw_headers = JSON_OBJECT\(\)/);
           const before = rows.length;
@@ -650,6 +677,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
             (row) =>
               !(
                 columns.every((column, i) => row[column] === params[i]) &&
+                row.platform_code === 'STAR' &&
                 row.delivery_id === null &&
                 row.raw_headers === '{}'
               ),
@@ -669,9 +697,11 @@ describe('PrmsWebhookDeliveryRepository', () => {
         let paramIndex = 0;
         columns.forEach((column, i) => {
           const token = tokens[i];
+          const quoted = /^'(.*)'$/.exec(token);
           if (token === '?') row[column] = params[paramIndex++];
           else if (/^NULL$/i.test(token)) row[column] = null;
           else if (/^TRUE$/i.test(token)) row[column] = true;
+          else if (quoted) row[column] = quoted[1];
           else throw new Error(`unsupported literal ${token}`);
         });
         const guardColumns = [...match[3].matchAll(/(\w+)\s*=\s*\?/g)].map(
@@ -683,6 +713,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
           'event_source',
           'status',
         ]);
+        expect(match[3]).toMatch(/platform_code = 'STAR'/);
         expect(match[3]).toMatch(/duplicate_of_id IS NULL/);
         expect(match[3]).toMatch(/is_active = TRUE/);
         const guardParams = params.slice(paramIndex);
@@ -691,6 +722,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
           (existing) =>
             existing.duplicate_of_id === null &&
             existing.is_active === true &&
+            existing.platform_code === 'STAR' &&
             guardColumns.every(
               (column, i) => existing[column] === guardParams[i],
             ),
@@ -754,6 +786,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
           occurred_at: OCCURRED_AT,
           environment: 'TEST',
           correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+          platform_code: 'STAR',
           result_official_code: '5001',
           result_year: 2025,
           prms_result_id: null,
@@ -800,6 +833,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       const realPush: FakeRow = {
         result_official_code: '5001',
         result_year: 2025,
+        platform_code: 'STAR',
         delivery_id: null,
         raw_headers: null,
         event_source: 'STAR',
@@ -810,6 +844,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       const realCallback: FakeRow = {
         result_official_code: '5001',
         result_year: 2025,
+        platform_code: 'STAR',
         delivery_id: '14',
         raw_headers: { 'x-prms-delivery-id': '14' },
         event_source: 'PRMS',
@@ -827,6 +862,40 @@ describe('PrmsWebhookDeliveryRepository', () => {
 
       expect(outcome).toEqual({ deleted: 0, inserted: 0 });
       expect(fake.rows).toEqual([realPush, realCallback]);
+    });
+
+    it('a TIP row with the same code and year is neither deleted nor a reason to skip the STAR insert', async () => {
+      const tipImported: FakeRow = {
+        result_official_code: '5001',
+        result_year: 2025,
+        platform_code: 'TIP',
+        delivery_id: null,
+        raw_headers: '{}',
+        event_source: 'PRMS',
+        status: 'REJECTED',
+        duplicate_of_id: null,
+        is_active: true,
+      };
+      const fake = importedTable([tipImported]);
+      const manager = useTable(fake);
+
+      const outcome = await repository.replaceImportedHistory(KEY, [
+        importedRow(),
+      ]);
+
+      expect(outcome).toEqual({ deleted: 0, inserted: 1 });
+      expect(fake.rows).toHaveLength(2);
+      expect(fake.rows[0]).toEqual(tipImported);
+      expect(fake.rows[1]).toMatchObject({
+        platform_code: 'STAR',
+        result_official_code: '5001',
+      });
+      const notExistsSql = String(
+        (manager.query as jest.Mock).mock.calls.find((call) =>
+          /NOT EXISTS/i.test(String(call[0])),
+        )?.[0],
+      );
+      expect(notExistsSql).toMatch(/platform_code = 'STAR'/);
     });
 
     it('only replaces the rows of its own result and year', async () => {
@@ -923,6 +992,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       const history = await repository.findHistoryByResultCodeAndYear(
         '1441061',
         2026,
+        'STAR',
       );
 
       expect(transaction).not.toHaveBeenCalled();
@@ -931,12 +1001,17 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect(sql).toMatch(/FROM\s+result_prms_sync_history/);
       expect(sql).toMatch(/WHERE\s+result_official_code\s*=\s*\?/);
       expect(sql).toMatch(/AND\s+result_year\s*=\s*\?/);
+      expect(sql).toMatch(/AND\s+platform_code\s*=\s*\?/);
       expect(sql).toMatch(/ORDER\s+BY\s+occurred_at\s+ASC/);
       expect(sql).not.toMatch(/FOR UPDATE/);
       // Never filters on is_active: nothing in this spec flips it, and a
       // hidden filter would be a way to silently discard history.
       expect(sql).not.toMatch(/is_active\s*=/);
-      expect(dataSourceQuery.mock.calls[0][1]).toEqual(['1441061', 2026]);
+      expect(dataSourceQuery.mock.calls[0][1]).toEqual([
+        '1441061',
+        2026,
+        'STAR',
+      ]);
 
       expect(history).toHaveLength(1);
       expect(history[0]).toMatchObject({
@@ -959,17 +1034,20 @@ describe('PrmsWebhookDeliveryRepository', () => {
       });
     });
 
-    it('across all results: NO pair filter, so uncorrelated (result_year IS NULL) rows come back too, in occurred_at order', async () => {
+    it('across one platform: platform filter only, no code or year predicate, in occurred_at order', async () => {
       dataSourceQuery.mockResolvedValueOnce(rawRows);
 
-      const history = await repository.findHistory();
+      const history = await repository.findHistory('STAR');
 
       expect(transaction).not.toHaveBeenCalled();
       const sql = String(dataSourceQuery.mock.calls[0][0]);
       expect(sql).toMatch(/FROM\s+result_prms_sync_history/);
-      expect(sql).not.toMatch(/WHERE/);
+      expect(sql).toMatch(/WHERE\s+platform_code\s*=\s*\?/);
+      expect(sql).not.toMatch(/result_official_code\s*=/);
+      expect(sql).not.toMatch(/result_year\s*=/);
       expect(sql).toMatch(/ORDER\s+BY\s+occurred_at\s+ASC/);
       expect(sql).not.toMatch(/FOR UPDATE/);
+      expect(dataSourceQuery.mock.calls[0][1]).toEqual(['STAR']);
 
       expect(history).toHaveLength(2);
       expect(history.map((row) => row.result_year)).toEqual([2026, null]);
@@ -988,8 +1066,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
     it('both reads select the domain columns (including the seven Pivot columns) and leave the select:false audit columns out', async () => {
       dataSourceQuery.mockResolvedValue([]);
 
-      await repository.findHistoryByResultCodeAndYear('1', 2026);
-      await repository.findHistory();
+      await repository.findHistoryByResultCodeAndYear('1', 2026, 'STAR');
+      await repository.findHistory('TIP');
 
       // Pinned first: a loop over zero calls asserts nothing (KZ-017).
       expect(dataSourceQuery).toHaveBeenCalledTimes(2);
@@ -999,6 +1077,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
           'delivery_id',
           'occurred_at',
           'correlation_outcome',
+          'platform_code',
           'result_id',
           'result_year',
           'duplicate_of_id',

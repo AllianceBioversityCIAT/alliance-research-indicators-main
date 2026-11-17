@@ -1048,3 +1048,81 @@ describe('InnovationUseActorItemComponent', () => {
     }));
   });
 });
+
+describe('InnovationUseActorItemComponent - defensive branches', () => {
+  let component: InnovationUseActorItemComponent;
+  let fixture: ComponentFixture<InnovationUseActorItemComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [InnovationUseActorItemComponent],
+      providers: [{ provide: GetActorTypesService, useValue: { list: signal(ACTOR_TYPES) } }]
+    }).compileComponents();
+    fixture = TestBed.createComponent(InnovationUseActorItemComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('falls back to an empty actor on init when the input is nullish', () => {
+    component.actor = null as unknown as InnovationUseActor;
+    component.ngOnInit();
+    expect(component.body()).toEqual({ ...new InnovationUseActor() });
+  });
+
+  it('ngOnChanges syncs the body when the parent row differs', () => {
+    component.actor = { ...new InnovationUseActor(), actor_type_id: 1 };
+    fixture.detectChanges();
+
+    component.actor = { ...new InnovationUseActor(), actor_type_id: 2 };
+    component.ngOnChanges({ actor: {} as never });
+    expect(component.body().actor_type_id).toBe(2);
+  });
+
+  it('ngOnChanges keeps the body when the parent row is identical', () => {
+    component.actor = { ...new InnovationUseActor(), actor_type_id: 1 };
+    fixture.detectChanges();
+    const before = component.body();
+
+    component.actor = { ...before };
+    component.ngOnChanges({ actor: {} as never });
+    expect(component.body()).toBe(before);
+  });
+
+  it('ngOnChanges falls back to an empty actor when the input became nullish', () => {
+    component.actor = { ...new InnovationUseActor(), actor_type_id: 1 };
+    fixture.detectChanges();
+
+    component.actor = null as unknown as InnovationUseActor;
+    component.ngOnChanges({ actor: {} as never });
+    expect(component.body()).toEqual({ ...new InnovationUseActor() });
+  });
+
+  it('ngOnChanges ignores changes before init and unrelated inputs', () => {
+    component.actor = { ...new InnovationUseActor(), actor_type_id: 2 };
+    component.ngOnChanges({ actor: {} as never });
+    expect(component.body().actor_type_id).not.toBe(2);
+
+    fixture.detectChanges();
+    const before = component.body();
+    component.ngOnChanges({ disabled: {} as never });
+    expect(component.body()).toBe(before);
+  });
+
+  it('showTotalNotPositive is false on the aggregate path', () => {
+    component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: 0 };
+    fixture.detectChanges();
+    expect(component.showTotalNotPositive).toBe(false);
+  });
+
+  it('onRemove emits only when enabled', () => {
+    fixture.detectChanges();
+    const emitSpy = jest.spyOn(component.remove, 'emit');
+
+    component.disabled = true;
+    component.onRemove();
+    expect(emitSpy).not.toHaveBeenCalled();
+
+    component.disabled = false;
+    component.onRemove();
+    expect(emitSpy).toHaveBeenCalledTimes(1);
+  });
+});
