@@ -42,7 +42,7 @@ The export is a new route on `ReportsController`. A dedicated workbook handler i
 | 6 | `ClarisaProjectsService` | Science Programs for a project, one rule shared with the picker. New public `loadBilateralCohort(phase, limitMs?)` returning `{ projects, available }`, the one bounded cohort load (§5). Called from 5a and 5b only | R-MFE-004, 011 |
 | 7 | `ExcelWorkbookBuilder` | Unchanged | — |
 
-**Export result**, one shape from 5a and 5b: the reporting year resolved once for the operation, the rows with their Science Programs, and `clarisaAvailable`. The year is returned even with zero rows, so the file name needs no row (R-MFE-005 AC.3).
+**Export result**, one shape from 5a and 5b: the reporting year resolved once for the operation, the rows with their Science Programs, and `clarisaAvailable`. The year is returned even with zero rows, so the file name needs no row (R-MFE-005 AC.3). It also carries `clarisaCohortEmpty`, true when CLARISA answered with an empty cohort. The handler shows the notice when `clarisaAvailable` is false or `clarisaCohortEmpty` is true, never because zero rows matched the filters (amended 2026-11-17, T-04 attempt 1, owner-approved).
 
 `ReportsModule` imports `BilateralProjectMappingModule` only. `ClarisaProjectsService` is not exported from it, and the handler does not need it (P-11).
 
@@ -146,7 +146,7 @@ The audit is written in the service, so every authorized caller of the endpoints
 
 ### CLARISA notice
 
-`ClarisaProjectsService.loadBilateralCohort(phase, limitMs?)` wraps `listBilateralProjects` and reports `{ projects, available }`. It is the only cohort load for `list()`, the 5a export and the 5b export. It catches every error, not only the 503, so a malformed feed (a non-array 200) also counts as a failure, on Pending as well as on the other statuses (`list()`'s bare `catch` already does). `list()` calls it with no limit and ignores `available`, so its behavior holds (P-21). An empty cohort reports `available: true`; its notice comes from the zero count, not from the flag.
+`ClarisaProjectsService.loadBilateralCohort(phase, limitMs?)` wraps `listBilateralProjects` and reports `{ projects, available }`. It is the only cohort load for `list()`, the 5a export and the 5b export. It catches every error, not only the 503, so a malformed feed (a non-array 200) also counts as a failure, on Pending as well as on the other statuses (`list()`'s bare `catch` already does). `list()` calls it with no limit and ignores `available`, so its behavior holds (P-21). An empty cohort reports `available: true`; its notice comes from the zero cohort count, which 5a and 5b return as `clarisaCohortEmpty` (§2.1), not from the flag and not from the number of rows exported.
 
 The export passes a 10-second limit, because the CLARISA client has no timeout (P-22). The limit covers only this CLARISA load. Reporting-year resolution and the automapper's database classification run outside it, so a slow database is never reported as a CLARISA failure. When the limit fires and the cache holds a feed for the same phase, that stale feed is returned with `available: true`, the same rule the service applies to an upstream error (P-8). Only a timeout with no same-phase cache reports `available: false`.
 

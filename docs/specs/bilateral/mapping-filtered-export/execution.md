@@ -172,3 +172,33 @@ The owner connected the VPN. The same read-only script (`SET SESSION TRANSACTION
 Stopped for the owner, as `/akili-execute` requires: "No mandate widens pre-approval: an owner brief that says "never stop" or "treat every gate as approved" pre-approves routine gates only. The exceptions in `/akili-propose` Step 1 *Approval Mode* (HALT, Pivot, budget tripwire, `FATAL_FAIL`, `PRODUCT_BUG`, destructive actions) still stop, and the stop message quotes this sentence."
 
 **Owner decision (2026-11-17):** "Re-baseline and continue (Recommended)". `design.md` §14 now reads ~850 production, ~2,500 tests, 12 review rounds. T-04 and T-05 continue unchanged. The tripwire is re-armed against the new figures.
+
+### T-04 — Server: reports route, workbook handler, file name, CORS, Swagger, boot and e2e — in progress
+
+- **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`, `tdd` (read from disk) · **Effort:** attempt 1 `grok-4.7-high`; attempt 2 bumped to xhigh (same worker, follow-up dispatch)
+- **Orca:** run `run_674b6b131b1f`; attempt 1: task `task_82ac7c5dcb89`, dispatch `ctx_317cef12a7e0`; attempt 2: follow-up dispatch `ctx_34733fbdc092` (task `task_0809d8616fbe`), same terminal
+
+#### Attempt 1 — FAIL
+
+- **Files changed:**
+  - New: `reports/dto/export-bilateral-mapping.query.dto.ts`, `reports/handlers/bilateral-mapping-workbook.handler.ts` (+ spec), `test/bilateral-mapping-export.e2e-spec.ts`
+  - Modified: `reports/reports.controller.ts` (+ spec), `reports/reports-generation.service.ts` (+ spec), `reports/reports.module.ts` (+ spec), `src/main.ts`
+- **Implementer verification:**
+  - jest 402/402; eslint clean; build 0.
+  - Boot: `[Nest] 76583 - 11/17/2026, 10:45:37 AM LOG [RouterExplorer] Mapped {/api/reports/bilateralMapping/xlsx, GET} route +0ms`; `/swagger-json` lists it under Reports with `search`, `status`, `source`.
+  - e2e: 403 and 401 pass. The Center Admin 200 fails with `QueryFailedError Unknown column 'bpm.status_changed_by'`, because the e2e app reads the shared DB, which does not have T-01's migration yet. Design §11 step 2 predicts this.
+  - Falsifiers: (a) `Expected [9, 1] Received undefined` / `Expected 403 Received 200`; (b) `hasNotice Expected true Received false`; (c) `Bilateral_Mapping_undefined_20261020.xlsx`.
+- **Evidence re-run (Leader inline) — VERIFIED:** reports + bilateral-project-mapping + clarisa/projects → `Test Suites: 31 passed` / `Tests: 515 passed` · eslint 0 · build 0.
+- **Leader observation before review:** the handler computed `notice = !clarisaAvailable || rows.length === 0`. Its own comment admitted that an empty cohort with Mapped rows gives no notice.
+- **Reviewer (akili-reviewer/opus, single, conformance + security) — FAIL.** Authorization, validation, columns, labels, error pass-through, module wiring, CORS and logging were all confirmed. Issues:
+  1. A filter that matches nothing, with CLARISA healthy, gets the CLARISA notice. This violates R-MFE-011 AC.1 and R-MFE-002 "Nothing matches". Two tests lock in the wrong behavior, and falsifier (b) was observed against a mislabeled test.
+  2. An empty cohort with All, Mapped or Inactive rows gives no notice. This violates the R-MFE-011 scenario "CLARISA returns no projects" and AC.1. The Reviewer classed it as a **spec tension**: design §2.1 "Export result" carries no cohort size, but §5, DD-11 and T-04 scope 3 need one.
+  - ADVISORY: `utcDateCell` builds a local midnight, so a server TZ east of UTC shifts the cell one day back (worked out from ExcelJS `dateToExcel`, not executed). The subtitle prints an unknown status. `forbidNonWhitelisted` is stricter than §4.
+- **Spec tension → amendment (owner-approved 2026-11-17, "Add cohort-empty flag (Recommended)"):**
+  - `design.md` §2.1 "Export result" gains `clarisaCohortEmpty`. The notice is `!clarisaAvailable || clarisaCohortEmpty`, never zero matched rows.
+  - §5 "CLARISA notice" paragraph 1 was reworded to match.
+  - The meaning of no requirement changed: the amendment makes R-MFE-011 achievable.
+  - Attempt 2's scope was widened, with owner approval, to the T-03 files `exportMappings` / `exportPending` and the shared result type.
+  - Named conformance check for the next Reviewers: §2.1 and §5 paragraph 1 as amended.
+- **Rework brief:** the Reviewer report verbatim, plus the Attempt History, the amendment, the required tests, falsifier (b) re-observed on a real empty cohort, and a new falsifier (d). The TZ advisory was passed as `[advisory-grade]`, in scope under DD-13.
+- **spawns:** Implementer Cursor/grok-4.7-high: not reported by host, ended complete · Reviewer akili-reviewer/opus 14 calls, 113 136 tokens, ended complete
