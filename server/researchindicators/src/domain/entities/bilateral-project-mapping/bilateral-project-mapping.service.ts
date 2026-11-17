@@ -59,6 +59,8 @@ export interface BilateralMappingExportResult<TRow> {
   reportingYear: number;
   rows: TRow[];
   clarisaAvailable: boolean;
+  /** True only when CLARISA answered with an empty cohort. */
+  clarisaCohortEmpty: boolean;
 }
 
 export interface MappedBilateralExportRow
@@ -167,6 +169,7 @@ export class BilateralProjectMappingService {
       reportingYear,
       rows,
       clarisaAvailable: available,
+      clarisaCohortEmpty: available && cohort.length === 0,
     };
   }
 

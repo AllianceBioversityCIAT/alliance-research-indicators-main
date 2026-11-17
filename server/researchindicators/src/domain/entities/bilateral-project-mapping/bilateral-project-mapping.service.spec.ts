@@ -1999,6 +1999,40 @@ describe('BilateralProjectMappingService', () => {
       }
     });
 
+    it('reports clarisaCohortEmpty true when CLARISA answers with an empty cohort', async () => {
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+        projects: [],
+        available: true,
+      });
+
+      const exported = await service.exportMappings({ status: 'mapped' });
+
+      expect(exported.clarisaAvailable).toBe(true);
+      expect(exported.clarisaCohortEmpty).toBe(true);
+      expect(exported.rows.length).toBeGreaterThan(0);
+    });
+
+    it('reports clarisaCohortEmpty false when the cohort has projects', async () => {
+      const exported = await service.exportMappings({});
+
+      expect(exported.clarisaAvailable).toBe(true);
+      expect(exported.clarisaCohortEmpty).toBe(false);
+      expect(exported.rows.length).toBeGreaterThan(0);
+    });
+
+    it('reports clarisaCohortEmpty false when the cohort is unavailable', async () => {
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+        projects: [],
+        available: false,
+      });
+
+      const exported = await service.exportMappings({ status: 'mapped' });
+
+      expect(exported.clarisaAvailable).toBe(false);
+      expect(exported.clarisaCohortEmpty).toBe(false);
+      expect(exported.rows.length).toBeGreaterThan(0);
+    });
+
     it('list rows carry status_changed_by, status_changed_at and status_changed_by_name', async () => {
       const listed = await service.list({});
       const byId = new Map(listed.items.map((row) => [row.id, row]));

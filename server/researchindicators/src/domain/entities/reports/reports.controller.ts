@@ -8,6 +8,8 @@ import {
   StreamableFile,
   UseGuards,
   UseInterceptors,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,7 +18,11 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { RolesGuard } from '../../shared/guards/roles.guard';
+import { MappingSourceEnum } from '../bilateral-project-mapping/enum/mapping-source.enum';
+import { ExportBilateralMappingQueryDto } from './dto/export-bilateral-mapping.query.dto';
 import { ReportsGenerationService } from './reports-generation.service';
 import { ResultSortEnum } from '../results/enum/result-sort.enum';
 import { ListParseToArrayPipe } from '../../shared/pipes/list-parse-array.pipe';
@@ -226,6 +232,53 @@ export class ReportsController {
     return new StreamableFile(buffer, {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       disposition: `attachment; filename="${filename}"`,
+    });
+  }
+
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-04 /
+  // R-MFE-001, NFR-MFE-002, DD-1, P-1, P-25.
+  // Roles sit on this handler: the class declares none, and RolesGuard allows
+  // a handler with no roles. forbidNonWhitelisted makes an unknown query a
+  // 400; whitelist alone would strip it.
+  @Get('bilateralMapping/xlsx')
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  @ApiOperation({
+    summary: 'Download the filtered bilateral mapping workbook',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    type: String,
+    description:
+      'Substring match on the agreement id, the project name, or the agreement description',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'all, mapped, pending, or inactive',
+  })
+  @ApiQuery({
+    name: 'source',
+    required: false,
+    enum: MappingSourceEnum,
+    description: 'Mapping source. Ignored when status is pending.',
+  })
+  async downloadBilateralMapping(
+    @Query() query: ExportBilateralMappingQueryDto,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName } =
+      await this.reportsGeneration.buildBilateralMappingWorkbook(query);
+    return new StreamableFile(buffer, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${fileName}"`,
     });
   }
 }

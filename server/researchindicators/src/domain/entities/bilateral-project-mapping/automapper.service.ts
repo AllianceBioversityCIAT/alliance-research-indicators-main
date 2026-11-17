@@ -196,6 +196,7 @@ export class AutomapperService {
     return {
       reportingYear,
       clarisaAvailable: available,
+      clarisaCohortEmpty: available && cohort.length === 0,
       rows: filtered.map((candidate) => ({
         clarisaProjectId: candidate.clarisaProjectId,
         clarisaProjectFullName: candidate.clarisaProjectFullName,

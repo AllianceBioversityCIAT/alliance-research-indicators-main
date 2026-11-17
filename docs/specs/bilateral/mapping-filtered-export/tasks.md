@@ -237,7 +237,7 @@ graph TD
 
 ### T-04 — Server: reports route, workbook handler, file name, CORS, Swagger, boot and e2e
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-03
+- **Status:** done (attempt 2) · **Size:** L · **Dependencies:** T-03
 - **Requirements covered:** R-MFE-001 (AC.1–AC.3), R-MFE-004 (AC.1–AC.3), R-MFE-005 (AC.1 server half, AC.3), R-MFE-011 (AC.1 workbook half), NFR-MFE-002
 - **Design references:** §2.1 rows 2–4, §4, §5 "Cell rules" and "CLARISA notice" table, §9, DD-1, DD-2, DD-5, DD-9, DD-13, DD-14, DD-15, P-1, P-10, P-11, P-13, P-25
 - **Files touched (intended):**
@@ -317,10 +317,10 @@ graph TD
 - **Review:** `full` — new public route and authorization.
 - **Effort:** `high`.
 - **Done criteria:**
-  - [ ] every test above passes; falsifiers (a)–(c) observed red
-  - [ ] boot observed with the route mapped; Swagger shows it
-  - [ ] e2e green or its blocker recorded
-  - [ ] suites green; eslint clean; build green
+  - [x] every test above passes; falsifiers (a)–(c) observed red
+  - [x] boot observed with the route mapped; Swagger shows it
+  - [x] e2e green or its blocker recorded — 403/401 green; 200 blocked until the migration reaches the shared DB (H-1)
+  - [x] suites green; eslint clean; build green
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`, `tdd`
 
 ### T-05 — Client: export button, download, single error toast, Inactive tooltip

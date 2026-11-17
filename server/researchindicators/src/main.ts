@@ -20,7 +20,11 @@ async function httpservice() {
   // @akili-spec changes/profile-simulation
   // `X-Impersonation-Error` must be readable by the browser (default CORS
   // exposes no custom headers) so `httpErrorInterceptor` can react to it.
-  app.enableCors({ exposedHeaders: ['X-Impersonation-Error'] });
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-04 / DD-5
+  // Content-Disposition carries the server file name.
+  app.enableCors({
+    exposedHeaders: ['X-Impersonation-Error', 'Content-Disposition'],
+  });
   app.use(
     helmet({
       contentSecurityPolicy: {

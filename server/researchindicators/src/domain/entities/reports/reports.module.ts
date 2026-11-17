@@ -19,6 +19,8 @@ import {
 import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/cap-sharing/cap-sharing-pdf-section.handler';
 import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
 import { ReportMsApp } from '../../tools/broker/report-ms.app';
+import { BilateralProjectMappingModule } from '../bilateral-project-mapping/bilateral-project-mapping.module';
+import { BilateralMappingWorkbookHandler } from './handlers/bilateral-mapping-workbook.handler';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     ResultCapacitySharingModule,
     ClarisaLeversModule,
     PdfViewerModule,
+    BilateralProjectMappingModule,
   ],
   controllers: [ReportsController],
   providers: [
@@ -37,6 +40,7 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     StarResultsMetadataWorkbookHandler,
     ReportHandlerRegistry,
     ReportsGenerationService,
+    BilateralMappingWorkbookHandler,
     CapSharingPdfSectionHandler,
     {
       provide: RESULT_PDF_INDICATOR_SECTION_HANDLERS,

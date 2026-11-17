@@ -1,10 +1,20 @@
-import { BadRequestException } from '@nestjs/common';
-import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
+import {
+  BadRequestException,
+  HttpStatus,
+  INestApplication,
+} from '@nestjs/common';
+import { PATH_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
+import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { RolesGuard, ROLES_KEY } from '../../shared/guards/roles.guard';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
-import { ResultsUtil } from '../../shared/utils/results.util';
+import { RESULT_CODE, ResultsUtil } from '../../shared/utils/results.util';
 import { PdfTemplates } from '../../tools/pdf-viewer/enums/pdf-templates.enum';
 import { ResultSortEnum } from '../results/enum/result-sort.enum';
 import { ReportsController } from './reports.controller';
@@ -169,5 +179,146 @@ describe('ReportsController', () => {
         { paperWidth: '800px', paperHeight: '1200px' },
       );
     });
+  });
+});
+
+describe('GET bilateralMapping/xlsx (R-MFE-001, NFR-MFE-002)', () => {
+  const buildBilateralMappingWorkbook = jest.fn();
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      controllers: [ReportsController],
+      providers: [
+        {
+          provide: ReportsGenerationService,
+          useValue: { buildBilateralMappingWorkbook },
+        },
+        {
+          provide: ResultPdfReportService,
+          useValue: { buildReport: jest.fn() },
+        },
+        {
+          provide: CurrentUserUtil,
+          useValue: { user_id: 7, user: { roles: [] } },
+        },
+        {
+          provide: ResultsUtil,
+          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
+        },
+        mockPortfolioUtilProvider,
+        SetUpInterceptor,
+        Reflector,
+        RolesGuard,
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.use((req, _res, next) => {
+      const header = req.headers['x-test-roles'];
+      req.user = {
+        sec_user_id: 7,
+        roles: header ? JSON.parse(String(header)) : [],
+      };
+      next();
+    });
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(() => {
+    buildBilateralMappingWorkbook.mockReset();
+    buildBilateralMappingWorkbook.mockResolvedValue({
+      buffer: Buffer.from('xlsx'),
+      fileName: 'Bilateral_Mapping_2031_20261020.xlsx',
+    });
+  });
+
+  it('declares CENTER_ADMIN and SYSTEM_ADMIN on the handler', () => {
+    const roles = Reflect.getMetadata(
+      ROLES_KEY,
+      ReportsController.prototype.downloadBilateralMapping,
+    );
+    expect(roles).toEqual([
+      SecRolesEnum.CENTER_ADMIN,
+      SecRolesEnum.SYSTEM_ADMIN,
+    ]);
+  });
+
+  it('documents the route under Reports with one query per filter', () => {
+    const tags = Reflect.getMetadata(DECORATORS.API_TAGS, ReportsController);
+    const operation = Reflect.getMetadata(
+      DECORATORS.API_OPERATION,
+      ReportsController.prototype.downloadBilateralMapping,
+    );
+    const parameters = Reflect.getMetadata(
+      DECORATORS.API_PARAMETERS,
+      ReportsController.prototype.downloadBilateralMapping,
+    ) as Array<{ name?: string }>;
+
+    expect(tags).toEqual(['Reports']);
+    expect(operation.summary).toEqual(expect.any(String));
+    expect(parameters.map((parameter) => parameter.name).sort()).toEqual([
+      'search',
+      'source',
+      'status',
+    ]);
+  });
+
+  it('is outside the result-code pdf capture', () => {
+    const pdfPath = Reflect.getMetadata(
+      PATH_METADATA,
+      ReportsController.prototype.findPdfReportSections,
+    );
+    const exportPath = Reflect.getMetadata(
+      PATH_METADATA,
+      ReportsController.prototype.downloadBilateralMapping,
+    );
+
+    expect(RESULT_CODE).toBe(':resultCode(\\d+)');
+    expect(pdfPath).toBe(`${RESULT_CODE}/pdf`);
+    expect(exportPath).toBe('bilateralMapping/xlsx');
+    expect(String(exportPath)).not.toMatch(/^\d+\/pdf$/);
+    expect('15/pdf').toMatch(/^\d+\/pdf$/);
+  });
+
+  it.each([
+    ['CENTER_ADMIN', [SecRolesEnum.CENTER_ADMIN]],
+    ['SYSTEM_ADMIN', [SecRolesEnum.SYSTEM_ADMIN]],
+  ])('returns the server file name for %s', async (_label, roles) => {
+    const response = await request(app.getHttpServer())
+      .get('/bilateralMapping/xlsx')
+      .set('x-test-roles', JSON.stringify(roles));
+
+    expect(response.status).toBe(HttpStatus.OK);
+    expect(response.headers['content-type']).toContain(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    expect(response.headers['content-disposition']).toBe(
+      'attachment; filename="Bilateral_Mapping_2031_20261020.xlsx"',
+    );
+    expect(buildBilateralMappingWorkbook).toHaveBeenCalledTimes(1);
+  });
+
+  it('forbids a user without the role and does not build the file', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/bilateralMapping/xlsx')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CONTRIBUTOR]));
+
+    expect(response.status).toBe(HttpStatus.FORBIDDEN);
+    expect(buildBilateralMappingWorkbook).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown query param with 400 and does not build the file', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/bilateralMapping/xlsx')
+      .query({ page: '1' })
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]));
+
+    expect(response.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(buildBilateralMappingWorkbook).not.toHaveBeenCalled();
   });
 });

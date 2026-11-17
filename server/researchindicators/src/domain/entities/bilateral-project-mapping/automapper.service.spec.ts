@@ -1893,6 +1893,7 @@ describe('AutomapperService', () => {
         reportingYear: YEAR,
         rows: [],
         clarisaAvailable: true,
+        clarisaCohortEmpty: true,
       });
     });
 
@@ -1954,6 +1955,32 @@ describe('AutomapperService', () => {
       } finally {
         clock.mockRestore();
       }
+    });
+
+    it('reports clarisaCohortEmpty false when the answered cohort has projects', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        pendingCohort(),
+      );
+      armContracts();
+
+      const result = await once();
+
+      expect(result.clarisaAvailable).toBe(true);
+      expect(result.clarisaCohortEmpty).toBe(false);
+      expect(result.rows.length).toBeGreaterThan(0);
+    });
+
+    it('reports clarisaCohortEmpty false when the cohort is unavailable', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockRejectedValue(
+        new Error('upstream down'),
+      );
+
+      const settled = await service
+        .exportPending({})
+        .catch((caught: unknown) => caught);
+
+      expect(settled).toBeInstanceOf(ServiceUnavailableException);
+      expect(settled).not.toHaveProperty('clarisaCohortEmpty');
     });
 
     it('throws 422 when the automapper guard trips', async () => {

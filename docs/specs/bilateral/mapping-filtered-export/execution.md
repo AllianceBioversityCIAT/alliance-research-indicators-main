@@ -202,3 +202,28 @@ Stopped for the owner, as `/akili-execute` requires: "No mandate widens pre-appr
   - Named conformance check for the next Reviewers: §2.1 and §5 paragraph 1 as amended.
 - **Rework brief:** the Reviewer report verbatim, plus the Attempt History, the amendment, the required tests, falsifier (b) re-observed on a real empty cohort, and a new falsifier (d). The TZ advisory was passed as `[advisory-grade]`, in scope under DD-13.
 - **spawns:** Implementer Cursor/grok-4.7-high: not reported by host, ended complete · Reviewer akili-reviewer/opus 14 calls, 113 136 tokens, ended complete
+
+#### Attempt 2 — PASS
+
+- **Files changed:** `reports/handlers/bilateral-mapping-workbook.handler.ts` (+ spec), `bilateral-project-mapping/bilateral-project-mapping.service.ts` (+ spec), `bilateral-project-mapping/automapper.service.ts` (+ spec). This was the owner-approved widening for the amendment.
+- **Changes:**
+  - `clarisaCohortEmpty = available && cohort.length === 0` in 5a and 5b.
+  - `notice = !clarisaAvailable || clarisaCohortEmpty`.
+  - `utcDateCell` now builds `new Date(Date.UTC(y, m, d))`.
+- **Falsifiers (observed red, reverted):**
+  - (b) skip the notice on an empty cohort that has rows → `Expected: true Received: false` (handler.spec.ts:382).
+  - (d) restore `rows.length === 0` as a trigger → `Expected: false Received: true` (handler.spec.ts:362).
+  - Old `utcDateCell` under America/Bogota → `Expected: 1792454400000 Received: 1792472400000`.
+- **Implementer verification:** jest 31 suites / 524 tests; eslint clean; build 0.
+- **Evidence re-run (Leader inline) — VERIFIED:** `Test Suites: 31 passed` / `Tests: 524 passed`. The handler suites under `TZ=Africa/Nairobi` → `Test Suites: 10 passed` / `Tests: 99 passed` · eslint 0 · build 0.
+- **Reviewer (akili-reviewer/opus, conformance + reliability) — PASS.** Both attempt-1 issues are closed, each by a test that reddens when the bug is restored. The `clarisaCohortEmpty` semantics match the amended §2.1 and §5. The only changed T-03 expectation added the new field. DD-13 holds.
+- **ADVISORY (recorded, not actioned):**
+  - **Reliability:** the TZ regression test only discriminates on a non-UTC host, because nothing pins `TZ`. Under `TZ=UTC` the old code would pass.
+  - **Readability:** the 5b "unavailable" test asserts `not.toHaveProperty` on a thrown error. The 503 assertion beside it is the real proof.
+  - **Recorded:** an empty same-phase stale cache would show the notice, which matches the spec.
+- **e2e:** the 403 and 401 cases pass. The Center Admin 200 is blocked until the migration reaches the shared DB (design §11 step 2). That is the recorded blocker the done criterion allows, and it is re-checked at H-1.
+
+**T-04 final status: PASS (attempt 2 of 3).**
+- **Requirements covered:** R-MFE-001 AC.1–AC.3, R-MFE-004 AC.1–AC.3, R-MFE-005 AC.1 (server half) and AC.3, R-MFE-011 AC.1, NFR-MFE-002.
+- **Running totals vs the re-baselined budget:** tasks 4/6 · LOC since `fa0fae7d`: production +823, tests +2399 (target ~850 production / ~2,500 tests) · review rounds 9/12.
+- **spawns:** Implementer Cursor/grok-4.7 (high, then xhigh, same worker): not reported by host, ended complete · Reviewer akili-reviewer/opus: not reported by host, ended complete.
