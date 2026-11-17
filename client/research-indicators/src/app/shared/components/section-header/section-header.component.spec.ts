@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { SectionHeaderComponent } from './section-header.component';
 import { ActivatedRoute, Router, NavigationEnd } from '@angular/router';
 import { of } from 'rxjs';
@@ -208,6 +209,7 @@ describe('SectionHeaderComponent', () => {
   });
 
   it('should execute delete confirm flow successfully', async () => {
+    const invalidate = jest.spyOn(TestBed.inject(ResultsCenterService), 'invalidateResultsListFetchCache');
     // Trigger menu open to register the alert with confirm callback
     const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
     const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
@@ -225,10 +227,14 @@ describe('SectionHeaderComponent', () => {
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
     expect(actionsService.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
     expect(routerSpy.navigate as jest.Mock).toHaveBeenCalledWith(['/results-center']);
+    // Results Center must re-fetch instead of showing its cached list with the deleted result.
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate.mock.invocationCallOrder[0]).toBeLessThan((routerSpy.navigate as jest.Mock).mock.invocationCallOrder.at(-1)!);
   });
 
   it('should handle unsuccessful delete response', async () => {
     (apiService.DELETE_Result as jest.Mock).mockResolvedValueOnce({ successfulRequest: false });
+    const invalidate = jest.spyOn(TestBed.inject(ResultsCenterService), 'invalidateResultsListFetchCache');
 
     const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
     const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
@@ -245,6 +251,7 @@ describe('SectionHeaderComponent', () => {
     const innerErrorPayload = (actionsService.showGlobalAlert as jest.Mock).mock.calls.pop()?.[0];
     innerErrorPayload.confirmCallback.event();
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('should handle delete API throwing error', async () => {
