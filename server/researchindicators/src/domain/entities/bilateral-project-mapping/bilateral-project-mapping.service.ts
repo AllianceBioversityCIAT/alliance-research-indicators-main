@@ -262,8 +262,11 @@ export class BilateralProjectMappingService {
       row.updated_by = user.sec_user_id;
       return this.repo.save(row);
     }
+    const statusChangedAt = new Date();
     row.is_active = false;
-    row.deleted_at = new Date();
+    row.deleted_at = statusChangedAt;
+    row.status_changed_at = statusChangedAt;
+    row.status_changed_by = user.sec_user_id;
     row.updated_by = user.sec_user_id;
     if (writeJustification) {
       row.status_justification = justification;
@@ -309,6 +312,8 @@ export class BilateralProjectMappingService {
     }
     row.is_active = true;
     row.deleted_at = null;
+    row.status_changed_at = new Date();
+    row.status_changed_by = user.sec_user_id;
     row.updated_by = user.sec_user_id;
     if (notes !== undefined) {
       row.notes = notes;

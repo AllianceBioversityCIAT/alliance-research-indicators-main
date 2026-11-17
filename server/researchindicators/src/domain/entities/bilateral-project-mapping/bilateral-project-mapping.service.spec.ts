@@ -1178,6 +1178,151 @@ describe('BilateralProjectMappingService', () => {
     });
   });
 
+  describe('status audit (R-MFE-007)', () => {
+    it('deactivate on an active row stores the acting user and the same instant as deleted_at', async () => {
+      const sentinelAt = new Date('2020-01-11T00:00:00.000Z');
+      const row = {
+        id: 5,
+        is_active: true,
+        reporting_year: CURRENT_YEAR,
+        status_changed_by: 11,
+        status_changed_at: sentinelAt,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await service.deactivate(5, fakeUser, 'wrong project');
+
+      expect(out.status_changed_by).toBe(42);
+      expect(out.status_changed_by).not.toBe(11);
+      expect(out.status_changed_at).toBe(out.deleted_at);
+      expect(out.status_changed_at).not.toBe(sentinelAt);
+      expect(out.is_active).toBe(false);
+    });
+
+    it('activate on an inactive row stores the acting user and a new date', async () => {
+      const sentinelAt = new Date('2020-02-13T00:00:00.000Z');
+      const row = {
+        id: 5,
+        is_active: false,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: new Date('2019-06-01T00:00:00.000Z'),
+        status_changed_by: 13,
+        status_changed_at: sentinelAt,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const before = Date.now();
+      const out = await service.activate(5, fakeUser);
+      const after = Date.now();
+
+      expect(out.status_changed_by).toBe(42);
+      expect(out.status_changed_by).not.toBe(13);
+      expect(out.status_changed_at).toBeInstanceOf(Date);
+      expect(out.status_changed_at).not.toBe(sentinelAt);
+      expect((out.status_changed_at as Date).getTime()).toBeGreaterThanOrEqual(
+        before,
+      );
+      expect((out.status_changed_at as Date).getTime()).toBeLessThanOrEqual(
+        after,
+      );
+      expect(out.is_active).toBe(true);
+    });
+
+    it('idempotent deactivate with notes leaves status_changed_by and status_changed_at unchanged', async () => {
+      const sentinelAt = new Date('2020-03-17T00:00:00.000Z');
+      const row = {
+        id: 5,
+        is_active: false,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: new Date('2019-06-01T00:00:00.000Z'),
+        notes: 'old note',
+        status_changed_by: 17,
+        status_changed_at: sentinelAt,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await service.deactivate(5, fakeUser, undefined, 'a note');
+
+      expect(repoSave).toHaveBeenCalledTimes(1);
+      expect(out.notes).toBe('a note');
+      expect(out.status_changed_by).toBe(17);
+      expect(out.status_changed_at).toBe(sentinelAt);
+    });
+
+    it('idempotent activate leaves status_changed_by and status_changed_at unchanged', async () => {
+      const sentinelAt = new Date('2020-04-19T00:00:00.000Z');
+      const row = {
+        id: 5,
+        is_active: true,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: null,
+        status_changed_by: 19,
+        status_changed_at: sentinelAt,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+
+      const out = await service.activate(5, fakeUser);
+
+      expect(repoSave).not.toHaveBeenCalled();
+      expect(out.status_changed_by).toBe(19);
+      expect(out.status_changed_at).toBe(sentinelAt);
+    });
+
+    it('update with notes leaves status_changed_by and status_changed_at unchanged', async () => {
+      const sentinelAt = new Date('2020-05-23T00:00:00.000Z');
+      const row = {
+        id: 5,
+        agresso_agreement_id: 'D527',
+        reporting_year: CURRENT_YEAR,
+        clarisa_project_id: 1,
+        source: MappingSourceEnum.MANUAL,
+        notes: null,
+        is_active: true,
+        status_changed_by: 23,
+        status_changed_at: sentinelAt,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await service.update(5, { notes: 'updated' }, fakeUser);
+
+      expect(repoSave).toHaveBeenCalledTimes(1);
+      expect(out.notes).toBe('updated');
+      expect(out.status_changed_by).toBe(23);
+      expect(out.status_changed_at).toBe(sentinelAt);
+    });
+
+    it('update with a project leaves status_changed_by and status_changed_at unchanged', async () => {
+      const sentinelAt = new Date('2020-06-29T00:00:00.000Z');
+      const row = {
+        id: 5,
+        reporting_year: CURRENT_YEAR,
+        clarisa_project_id: 1,
+        clarisa_external_code: 'OLD',
+        source: MappingSourceEnum.DERIVED,
+        is_active: true,
+        status_changed_by: 29,
+        status_changed_at: sentinelAt,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+      mockClarisaProjectsService.findProjectById.mockResolvedValue({
+        id: 2,
+        external_code: 'B-D527',
+      });
+
+      const out = await service.update(5, { clarisa_project_id: 2 }, fakeUser);
+
+      expect(repoSave).toHaveBeenCalledTimes(1);
+      expect(out.clarisa_project_id).toBe(2);
+      expect(out.status_changed_by).toBe(29);
+      expect(out.status_changed_at).toBe(sentinelAt);
+    });
+  });
+
   describe('findById year scope (R-APM-004)', () => {
     it('returns 404 for a prior-year id', async () => {
       repoFindOne.mockReset();
