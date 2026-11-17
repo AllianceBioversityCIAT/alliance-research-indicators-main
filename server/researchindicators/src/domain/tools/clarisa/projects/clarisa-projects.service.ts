@@ -41,6 +41,12 @@ export interface ListBilateralProjectsOptions {
   onlyWithSciencePrograms?: boolean;
 }
 
+/** Cohort load for list() and the bilateral export (R-MFE-011, DD-3). */
+export interface BilateralCohort {
+  projects: ClarisaProject[];
+  available: boolean;
+}
+
 @Injectable()
 export class ClarisaProjectsService {
   private readonly logger = new Logger(ClarisaProjectsService.name);
@@ -79,11 +85,44 @@ export class ClarisaProjectsService {
     );
   }
 
+  /**
+   * Science Programs the picker shows for one project (R-MFE-004, DD-7).
+   * The precomputed flag wins, matching the picker. Each mapping is accepted
+   * through `hasSciencePrograms`, which reads `ENV.BILATERAL_ACCEPTED_SP_STATUSES`.
+   */
+  scienceProgramsFor(project: ClarisaProject): {
+    code: string | undefined;
+    name: string | undefined;
+    portfolio: string | undefined;
+    allocation: number | undefined;
+  }[] {
+    const flagged = (project as { has_science_programs?: boolean })
+      .has_science_programs;
+    const included = flagged ?? this.hasSciencePrograms(project);
+    if (!included) {
+      return [];
+    }
+
+    return (project.project_mappings_array ?? [])
+      .filter((mapping) =>
+        this.hasSciencePrograms({
+          project_mappings_array: [mapping],
+        } as ClarisaProject),
+      )
+      .map((mapping) => ({
+        code: mapping.global_unit_object?.smo_code,
+        name: mapping.global_unit_object?.name,
+        portfolio: mapping.global_unit_object?.portfolio_object?.acronym,
+        allocation: mapping.allocation,
+      }));
+  }
+
   async listBilateralProjects(
     options?: ListBilateralProjectsOptions,
+    limitMs?: number,
   ): Promise<ClarisaProject[]> {
     const targetPhase = await this.resolveListingYear(options?.phase);
-    const all = await this.getCachedAll(targetPhase);
+    const all = await this.getCachedAll(targetPhase, limitMs);
 
     const eligible = all.filter(
       (p) =>
@@ -109,6 +148,23 @@ export class ClarisaProjectsService {
     }
 
     return withFlag;
+  }
+
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-02 / R-MFE-011, DD-3, DD-12
+  //
+  // The one cohort load for list() and the export. Every failure, including a
+  // malformed (non-array) feed, reports `available: false`. `limitMs` races
+  // only the CLARISA request; list() passes none. No call deduplication.
+  async loadBilateralCohort(
+    phase: number | string,
+    limitMs?: number,
+  ): Promise<BilateralCohort> {
+    try {
+      const projects = await this.listBilateralProjects({ phase }, limitMs);
+      return { projects, available: true };
+    } catch {
+      return { projects: [], available: false };
+    }
   }
 
   /**
@@ -204,7 +260,44 @@ export class ClarisaProjectsService {
     this.cache = null;
   }
 
-  private async getCachedAll(phase: number): Promise<ClarisaProject[]> {
+  /**
+   * Races only the CLARISA request. A timeout rejects into `getCachedAll`'s
+   * catch, so a same-phase stale feed is served and any other cache is not.
+   * The abandoned request is left to settle and is not deduplicated.
+   */
+  private async fetchClarisaProjects(
+    path: string,
+    limitMs?: number,
+  ): Promise<ClarisaProject[]> {
+    const request = this.connection.get<ClarisaProject[]>(path);
+    if (limitMs == null) {
+      return request;
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error('CLARISA cohort load timed out'));
+      }, limitMs);
+    });
+
+    // A late rejection of the abandoned request must not surface unhandled.
+    // Promise.race still observes `request` itself.
+    void request.catch(() => undefined);
+
+    try {
+      return await Promise.race([request, timeout]);
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  private async getCachedAll(
+    phase: number,
+    limitMs?: number,
+  ): Promise<ClarisaProject[]> {
     const now = Date.now();
     if (
       this.cache?.phase === phase &&
@@ -219,9 +312,10 @@ export class ClarisaProjectsService {
       // sent. The cache records that phase: a different phase is a miss, so
       // a year change cannot be served from another year's feed. On upstream
       // error a cached feed is served only when its phase matches; a
-      // mismatch falls through to the cold-cache 503 below.
+      // mismatch falls through to the cold-cache 503 below. A `limitMs`
+      // timeout is the same kind of error: same-phase stale feed, or 503.
       const path = `api/projects?phase=${encodeURIComponent(String(phase))}`;
-      const data = await this.connection.get<ClarisaProject[]>(path);
+      const data = await this.fetchClarisaProjects(path, limitMs);
       this.cache = { data, fetchedAt: now, phase };
 
       let sourceCenterCount = 0;

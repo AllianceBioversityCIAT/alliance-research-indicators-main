@@ -54,5 +54,43 @@
 - **Requirements covered:** R-MFE-007 AC.1–AC.5, R-MFE-008 AC.1–AC.3 (on the scratch shape; Dev at H-1)
 - **Open:** the P-17 done criterion stays unchecked and is carried to H-1.
 - **Running totals vs budget:** tasks 1/6 · LOC +167/−1 tracked plus the new migration (~200) · review rounds 2/8 (parallel lens counts 2)
-- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 10 calls, 69 205 tokens, ended complete · Reviewer B akili-reviewer/opus: not reported by host, ended complete
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 10 calls, 69 205 tokens, ended complete · Reviewer B akili-reviewer/opus 12 calls, 66 313 tokens, ended complete
 - **Gate:** auto-approved (owner's standing direction: continue until FATAL_FAIL / HALT / Pivot / tripwire)
+
+### T-02 — Server: Science Programs rule and `loadBilateralCohort` in `ClarisaProjectsService` — PASS (attempt 1)
+
+- **Date:** 2026-11-17 · **Final status:** PASS (two parallel lens Reviewers, both PASS)
+- **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd` (read from disk; no skill tool on the host) · **Effort:** `grok-4.7-xhigh` (timeout and cache semantics)
+- **Orca:** run `run_674b6b131b1f`, task `task_d4ad6429bee6`, dispatch `ctx_571df61e9fd4`; kept through review, released after PASS
+- **Attempts:** 1
+- **Files changed:**
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.service.ts`
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.service.spec.ts`
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.controller.ts`
+  - `server/researchindicators/src/domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts`
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.ts`
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.spec.ts`
+  - Total +424/−29 (incl. 1 line of Leader bookkeeping)
+- **Tests added:**
+  - `scienceProgramsFor`: default statuses, the `ENV.BILATERAL_ACCEPTED_SP_STATUSES` override, and a precomputed false flag.
+  - Loader: healthy; empty; failing with a cold cache; malformed; never-resolving with a cold cache; same-phase stale (filled by an earlier healthy call); other-phase cache only; no limit.
+  - `list()`: "returns the rows when CLARISA fails (R-MFE-006)".
+- **Falsifiers (observed red, reverted):**
+  - (a) catch only 503 → malformed case `Rejected to value: [TypeError: all.filter is not a function]`.
+  - (b) timeout returns false even with a cache → stale case received `available: false, projects: []`.
+  - (c) accept a cache from another phase → other-phase case received `available: true`.
+- **Implementer verification:** jest clarisa/projects + bilateral-project-mapping → 11 suites / 306 tests passed; eslint clean; build 0.
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** `Test Suites: 11 passed, 11 total` / `Tests: 306 passed, 306 total` · `ESLINT_EXIT:0` · `BUILD_EXIT:0`.
+- **Reviewers (parallel lens, effort xhigh):**
+  - A, conformance + readability/reliability → **PASS**. `scienceProgramsFor` is a line-for-line extraction. No controller or `list()` expectation changed. Every loader row has a test.
+  - B, resilience/concurrency → **PASS**. The timer covers only `connection.get` and is cleared in `finally`. The late rejection is swallowed. The phase check is exact. The fake-timer tests cannot pass vacuously.
+- **Decisions made — execute-time spec edit:** `design.md` §5 "CLARISA notice", paragraph 3. "The abandoned call may still finish and fill the cache" was false against the code: a timed-out call's payload is discarded, and the cache is warmed by `list()`, which has no limit. The sentence was rewritten (amended 2026-11-17). Reviewer B confirmed that no requirement depends on the old sentence: R-MFE-011 and R-MFE-003 AC.3 prescribe the notice for "no answer within 10 s AND no feed cached". Carried as a named conformance check into T-03's Reviewer brief.
+- **ADVISORY (recorded, not actioned):**
+  - **Reliability:** the controller spec mocks `scienceProgramsFor` with a copy of the rule, so the controller tests prove the copy. Fix: delegate the mock to `ClarisaProjectsService.prototype.scienceProgramsFor`.
+  - **Reliability (pre-existing, now reachable through the loader):** `getCachedAll` writes `this.cache` before iterating the data. So a malformed 200 after the TTL overwrites the last good feed, and it stays failed for 5 minutes, for the export and for the picker (500 instead of 503). Not a regression. Fix: an `Array.isArray(data)` check before the cache write.
+  - **Reliability:** no test pins the discard of the late payload.
+  - **Coverage:** two picker-rule edge cases are not pinned: the precomputed flag `true` with no passing mapping, and a project with no `project_mappings_array`.
+- **Requirements covered:** R-MFE-004 (allocations rule), R-MFE-006 (`list()` half), R-MFE-011 AC.1 (loader half) and AC.2 (the limit is a parameter, unset in `list()`)
+- **Running totals vs budget:** tasks 2/6 · LOC ~+590 · review rounds 4/8
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 10 calls, 74 830 tokens, ended complete · Reviewer B akili-reviewer/opus: not reported by host, ended complete
+- **Gate:** auto-approved (owner's standing direction)

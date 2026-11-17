@@ -1334,4 +1334,255 @@ describe('ClarisaProjectsService', () => {
       debugSpy.mockRestore();
     });
   });
+
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-02 / R-MFE-004, DD-7
+  describe('scienceProgramsFor (R-MFE-004, DD-7)', () => {
+    const projectWithPrograms = (): ClarisaProject => ({
+      id: 9,
+      short_name: 'P-SP',
+      source_of_funding: 'Bilateral',
+      project_mappings_array: [
+        {
+          id: 1,
+          project_id: 9,
+          program_id: 20,
+          allocation: 40,
+          status: 'Confirmed',
+          global_unit_object: {
+            id: 20,
+            name: 'Plant Health',
+            smo_code: 'SP01',
+            portfolio_object: { id: 1, acronym: 'P25' },
+          },
+        },
+        {
+          id: 2,
+          project_id: 9,
+          program_id: 21,
+          allocation: 60,
+          status: 'Pending',
+          global_unit_object: {
+            id: 21,
+            name: 'Gender',
+            smo_code: 'SP02',
+            portfolio_object: { id: 1, acronym: 'P25' },
+          },
+        },
+        {
+          id: 3,
+          project_id: 9,
+          program_id: 22,
+          allocation: 10,
+          status: 'Rejected',
+          global_unit_object: {
+            id: 22,
+            name: 'Rejected program',
+            smo_code: 'SP03',
+            portfolio_object: { id: 1, acronym: 'P25' },
+          },
+        },
+        {
+          id: 4,
+          project_id: 9,
+          program_id: 30,
+          allocation: 100,
+          status: 'Confirmed',
+          global_unit_object: {
+            id: 30,
+            name: 'Area of Work 1',
+            smo_code: 'AOW01',
+          },
+        },
+      ],
+    });
+
+    const previousStatuses = process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+
+    afterEach(() => {
+      if (previousStatuses === undefined) {
+        delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      } else {
+        process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = previousStatuses;
+      }
+    });
+
+    it('lists Confirmed and Pending Science Programs and drops every other mapping', () => {
+      delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+
+      expect(service.scienceProgramsFor(projectWithPrograms())).toEqual([
+        {
+          code: 'SP01',
+          name: 'Plant Health',
+          portfolio: 'P25',
+          allocation: 40,
+        },
+        {
+          code: 'SP02',
+          name: 'Gender',
+          portfolio: 'P25',
+          allocation: 60,
+        },
+      ]);
+    });
+
+    it('reads ENV.BILATERAL_ACCEPTED_SP_STATUSES and keeps only those statuses', () => {
+      process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = 'Confirmed';
+
+      expect(service.scienceProgramsFor(projectWithPrograms())).toEqual([
+        {
+          code: 'SP01',
+          name: 'Plant Health',
+          portfolio: 'P25',
+          allocation: 40,
+        },
+      ]);
+
+      process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = 'Pending';
+
+      expect(service.scienceProgramsFor(projectWithPrograms())).toEqual([
+        {
+          code: 'SP02',
+          name: 'Gender',
+          portfolio: 'P25',
+          allocation: 60,
+        },
+      ]);
+    });
+
+    it('returns no programs when the precomputed flag is false', () => {
+      delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      const project = {
+        ...projectWithPrograms(),
+        has_science_programs: false,
+      };
+
+      expect(service.scienceProgramsFor(project)).toEqual([]);
+    });
+  });
+
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-02 / R-MFE-011, DD-12
+  describe('loadBilateralCohort (R-MFE-011)', () => {
+    const cohortLimitMs = 1_000;
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('reports a healthy cohort as available', async () => {
+      connectionGet.mockResolvedValueOnce([
+        bilateralProject(1, 'A'),
+        window3Project(2, 'W'),
+      ]);
+
+      const result = await service.loadBilateralCohort(2026);
+
+      expect(result.available).toBe(true);
+      expect(result.projects.map((project) => project.id)).toEqual([1]);
+      expect(result.projects[0].short_name).toBe('A');
+    });
+
+    it('reports an empty cohort as available', async () => {
+      connectionGet.mockResolvedValueOnce([]);
+
+      await expect(service.loadBilateralCohort(2026)).resolves.toEqual({
+        projects: [],
+        available: true,
+      });
+    });
+
+    it('reports a failing cold cache as unavailable', async () => {
+      connectionGet.mockRejectedValueOnce(new Error('upstream down'));
+
+      await expect(service.loadBilateralCohort(2026)).resolves.toEqual({
+        projects: [],
+        available: false,
+      });
+    });
+
+    it('reports a malformed 200 object as unavailable', async () => {
+      connectionGet.mockResolvedValueOnce({ not: 'an array' });
+
+      await expect(service.loadBilateralCohort(2026)).resolves.toEqual({
+        projects: [],
+        available: false,
+      });
+    });
+
+    it('reports a never-resolving load with no cache as unavailable within the limit', async () => {
+      jest.useFakeTimers();
+      connectionGet.mockImplementation(() => new Promise(() => undefined));
+
+      const pending = service.loadBilateralCohort(2026, cohortLimitMs);
+      await jest.advanceTimersByTimeAsync(cohortLimitMs);
+
+      await expect(pending).resolves.toEqual({
+        projects: [],
+        available: false,
+      });
+      expect(connectionGet).toHaveBeenCalledTimes(1);
+    });
+
+    it('serves the same-phase feed filled by an earlier healthy call when the refresh never resolves', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(1_700_000_000_000);
+      connectionGet.mockResolvedValueOnce([bilateralProject(11, 'Cached')]);
+
+      const warm = await service.loadBilateralCohort(2026);
+      expect(warm).toEqual({
+        projects: [expect.objectContaining({ id: 11, short_name: 'Cached' })],
+        available: true,
+      });
+
+      jest.setSystemTime(1_700_000_000_000 + 10 * 60 * 1000);
+      connectionGet.mockImplementation(() => new Promise(() => undefined));
+
+      const pending = service.loadBilateralCohort(2026, cohortLimitMs);
+      await jest.advanceTimersByTimeAsync(cohortLimitMs);
+
+      await expect(pending).resolves.toEqual({
+        projects: warm.projects,
+        available: true,
+      });
+      expect(connectionGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not serve a cache that belongs to another phase when the load never resolves', async () => {
+      jest.useFakeTimers();
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(21, 'OtherYear'), phase: 2025 },
+      ]);
+
+      const otherYear = await service.loadBilateralCohort(2025);
+      expect(otherYear.available).toBe(true);
+      expect(otherYear.projects.map((project) => project.id)).toEqual([21]);
+
+      connectionGet.mockImplementation(() => new Promise(() => undefined));
+      const pending = service.loadBilateralCohort(2026, cohortLimitMs);
+      await jest.advanceTimersByTimeAsync(cohortLimitMs);
+
+      await expect(pending).resolves.toEqual({
+        projects: [],
+        available: false,
+      });
+      expect(connectionGet).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not time out a load when no limit is passed', async () => {
+      jest.useFakeTimers();
+      connectionGet.mockImplementation(() => new Promise(() => undefined));
+      let settled = false;
+      void service.loadBilateralCohort(2026).then(
+        () => {
+          settled = true;
+        },
+        () => {
+          settled = true;
+        },
+      );
+
+      await jest.advanceTimersByTimeAsync(15_000);
+
+      expect(settled).toBe(false);
+    });
+  });
 });

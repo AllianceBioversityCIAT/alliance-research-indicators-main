@@ -121,7 +121,10 @@ describe('BilateralProjectMappingService', () => {
   ];
 
   const mockClarisaProjectsService = {
-    listBilateralProjects: jest.fn().mockResolvedValue(bilateralFeed),
+    loadBilateralCohort: jest.fn().mockResolvedValue({
+      projects: bilateralFeed,
+      available: true,
+    }),
     findProjectById: jest.fn().mockResolvedValue(null),
   };
 
@@ -140,10 +143,11 @@ describe('BilateralProjectMappingService', () => {
     mockReportingYearResolver.resolve.mockResolvedValue(CURRENT_YEAR);
     mockClarisaProjectsService.findProjectById.mockReset();
     mockClarisaProjectsService.findProjectById.mockResolvedValue(null);
-    mockClarisaProjectsService.listBilateralProjects.mockReset();
-    mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
-      bilateralFeed,
-    );
+    mockClarisaProjectsService.loadBilateralCohort.mockReset();
+    mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+      projects: bilateralFeed,
+      available: true,
+    });
     mockDataSource.transaction.mockReset();
     mockDataSource.transaction.mockImplementation(async (fn) =>
       fn({ getRepository: txGetRepository }),
@@ -611,6 +615,47 @@ describe('BilateralProjectMappingService', () => {
         { reportingYear: CURRENT_YEAR },
       );
       expect(out.items[0].reporting_year).toBe(CURRENT_YEAR);
+    });
+
+    it('returns the rows when CLARISA fails (R-MFE-006)', async () => {
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValueOnce({
+        projects: [],
+        available: false,
+      });
+      const qb = makeQb({
+        getRawAndEntities: async () => ({
+          entities: [
+            {
+              id: 1,
+              agresso_agreement_id: 'A1676',
+              clarisa_project_id: 1403,
+            },
+          ],
+          raw: [{ ac_description: 'Rice-Wheat Initiative' }],
+        }),
+        getCount: async () => 1,
+      });
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qb);
+
+      const out = await service.list({});
+
+      expect(
+        mockClarisaProjectsService.loadBilateralCohort,
+      ).toHaveBeenCalledWith(CURRENT_YEAR);
+      expect(out.items).toEqual([
+        expect.objectContaining({
+          id: 1,
+          agresso_agreement_id: 'A1676',
+          agresso_description: 'Rice-Wheat Initiative',
+          clarisa_project_full_name: null,
+        }),
+      ]);
+      expect(out.meta).toEqual({
+        total: 1,
+        page: 1,
+        limit: 50,
+        totalPages: 1,
+      });
     });
   });
 

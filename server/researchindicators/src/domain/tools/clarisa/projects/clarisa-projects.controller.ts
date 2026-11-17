@@ -11,7 +11,6 @@ import { RolesGuard } from '../../../shared/guards/roles.guard';
 import { QueryParseBool } from '../../../shared/pipes/query-parse-boolean.pipe';
 import { ResponseUtils } from '../../../shared/utils/response.utils';
 import { ClarisaProjectsService } from './clarisa-projects.service';
-import { ClarisaProject } from './dto/clarisa-project.types';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-04 / R-BAS-003, R-BAS-004, R-BAS-006
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.15 / R-BIL-080 (UI)
@@ -101,20 +100,7 @@ export class ClarisaProjectsController {
           phase: p.phase,
           source_center_acronym: p.source_center_acronym,
           has_science_programs: hasSciencePrograms,
-          science_programs: !hasSciencePrograms
-            ? []
-            : (p.project_mappings_array ?? [])
-                .filter((m) =>
-                  this.projectsService.hasSciencePrograms({
-                    project_mappings_array: [m],
-                  } as ClarisaProject),
-                )
-                .map((m) => ({
-                  code: m.global_unit_object?.smo_code,
-                  name: m.global_unit_object?.name,
-                  portfolio: m.global_unit_object?.portfolio_object?.acronym,
-                  allocation: m.allocation,
-                })),
+          science_programs: this.projectsService.scienceProgramsFor(p),
         };
       }),
     });

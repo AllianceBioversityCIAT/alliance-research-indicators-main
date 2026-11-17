@@ -124,10 +124,8 @@ export class BilateralProjectMappingService {
 
     const clarisaNameMap = new Map<number, string>();
     try {
-      const clarisaProjects =
-        await this.clarisaProjectsService.listBilateralProjects({
-          phase: reportingYear,
-        });
+      const { projects: clarisaProjects } =
+        await this.clarisaProjectsService.loadBilateralCohort(reportingYear);
       if (clarisaProjects) {
         for (const cp of clarisaProjects) {
           if (cp.id !== undefined && cp.id !== null) {

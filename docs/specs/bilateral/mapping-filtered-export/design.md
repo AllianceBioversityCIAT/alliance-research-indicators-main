@@ -150,7 +150,7 @@ The audit is written in the service, so every authorized caller of the endpoints
 
 The export passes a 10-second limit, because the CLARISA client has no timeout (P-22). The limit covers only this CLARISA load. Reporting-year resolution and the automapper's database classification run outside it, so a slow database is never reported as a CLARISA failure. When the limit fires and the cache holds a feed for the same phase, that stale feed is returned with `available: true`, the same rule the service applies to an upstream error (P-8). Only a timeout with no same-phase cache reports `available: false`.
 
-The abandoned call may still finish and fill the cache. Calls are not deduplicated, so each retry during a CLARISA hang opens one more pending request. That is accepted: the button blocks repeats in one tab, and the export is a low-volume admin action.
+The abandoned call is left to settle, but its payload is discarded, so a late response never overwrites a newer cache entry. The cache is warmed by `list()`, which has no limit and runs before the export on the same screen (amended 2026-11-17, T-02). Calls are not deduplicated, so each retry during a CLARISA hang opens one more pending request. That is accepted: the button blocks repeats in one tab, and the export is a low-volume admin action.
 
 Pending refactors `resolve()` into a cohort-taking step that `resolve()` itself calls, so the preview keeps its behavior and the export classifies the cohort it already loaded. The NFR-CAM-001 guard runs on that cohort unchanged.
 

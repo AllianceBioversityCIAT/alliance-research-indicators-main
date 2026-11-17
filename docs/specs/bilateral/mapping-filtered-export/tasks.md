@@ -106,7 +106,7 @@ graph TD
 
 ### T-02 — Server: Science Programs rule and `loadBilateralCohort` in `ClarisaProjectsService`
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-MFE-004 (the allocations rule), R-MFE-011 (AC.1 loader half, AC.2), R-MFE-006 (the `list()` half)
 - **Design references:** §2.1 row 6, §5 "CLARISA notice", DD-3, DD-7, DD-11, DD-12, P-7, P-8, P-15, P-21, P-22
 - **Files touched (intended):**
@@ -157,10 +157,10 @@ graph TD
 - **Review:** `full` — shared integration rule, timeout and cache semantics.
 - **Effort:** `xhigh` (concurrency and timeout).
 - **Done criteria:**
-  - [ ] picker response unchanged (existing controller tests green, unchanged)
-  - [ ] every loader row above owned by a passing test; falsifiers (a)–(c) observed red
-  - [ ] `list()` expectations unchanged
-  - [ ] suites green; eslint clean; build green
+  - [x] picker response unchanged (existing controller tests green, unchanged)
+  - [x] every loader row above owned by a passing test; falsifiers (a)–(c) observed red
+  - [x] `list()` expectations unchanged
+  - [x] suites green; eslint clean; build green
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ### T-03 — Server: shared query builder with the user join, and the export methods 5a and 5b
