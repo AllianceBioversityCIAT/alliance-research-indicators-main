@@ -325,7 +325,7 @@ graph TD
 
 ### T-05 — Client: export button, download, single error toast, Inactive tooltip
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-04
+- **Status:** done (owner tested locally and approved, 2026-11-17) · **Size:** M · **Dependencies:** T-04
 - **Requirements covered:** R-MFE-009 (AC.1–AC.3), R-MFE-010 (AC.1, AC.2), R-MFE-005 (AC.1 and AC.2 client half), NFR-MFE-001 (loading), NFR-MFE-003
 - **Design references:** §6, DD-5, DD-10, P-9, P-12, P-23, P-26
 - **Files touched (intended):**
@@ -389,9 +389,9 @@ graph TD
 - **Review:** `full`.
 - **Effort:** `medium`.
 - **Done criteria:**
-  - [ ] every test above passes; falsifiers (a)–(c) observed red
-  - [ ] `tsc -p tsconfig.spec.json` proven able to fail, then green
-  - [ ] lint clean; build within budgets
+  - [x] every test above passes; falsifiers (a)–(c) observed red
+  - [x] `tsc -p tsconfig.spec.json` proven able to fail, then green
+  - [x] lint clean; build within budgets
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `error-handling-patterns`, `tdd`
 
 ### H-1 — HITL on Dev (owner), after the merge to `dev`

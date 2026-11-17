@@ -213,6 +213,41 @@ export class ToPromiseService {
     );
   };
 
+  /**
+   * Same request as `getBlob`, but keeps the response headers.
+   * `getBlob` drops them, so a caller that needs `Content-Disposition` uses this.
+   */
+  getBlobResponse = (url: string, config?: Config): Promise<{ blob: Blob; headers: HttpHeaders }> => {
+    let headers = new HttpHeaders();
+
+    if (config?.useResultInterceptor) {
+      headers = headers.set('X-Use-Year', 'true');
+    }
+    if (config?.platform) {
+      headers = headers.set('X-Platform', config.platform);
+    }
+    if (config?.noAuthInterceptor) {
+      headers = headers.set('no-auth-interceptor', 'true');
+    }
+
+    headers = this.applyAuthMarker(headers, config);
+
+    const fullUrl = this.getEnv(config?.isAuth) + url;
+
+    return firstValueFrom(
+      this.http.get(fullUrl, {
+        headers,
+        params: config?.params,
+        responseType: 'blob',
+        observe: 'response',
+        ...(config?.noCache && { cache: 'no-store' })
+      })
+    ).then(response => ({
+      blob: response.body ?? new Blob(),
+      headers: response.headers
+    }));
+  };
+
   getWithParams = <T>(url: string, params?: Record<string, string>, config?: Config) => {
     return this.TP(this.http.get<T>(this.getEnv(config?.isAuth) + url, { params }), config?.loadingTrigger);
   };

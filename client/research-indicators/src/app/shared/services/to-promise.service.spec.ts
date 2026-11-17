@@ -1,5 +1,5 @@
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
-import { HttpClient, HttpHeaders, HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams, HttpResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -393,6 +393,37 @@ describe('ToPromiseService', () => {
       await service.getBlob('/test-url');
       const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
       expect(headers.has('X-Ari-Auth-Call')).toBe(false);
+    });
+  });
+
+  describe('getBlobResponse', () => {
+    it('returns the blob and the response headers', async () => {
+      const mockBlob = new Blob(['sheet'], { type: 'application/vnd.ms-excel' });
+      const responseHeaders = new HttpHeaders({ 'Content-Disposition': 'attachment; filename="From_Server.xlsx"' });
+      httpClientMock.get = jest.fn().mockReturnValue(of(new HttpResponse({ body: mockBlob, headers: responseHeaders })));
+
+      const res = await service.getBlobResponse('/test-url', { params: new HttpParams().set('status', 'inactive') });
+
+      expect(res.blob).toBe(mockBlob);
+      expect(res.headers.get('Content-Disposition')).toBe('attachment; filename="From_Server.xlsx"');
+      const options = (httpClientMock.get as jest.Mock).mock.calls[0][1];
+      expect(options.responseType).toBe('blob');
+      expect(options.observe).toBe('response');
+      expect(options.params.get('status')).toBe('inactive');
+    });
+
+    it('returns an empty blob when the response body is null', async () => {
+      httpClientMock.get = jest.fn().mockReturnValue(of(new HttpResponse({ body: null })));
+
+      const res = await service.getBlobResponse('/test-url');
+
+      expect(res.blob.size).toBe(0);
+    });
+
+    it('rejects when the request fails', async () => {
+      httpClientMock.get = jest.fn().mockReturnValue(throwError(() => new Error('Blob fetch failed')));
+
+      await expect(service.getBlobResponse('/test-url')).rejects.toThrow('Blob fetch failed');
     });
   });
 

@@ -15,6 +15,9 @@ import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
+import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { formatUtcWithConfig } from '@shared/utils/date-format.util';
+import { downloadBlob } from '../../../my-pi-delegates/utils/pi-delegates-export.util';
 import { ActionsService } from '@services/actions.service';
 import { ClarityService } from '@services/clarity.service';
 import {
@@ -101,6 +104,7 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   private readonly service = inject(BilateralMappingService);
   private readonly actions = inject(ActionsService);
   private readonly clarity = inject(ClarityService);
+  private readonly dateFormatConfig = inject(DateFormatConfigService);
   private readonly destroy$ = new Subject<void>();
   private readonly searchInput$ = new Subject<string>();
   /** Debounced AGRESSO filter stream — pushes a server search on each keystroke. */
@@ -113,6 +117,8 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   readonly meta = signal<BilateralMappingListMeta | null>(null);
   readonly loading = signal(true);
   readonly loadError = signal(false);
+  /** True while an Excel export request is in flight. Drives the button loading and disabled state. */
+  readonly exporting = signal(false);
 
   // --- Filter / pagination / sort state (R-BTE-003, R-BTE-004) ---
   readonly search = signal('');
@@ -312,6 +318,22 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Tooltip for an Inactive row. Lists only the values that exist:
+   * justification, user name, and status-change date. No empty labels.
+   */
+  statusChangeTooltip(row: BilateralProjectMapping): string {
+    const parts: string[] = [];
+    const justification = row.status_justification?.trim();
+    if (justification) parts.push(`Justification: ${justification}`);
+    const user = row.status_changed_by_name?.trim();
+    if (user) parts.push(`User: ${user}`);
+    const changedAt = row.status_changed_at?.trim();
+    const formattedDate = changedAt ? formatUtcWithConfig(changedAt, this.dateFormatConfig.config()) : null;
+    if (formattedDate) parts.push(`Date: ${formattedDate}`);
+    return parts.join('\n');
+  }
+
   /** Human-readable source label for display in the table badge. */
   sourceLabel(source: BilateralMappingSource): string {
     switch (source) {
@@ -349,6 +371,65 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   onAutomapperApplied(): void {
     void this.load();
     void this.coverageComponent()?.loadCoverage();
+  }
+
+  /**
+   * Exports the rows that match the filters on screen at press time.
+   * "All" and a blank search are omitted. A second press while one is running does nothing.
+   */
+  async exportToExcel(): Promise<void> {
+    if (this.exporting()) return;
+    this.exporting.set(true);
+    try {
+      const search = this.search().trim();
+      const status = this.statusFilter();
+      const source = this.sourceFilter();
+      const result = await this.service.exportXlsx({
+        ...(search ? { search } : {}),
+        ...(status !== 'all' ? { status } : {}),
+        ...(source !== 'all' ? { source } : {})
+      });
+      if (!result.ok) {
+        this.actions.showToast({
+          severity: 'error',
+          summary: 'Error',
+          detail: result.message
+        });
+        return;
+      }
+      const fileName = this.fileNameFromContentDisposition(result.data.headers?.get('Content-Disposition') ?? null) ?? this.fallbackExportFileName();
+      downloadBlob(result.data.blob, fileName);
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
+  /** Quoted `filename`, or `filename*`. Null when the header does not carry a name. */
+  private fileNameFromContentDisposition(header: string | null): string | null {
+    if (!header) return null;
+    const encoded = /filename\*\s*=\s*(?:UTF-8''|utf-8'')?([^;]+)/i.exec(header);
+    if (encoded?.[1]) {
+      const raw = encoded[1].trim().replace(/^["']|["']$/g, '');
+      if (raw) {
+        try {
+          return decodeURIComponent(raw);
+        } catch {
+          return raw;
+        }
+      }
+    }
+    const quoted = /filename\s*=\s*"([^"]+)"/i.exec(header);
+    if (quoted?.[1]) return quoted[1];
+    const plain = /filename\s*=\s*([^;]+)/i.exec(header);
+    const value = plain?.[1]?.trim().replace(/^["']|["']$/g, '');
+    return value || null;
+  }
+
+  /** `Bilateral_Mapping_<year>_<yyyymmdd>.xlsx` in UTC. The year is dropped only when it is null. */
+  private fallbackExportFileName(now = new Date()): string {
+    const yyyymmdd = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
+    const year = this.reportingYear();
+    return year == null ? `Bilateral_Mapping_${yyyymmdd}.xlsx` : `Bilateral_Mapping_${year}_${yyyymmdd}.xlsx`;
   }
 
   // ── Dialog / form (T-BIL-CAM-05) ──────────────────────────────────────────

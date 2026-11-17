@@ -16,6 +16,12 @@ export interface BilateralProjectMapping {
   notes?: string | null;
   /** Last inactivation reason. Null until the mapping has been inactivated. */
   status_justification?: string | null;
+  /** User id of the last status change. Absent on responses that predate the column. */
+  status_changed_by?: number | null;
+  /** Timestamp of the last status change. */
+  status_changed_at?: string | null;
+  /** Display name of `status_changed_by`, present on the list. */
+  status_changed_by_name?: string | null;
   is_active: boolean;
   mapping_status?: MappingStatus;
   created_at: string;

@@ -1,12 +1,29 @@
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05, T-BIL-CAM-06)
 // @sdd-spec docs/specs/bilateral/mapping-status-in-edit-modal (T-03 / R-MSE-001..004)
+jest.mock('../../../my-pi-delegates/utils/pi-delegates-export.util', () => ({
+  downloadBlob: jest.fn()
+}));
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
+import { HttpHeaders, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router } from '@angular/router';
+import { Tooltip } from 'primeng/tooltip';
 import BilateralMappingComponent from './bilateral-mapping.component';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
 import { ActionsService } from '@services/actions.service';
 import { ClarityService } from '@services/clarity.service';
+import { ApiService } from '@services/api.service';
+import { ToPromiseService } from '@services/to-promise.service';
+import { CacheService } from '@services/cache/cache.service';
+import { ControlListCacheService } from '@services/control-list-cache.service';
+import { SignalEndpointService } from '@services/signal-endpoint.service';
+import { ImpersonationService } from '@services/impersonation.service';
+import { httpErrorInterceptor } from '@interceptors/http-error.interceptor';
+import { downloadBlob } from '../../../my-pi-delegates/utils/pi-delegates-export.util';
 import {
   BilateralMappingListPage,
   BilateralProjectMapping,
@@ -14,6 +31,8 @@ import {
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
 import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { mockBilateralMapping, mockBilateralMappingListPage } from 'src/app/testing/bilateral-project-mapping.fixture';
+import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { DateFormatJsonValue } from '@shared/interfaces/date-format-config.interface';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +88,11 @@ function delayMs(ms = 0): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function exportButton(root: HTMLElement): HTMLButtonElement {
+  const host = root.querySelector('[data-testid="header-export-btn"]');
+  return (host?.querySelector('button') ?? host) as HTMLButtonElement;
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('BilateralMappingComponent', () => {
@@ -85,9 +109,11 @@ describe('BilateralMappingComponent', () => {
     getCoverage: jest.Mock;
     previewAutoMap: jest.Mock;
     applyAutoMap: jest.Mock;
+    exportXlsx: jest.Mock;
   };
   let mockActions: { showToast: jest.Mock; showGlobalAlert: jest.Mock };
   let mockClarity: { trackEvent: jest.Mock };
+  let dateFormatConfig: { config: ReturnType<typeof signal<DateFormatJsonValue | null>> };
 
   beforeEach(async () => {
     jest.setTimeout(15000);
@@ -101,10 +127,15 @@ describe('BilateralMappingComponent', () => {
       loadClarisaProjectOptions: jest.fn().mockResolvedValue(CLARISA_OPTIONS),
       getCoverage: jest.fn().mockResolvedValue({ mapped: 4, pending: 194, reachable: 198 }),
       previewAutoMap: jest.fn().mockResolvedValue(null),
-      applyAutoMap: jest.fn().mockResolvedValue({ ok: true, data: null })
+      applyAutoMap: jest.fn().mockResolvedValue({ ok: true, data: null }),
+      exportXlsx: jest.fn().mockResolvedValue({
+        ok: true,
+        data: { blob: new Blob(['xlsx']), headers: new HttpHeaders() }
+      })
     };
     mockActions = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
     mockClarity = { trackEvent: jest.fn() };
+    dateFormatConfig = { config: signal<DateFormatJsonValue | null>(null) };
 
     await TestBed.configureTestingModule({
       imports: [BilateralMappingComponent],
@@ -112,7 +143,8 @@ describe('BilateralMappingComponent', () => {
         provideNoopAnimations(),
         { provide: BilateralMappingService, useValue: mockService },
         { provide: ActionsService, useValue: mockActions },
-        { provide: ClarityService, useValue: mockClarity }
+        { provide: ClarityService, useValue: mockClarity },
+        { provide: DateFormatConfigService, useValue: dateFormatConfig }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -2398,5 +2430,420 @@ describe('BilateralMappingComponent', () => {
     expect(badge?.textContent?.trim()).toBe('2027');
     expect(readHelp()).toContain('2027');
     expect(readHelp()).not.toContain('Phase 2026');
+  });
+
+  // ── R-MFE-009: Export to Excel ────────────────────────────────────────────
+
+  async function buildPage(): Promise<void> {
+    mockService.list.mockResolvedValue(makePage([]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+  }
+
+  it('sends the Search, Status and Source changed after the page is built, and omits all (R-MFE-009 AC.1)', async () => {
+    await buildPage();
+    expect(component.search()).toBe('');
+    expect(component.statusFilter()).toBe('all');
+    expect(component.sourceFilter()).toBe('all');
+
+    component.search.set('rice systems');
+    component.statusFilter.set('inactive');
+    component.sourceFilter.set('DERIVED');
+    await component.exportToExcel();
+
+    expect(mockService.exportXlsx).toHaveBeenCalledTimes(1);
+    expect(mockService.exportXlsx).toHaveBeenCalledWith({
+      search: 'rice systems',
+      status: 'inactive',
+      source: 'DERIVED'
+    });
+
+    mockService.exportXlsx.mockClear();
+    component.search.set('   ');
+    component.statusFilter.set('all');
+    component.sourceFilter.set('all');
+    await component.exportToExcel();
+
+    expect(mockService.exportXlsx).toHaveBeenCalledTimes(1);
+    expect(mockService.exportXlsx).toHaveBeenCalledWith({});
+  });
+
+  it('starts one export when the button is pressed twice while the first is pending (R-MFE-009 AC.2)', async () => {
+    await buildPage();
+    let resolveExport: (value: unknown) => void = () => undefined;
+    mockService.exportXlsx.mockReturnValue(
+      new Promise(resolve => {
+        resolveExport = resolve;
+      })
+    );
+
+    const first = component.exportToExcel();
+    const second = component.exportToExcel();
+    expect(mockService.exportXlsx).toHaveBeenCalledTimes(1);
+    expect(component.exporting()).toBe(true);
+
+    fixture.detectChanges();
+    const button = exportButton(fixture.nativeElement);
+    expect(button.disabled).toBe(true);
+
+    resolveExport({
+      ok: true,
+      data: { blob: new Blob(['x']), headers: new HttpHeaders() }
+    });
+    await first;
+    await second;
+    expect(mockService.exportXlsx).toHaveBeenCalledTimes(1);
+    expect(component.exporting()).toBe(false);
+  });
+
+  it('downloads the name from Content-Disposition, and falls back in UTC with and without the year (R-MFE-005)', async () => {
+    await buildPage();
+
+    mockService.exportXlsx.mockResolvedValue({
+      ok: true,
+      data: {
+        blob: new Blob(['server']),
+        headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="From_Server.xlsx"' })
+      }
+    });
+    await component.exportToExcel();
+    expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'From_Server.xlsx');
+
+    jest.useFakeTimers({ doNotFake: ['setTimeout', 'setInterval', 'queueMicrotask', 'nextTick'] });
+    jest.setSystemTime(new Date('2026-10-20T02:30:00.000Z'));
+    try {
+      (downloadBlob as jest.Mock).mockClear();
+      component.reportingYear.set(2026);
+      mockService.exportXlsx.mockResolvedValue({
+        ok: true,
+        data: { blob: new Blob(['fallback']), headers: new HttpHeaders() }
+      });
+      await component.exportToExcel();
+      expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'Bilateral_Mapping_2026_20261020.xlsx');
+
+      (downloadBlob as jest.Mock).mockClear();
+      component.reportingYear.set(null);
+      await component.exportToExcel();
+      expect(downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'Bilateral_Mapping_20261020.xlsx');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('places an outlined Export to Excel button to the left of Auto-map', async () => {
+    await buildPage();
+    const root: HTMLElement = fixture.nativeElement;
+    const exportHost = root.querySelector('[data-testid="header-export-btn"]') as HTMLElement;
+    const autoMapHost = root.querySelector('[data-testid="header-automap-btn"]') as HTMLElement;
+    const exportBtn = exportButton(root);
+    expect(exportHost).not.toBeNull();
+    expect(exportBtn.textContent).toContain('Export to Excel');
+    expect(exportBtn.className).toContain('p-button-outlined');
+    expect(exportBtn.getAttribute('aria-label')).toBe('Export to Excel');
+    expect(exportHost.compareDocumentPosition(autoMapHost) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  // ── R-MFE-010: Inactive badge tooltip ─────────────────────────────────────
+
+  it('shows the status-change icon only on Inactive rows, with a name and tabindex (R-MFE-010 AC.1 AC.2)', async () => {
+    mockService.list.mockResolvedValue(
+      makePage([
+        makeRow({ id: 1, mapping_status: 'Mapped', is_active: true }),
+        makeRow({ id: 2, mapping_status: 'Pending', is_active: true, source: 'UNMAPPED' }),
+        makeRow({ id: 3, mapping_status: 'Inactive', is_active: false })
+      ])
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const icons = fixture.nativeElement.querySelectorAll('[data-testid="inactive-status-help"]');
+    expect(icons.length).toBe(1);
+    expect(icons[0].getAttribute('tabindex')).toBe('0');
+    expect(icons[0].getAttribute('aria-label')).toBe('Last status change');
+    expect(icons[0].className).toContain('pi-question-circle');
+
+    const tooltip = fixture.debugElement.query(By.css('[data-testid="inactive-status-help"]')).injector.get(Tooltip);
+    expect(tooltip.tooltipEvent).toBe('both');
+    expect(tooltip.escape).toBe(true);
+  });
+
+  it('lists every status-change value when all three exist, and only the present ones otherwise (R-MFE-010)', async () => {
+    const full = makeRow({
+      id: 3,
+      mapping_status: 'Inactive',
+      is_active: false,
+      status_justification: 'Contract closed',
+      status_changed_by: 9,
+      status_changed_by_name: 'Ada Lovelace',
+      status_changed_at: '2019-06-01T00:00:00.000Z'
+    });
+    mockService.list.mockResolvedValue(makePage([full]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const fullText = 'Justification: Contract closed\nUser: Ada Lovelace\nDate: 01/06/2019 at 12:00 am (UTC)';
+    const tooltip = fixture.debugElement.query(By.css('[data-testid="inactive-status-help"]')).injector.get(Tooltip);
+    expect(tooltip.content).toBe(fullText);
+    expect(component.statusChangeTooltip(full)).toBe(fullText);
+
+    const partial = makeRow({
+      id: 4,
+      mapping_status: 'Inactive',
+      is_active: false,
+      status_justification: null,
+      status_changed_by: null,
+      status_changed_by_name: null,
+      status_changed_at: '2019-06-01T00:00:00.000Z'
+    });
+    component.rows.set([partial]);
+    fixture.detectChanges();
+    const partialText = 'Date: 01/06/2019 at 12:00 am (UTC)';
+    const partialTooltip = fixture.debugElement.query(By.css('[data-testid="inactive-status-help"]')).injector.get(Tooltip);
+    expect(partialTooltip.content).toBe(partialText);
+    expect(partialText).not.toContain('null');
+    expect(partialText).not.toContain('undefined');
+    expect(partialText).not.toContain('User:');
+    expect(partialText).not.toContain('Justification:');
+  });
+
+  /** Seeded `date-format` app_config shape (locale en-US, Europe/Paris, DMY, AUTO_TZ_ABBR). */
+  const APP_DATE_FORMAT: DateFormatJsonValue = {
+    locale: 'en-US',
+    timezone: { iana: 'Europe/Paris', displayName: 'CET', abbreviationMode: 'AUTO' },
+    date: {
+      style: 'numeric',
+      order: 'DMY',
+      separator: '/',
+      twoDigitDay: true,
+      twoDigitMonth: true,
+      fourDigitYear: true,
+      monthName: { enabled: false, format: 'long', uppercase: true }
+    },
+    time: { hour12: true, twoDigitMinute: true },
+    display: {
+      order: 'DATE_TIME',
+      separator: ' at ',
+      suffix: { enabled: true, style: 'AUTO_TZ_ABBR', fallback: 'CET', wrap: 'PAREN' }
+    }
+  };
+
+  it('formats the Inactive tooltip date with the configured date format (R-MFE-010)', async () => {
+    dateFormatConfig.config.set(APP_DATE_FORMAT);
+    const full = makeRow({
+      id: 3,
+      mapping_status: 'Inactive',
+      is_active: false,
+      status_justification: 'Contract closed',
+      status_changed_by: 9,
+      status_changed_by_name: 'Ada Lovelace',
+      status_changed_at: '2019-06-01T00:00:00.000Z'
+    });
+    mockService.list.mockResolvedValue(makePage([full]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const fullText = 'Justification: Contract closed\nUser: Ada Lovelace\nDate: 01/06/2019 at 2:00 AM (CEST)';
+    const tooltip = fixture.debugElement.query(By.css('[data-testid="inactive-status-help"]')).injector.get(Tooltip);
+    expect(tooltip.content).toBe(fullText);
+    expect(component.statusChangeTooltip(full)).toBe(fullText);
+  });
+
+  it('falls back to the UTC display when the date-format config is null (R-MFE-010)', async () => {
+    dateFormatConfig.config.set(null);
+    const full = makeRow({
+      id: 3,
+      mapping_status: 'Inactive',
+      is_active: false,
+      status_justification: 'Contract closed',
+      status_changed_by_name: 'Ada Lovelace',
+      status_changed_at: '2019-06-01T00:00:00.000Z'
+    });
+    mockService.list.mockResolvedValue(makePage([full]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const fullText = 'Justification: Contract closed\nUser: Ada Lovelace\nDate: 01/06/2019 at 12:00 am (UTC)';
+    const tooltip = fixture.debugElement.query(By.css('[data-testid="inactive-status-help"]')).injector.get(Tooltip);
+    expect(tooltip.content).toBe(fullText);
+    expect(fullText).not.toContain('2019-06-01T00:00:00.000Z');
+  });
+
+  it('omits the Date line when the timestamp cannot be formatted (R-MFE-010 partial data)', async () => {
+    dateFormatConfig.config.set(APP_DATE_FORMAT);
+    const row = makeRow({
+      id: 5,
+      mapping_status: 'Inactive',
+      is_active: false,
+      status_justification: 'Contract closed',
+      status_changed_by_name: null,
+      status_changed_at: 'not-a-date'
+    });
+    mockService.list.mockResolvedValue(makePage([row]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const tooltip = fixture.debugElement.query(By.css('[data-testid="inactive-status-help"]')).injector.get(Tooltip);
+    expect(tooltip.content).toBe('Justification: Contract closed');
+    expect(tooltip.content).not.toContain('Date:');
+  });
+});
+
+describe('Bilateral mapping export toasts through the real interceptor (R-MFE-009 AC.3)', () => {
+  let fixture: ComponentFixture<BilateralMappingComponent>;
+  let component: BilateralMappingComponent;
+  let http: HttpTestingController;
+  let actions: { showToast: jest.Mock; showGlobalAlert: jest.Mock };
+
+  const envelopeBlob = (body: unknown): Blob => new Blob([JSON.stringify(body)], { type: 'application/json' });
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+    actions = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
+    await TestBed.configureTestingModule({
+      imports: [BilateralMappingComponent],
+      providers: [
+        provideNoopAnimations(),
+        provideHttpClient(withInterceptors([httpErrorInterceptor])),
+        provideHttpClientTesting(),
+        BilateralMappingService,
+        ApiService,
+        ToPromiseService,
+        { provide: ActionsService, useValue: actions },
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: CacheService,
+          useValue: {
+            isLoggedIn: jest.fn().mockReturnValue(true),
+            dataCache: jest.fn().mockReturnValue({
+              user: { sec_user_id: 1, first_name: 'Ada', last_name: 'Lovelace', email: 'ada@test.com' }
+            }),
+            currentResultIsLoading: signal(false),
+            greenChecks: signal({}),
+            currentResultId: jest.fn().mockReturnValue(null),
+            getCurrentNumericResultId: jest.fn().mockReturnValue(0)
+          }
+        },
+        { provide: ControlListCacheService, useValue: {} },
+        { provide: SignalEndpointService, useValue: { createEndpoint: () => ({ get: jest.fn(), post: jest.fn() }) } },
+        { provide: Router, useValue: { url: '/platform/administration/bilateral-mapping' } },
+        { provide: ImpersonationService, useValue: { active: jest.fn().mockReturnValue(false), end: jest.fn() } }
+      ],
+      schemas: [NO_ERRORS_SCHEMA]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(BilateralMappingComponent);
+    component = fixture.componentInstance;
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    for (const req of http.match(() => true)) {
+      if (req.request.responseType === 'blob') {
+        req.flush(new Blob(['{}']));
+      } else {
+        req.flush({});
+      }
+    }
+    http.verify();
+  });
+
+  async function ready(): Promise<void> {
+    fixture.detectChanges();
+    const initial = http.match(req => !req.url.includes('reports/bilateralMapping/xlsx'));
+    for (const req of initial) {
+      if (req.request.url.includes('coverage')) {
+        req.flush({
+          data: { reporting_year: 2026, mapped: 1, pending: 0, inactive: 0, reachable: 1 },
+          status: 200,
+          description: 'ok',
+          timestamp: '',
+          path: ''
+        });
+      } else {
+        req.flush({
+          data: { items: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } },
+          status: 200,
+          description: 'ok',
+          timestamp: '',
+          path: ''
+        });
+      }
+    }
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  async function failExport(body: Blob): Promise<void> {
+    const pending = component.exportToExcel();
+    const exportReq = http.expectOne(req => req.url.includes('reports/bilateralMapping/xlsx'));
+    exportReq.flush(body, { status: 400, statusText: 'Bad Request' });
+    for (const req of http.match(req => req.url.includes('workers.dev'))) {
+      req.flush({});
+    }
+    await pending;
+    fixture.detectChanges();
+  }
+
+  it('shows exactly one toast with the string errors from the Blob envelope, and resets the button', async () => {
+    await ready();
+    await failExport(
+      envelopeBlob({
+        description: 'BadRequestException',
+        status: 400,
+        errors: 'Search is not valid',
+        timestamp: 't',
+        path: '/api/reports/bilateralMapping/xlsx'
+      })
+    );
+
+    expect(actions.showToast).toHaveBeenCalledTimes(1);
+    expect(actions.showToast).toHaveBeenCalledWith({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Search is not valid'
+    });
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(component.exporting()).toBe(false);
+    expect(exportButton(fixture.nativeElement).disabled).toBe(false);
+  });
+
+  it('shows exactly one toast with the errors array joined, not the exception class name', async () => {
+    await ready();
+    await failExport(
+      envelopeBlob({
+        description: 'UnprocessableEntityException',
+        status: 422,
+        errors: ['Quota exceeded', 'Year is closed'],
+        timestamp: 't',
+        path: '/api/reports/bilateralMapping/xlsx'
+      })
+    );
+
+    expect(actions.showToast).toHaveBeenCalledTimes(1);
+    expect(actions.showToast.mock.calls[0][0].detail).toBe('Quota exceeded, Year is closed');
+  });
+
+  it('shows the fallback toast when the error body is not JSON, and resets the button', async () => {
+    await ready();
+    await failExport(new Blob(['<html>nope</html>'], { type: 'text/html' }));
+
+    expect(actions.showToast).toHaveBeenCalledTimes(1);
+    expect(actions.showToast).toHaveBeenCalledWith({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'The export could not be downloaded. Please try again.'
+    });
+    expect(component.exporting()).toBe(false);
   });
 });
