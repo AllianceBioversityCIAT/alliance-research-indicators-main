@@ -1,4 +1,10 @@
 @let list = this.selectedOptions();
+<ng-template #inactiveTag>
+  <span class="multiselect-inactive-tag" data-testid="multiselect-inactive-tag"
+    pTooltip="This option is no longer active. It stays only because it was already selected." tooltipPosition="top">
+    Inactive<span class="sr-only">: no longer available for new selections</span>
+  </span>
+</ng-template>
 <div class="input-container">
   @if (label) {
   <label class="label inline-block flex items-center" for="username">{{ label }}
@@ -77,6 +83,9 @@
           </div>
           }
           }
+          @if (item?.is_catalog_inactive) {
+          <ng-container *ngTemplateOutlet="inactiveTag"></ng-container>
+          }
         </div>
       </ng-template>
       }
@@ -116,6 +125,9 @@
       <div class="selected-row-main">
         <ng-container *ngTemplateOutlet="rows || defaultTemplate; context: { $implicit: row }"></ng-container>
       </div>
+      @if (row?.is_catalog_inactive) {
+      <ng-container *ngTemplateOutlet="inactiveTag"></ng-container>
+      }
       @if (!hideRemoveIcon) {
       @if (removeCondition(row) && !this.disabled) {
       @if (!row.disabled) {
