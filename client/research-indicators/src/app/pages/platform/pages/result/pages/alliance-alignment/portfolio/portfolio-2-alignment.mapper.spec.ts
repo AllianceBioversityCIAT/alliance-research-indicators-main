@@ -330,6 +330,27 @@ describe('portfolio-2-alignment.mapper', () => {
     });
   });
 
+  it('sends the "Other" team name and the primary flag of each Research Area', () => {
+    const body: GetAllianceAlignment = {
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: [],
+      research_areas: [
+        { id: 18, lever_id: 18, is_primary: true, custom_lever_name: '  ImpactSF  ' } as never,
+        { id: 12, lever_id: 12, is_primary: 0, custom_lever_name: 'ignored' } as never,
+        { id: 7, lever_id: 7 } as never
+      ],
+      strategic_objectives: []
+    };
+
+    expect(buildPortfolio2AlignmentPatch(body, false).research_areas).toEqual([
+      { lever_id: '18', is_primary: true, custom_lever_name: 'ImpactSF' },
+      { lever_id: '12', is_primary: false },
+      { lever_id: '7' }
+    ]);
+  });
+
   it('omits impact_outcomes when indicator does not use them', () => {
     const body: GetAllianceAlignment = {
       contracts: [],
