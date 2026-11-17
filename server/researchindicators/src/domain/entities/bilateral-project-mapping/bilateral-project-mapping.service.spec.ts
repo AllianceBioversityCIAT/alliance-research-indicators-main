@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { join } from 'path';
+import { DataSource, SelectQueryBuilder } from 'typeorm';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
 import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
@@ -49,6 +51,7 @@ describe('BilateralProjectMappingService', () => {
     qb.leftJoin = jest.fn().mockReturnValue(qb);
     qb.addSelect = jest.fn().mockReturnValue(qb);
     qb.orderBy = jest.fn().mockReturnValue(qb);
+    qb.addOrderBy = jest.fn().mockReturnValue(qb);
     qb.skip = jest.fn().mockReturnValue(qb);
     qb.take = jest.fn().mockReturnValue(qb);
     qb.andWhere = jest.fn().mockReturnValue(qb);
@@ -126,6 +129,18 @@ describe('BilateralProjectMappingService', () => {
       available: true,
     }),
     findProjectById: jest.fn().mockResolvedValue(null),
+    hasSciencePrograms(project: ClarisaProject) {
+      return ClarisaProjectsService.prototype.hasSciencePrograms.call(
+        mockClarisaProjectsService as unknown as ClarisaProjectsService,
+        project,
+      );
+    },
+    scienceProgramsFor(project: ClarisaProject) {
+      return ClarisaProjectsService.prototype.scienceProgramsFor.call(
+        mockClarisaProjectsService as unknown as ClarisaProjectsService,
+        project,
+      );
+    },
   };
 
   const mockReportingYearResolver = {
@@ -1379,6 +1394,630 @@ describe('BilateralProjectMappingService', () => {
       await expect(service.findById(8)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  // Real TypeORM query builder, metadata only: DataSource is not initialize()'d
+  // and never opens a connection. A mocked builder cannot show AND/OR precedence.
+  describe('shared filter SQL (R-MFE-006 AC.1)', () => {
+    let dataSource: DataSource;
+
+    beforeAll(async () => {
+      const domain = join(__dirname, '../..');
+      dataSource = new DataSource({
+        type: 'mysql',
+        host: '127.0.0.1',
+        port: 3306,
+        username: 'sql-shape',
+        password: 'sql-shape',
+        database: 'sql_shape',
+        entities: [join(domain, '**/*.entity{.ts,.js}')],
+        synchronize: false,
+      });
+      await (
+        dataSource as unknown as { buildMetadatas(): Promise<void> }
+      ).buildMetadatas();
+    }, 60_000);
+
+    afterAll(async () => {
+      if (dataSource?.isInitialized) {
+        await dataSource.destroy();
+      }
+    });
+
+    const captureSql = (
+      qb: SelectQueryBuilder<BilateralProjectMapping>,
+    ): { sql: string } => {
+      const captured = { sql: '' };
+      qb.getRawAndEntities = jest.fn(async () => {
+        captured.sql = qb.getQuery();
+        return { entities: [], raw: [] };
+      }) as typeof qb.getRawAndEntities;
+      qb.getCount = jest.fn(async () => 0) as typeof qb.getCount;
+      return captured;
+    };
+
+    // TypeORM quotes identifiers. The parentheses are what keep the ORs
+    // from escaping `is_active` and `source` (AND binds tighter than OR).
+    const groupedSearch =
+      '(`bpm`.`agresso_agreement_id` LIKE :s OR `bpm`.`clarisa_project_short_name` LIKE :s OR `ac`.`description` LIKE :s OR `ac`.`projectDescription` LIKE :s)';
+
+    it('keeps the search OR inside parentheses when combined with status and source', async () => {
+      const qb = dataSource
+        .getRepository(BilateralProjectMapping)
+        .createQueryBuilder('bpm');
+      const captured = captureSql(qb);
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qb);
+
+      await service.list({
+        search: 'Rice',
+        status: 'mapped',
+        source: MappingSourceEnum.MANUAL,
+      });
+
+      const sql = captured.sql;
+      expect(sql).toContain(groupedSearch);
+      const outside = sql.replace(groupedSearch, '');
+      expect(outside).not.toMatch(/\bOR\b/);
+      expect(outside).toContain('`bpm`.`is_active` = :is_active');
+      expect(outside).toContain('`bpm`.`source` = :source');
+      expect(sql).toContain(
+        'LEFT JOIN `sec_users` `su` ON `su`.`sec_user_id` = `bpm`.`status_changed_by`',
+      );
+      expect(sql).toContain(
+        "NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(`su`.`first_name`), ''), NULLIF(TRIM(`su`.`last_name`), ''))), '')",
+      );
+      expect(sql).toContain('AS `status_changed_by_name`');
+      expect(sql).toMatch(
+        /ORDER BY `bpm`\.`updated_at` DESC, `bpm`\.`id` DESC/,
+      );
+    });
+
+    it('export SQL uses the same grouped search and does not page', async () => {
+      const qb = dataSource
+        .getRepository(BilateralProjectMapping)
+        .createQueryBuilder('bpm');
+      const captured = captureSql(qb);
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qb);
+
+      await service.exportMappings({
+        search: 'Rice',
+        status: 'inactive',
+        source: MappingSourceEnum.DERIVED,
+      });
+
+      const sql = captured.sql;
+      expect(sql).toContain(groupedSearch);
+      const outside = sql.replace(groupedSearch, '');
+      expect(outside).not.toMatch(/\bOR\b/);
+      expect(outside).toContain('`bpm`.`is_active` = :is_active');
+      expect(outside).toContain('`bpm`.`source` = :source');
+      expect(sql).toMatch(/ORDER BY `bpm`\.`updated_at` DESC$/);
+      expect(sql).not.toMatch(/`bpm`\.`id` DESC/);
+      expect(
+        mockClarisaProjectsService.loadBilateralCohort,
+      ).toHaveBeenCalledWith(CURRENT_YEAR, 10_000);
+    });
+  });
+
+  describe('exportMappings (R-MFE-002, R-MFE-010, R-MFE-011)', () => {
+    type FixtureRow = {
+      id: number;
+      reporting_year: number;
+      is_active: boolean;
+      source: MappingSourceEnum;
+      agresso_agreement_id: string;
+      clarisa_project_short_name: string;
+      clarisa_project_id: number;
+      description: string | null;
+      projectDescription: string | null;
+      status_changed_by: number | null;
+      status_changed_at: Date | null;
+      status_changed_by_name: string | null;
+    };
+
+    const changedAt = (day: number) =>
+      new Date(Date.UTC(2026, 0, day, 12, 0, 0));
+
+    const FIXTURE: FixtureRow[] = [
+      {
+        id: 1,
+        reporting_year: CURRENT_YEAR,
+        is_active: true,
+        source: MappingSourceEnum.MANUAL,
+        agresso_agreement_id: 'AGR-RICE',
+        clarisa_project_short_name: 'short-rice',
+        clarisa_project_id: 501,
+        description: 'plain-a',
+        projectDescription: 'plain-b',
+        status_changed_by: 7,
+        status_changed_at: changedAt(1),
+        status_changed_by_name: 'Ana Ruiz',
+      },
+      {
+        id: 2,
+        reporting_year: CURRENT_YEAR,
+        is_active: false,
+        source: MappingSourceEnum.MANUAL,
+        agresso_agreement_id: 'AGR-RICE-OLD',
+        clarisa_project_short_name: 'short-old',
+        clarisa_project_id: 502,
+        description: 'plain-c',
+        projectDescription: 'plain-d',
+        status_changed_by: 8,
+        status_changed_at: changedAt(2),
+        status_changed_by_name: 'Bo Chen',
+      },
+      {
+        id: 3,
+        reporting_year: CURRENT_YEAR,
+        is_active: true,
+        source: MappingSourceEnum.DERIVED,
+        agresso_agreement_id: 'AGR-WHEAT',
+        clarisa_project_short_name: 'only-wheat',
+        clarisa_project_id: 503,
+        description: 'plain-e',
+        projectDescription: 'plain-f',
+        status_changed_by: null,
+        status_changed_at: null,
+        status_changed_by_name: null,
+      },
+      {
+        id: 4,
+        reporting_year: CURRENT_YEAR,
+        is_active: true,
+        source: MappingSourceEnum.AI_SUGGESTED,
+        agresso_agreement_id: 'AGR-MAIZE',
+        clarisa_project_short_name: 'short-maize',
+        clarisa_project_id: 504,
+        description: 'desc-maize',
+        projectDescription: 'plain-g',
+        status_changed_by: 9,
+        status_changed_at: changedAt(4),
+        status_changed_by_name: 'Cia Dos',
+      },
+      {
+        id: 5,
+        reporting_year: CURRENT_YEAR,
+        is_active: true,
+        source: MappingSourceEnum.AI_AUTO,
+        agresso_agreement_id: 'AGR-BEAN',
+        clarisa_project_short_name: 'short-bean',
+        clarisa_project_id: 505,
+        description: 'plain-h',
+        projectDescription: 'proj-bean',
+        status_changed_by: 10,
+        status_changed_at: changedAt(5),
+        status_changed_by_name: 'Dee El',
+      },
+      {
+        id: 6,
+        reporting_year: CURRENT_YEAR,
+        is_active: false,
+        source: MappingSourceEnum.DERIVED,
+        agresso_agreement_id: 'AGR-DEAD',
+        clarisa_project_short_name: 'dead-sorghum',
+        clarisa_project_id: 506,
+        description: 'plain-i',
+        projectDescription: 'plain-j',
+        status_changed_by: 11,
+        status_changed_at: changedAt(6),
+        status_changed_by_name: 'Fae Goh',
+      },
+      {
+        id: 7,
+        reporting_year: CURRENT_YEAR - 1,
+        is_active: true,
+        source: MappingSourceEnum.MANUAL,
+        agresso_agreement_id: 'AGR-RICE',
+        clarisa_project_short_name: 'prior-year',
+        clarisa_project_id: 507,
+        description: 'rice-prior',
+        projectDescription: 'plain-k',
+        status_changed_by: 12,
+        status_changed_at: changedAt(7),
+        status_changed_by_name: 'Prior Year',
+      },
+    ];
+
+    const cohortFor = (rows: FixtureRow[]) =>
+      rows.map((row) => ({
+        id: row.clarisa_project_id,
+        short_name: row.clarisa_project_short_name,
+        full_name: `Full ${row.id}`,
+        source_of_funding: 'Bilateral',
+      }));
+
+    const makeFilteringQb = (rows: FixtureRow[]) => {
+      const clauses: { sql: string; params?: Record<string, unknown> }[] = [];
+      let skipN = 0;
+      let takeN: number | undefined;
+      const qb: Record<string, jest.Mock> = {};
+      qb.leftJoin = jest.fn().mockReturnValue(qb);
+      qb.addSelect = jest.fn().mockReturnValue(qb);
+      qb.orderBy = jest.fn().mockReturnValue(qb);
+      qb.addOrderBy = jest.fn().mockReturnValue(qb);
+      qb.where = jest.fn().mockReturnValue(qb);
+      qb.skip = jest.fn().mockImplementation((n: number) => {
+        skipN = n;
+        return qb;
+      });
+      qb.take = jest.fn().mockImplementation((n: number) => {
+        takeN = n;
+        return qb;
+      });
+      qb.andWhere = jest
+        .fn()
+        .mockImplementation((sql: string, params?: Record<string, unknown>) => {
+          clauses.push({ sql, params });
+          return qb;
+        });
+
+      const matching = () =>
+        rows.filter((row) => {
+          for (const { sql, params } of clauses) {
+            if (
+              sql.includes('reporting_year') &&
+              row.reporting_year !== params?.reportingYear
+            ) {
+              return false;
+            }
+            if (
+              sql === 'bpm.is_active = :is_active' &&
+              row.is_active !== params?.is_active
+            ) {
+              return false;
+            }
+            if (sql === '1 = 0') return false;
+            if (
+              sql === 'bpm.source = :source' &&
+              row.source !== params?.source
+            ) {
+              return false;
+            }
+            if (sql.includes('LIKE :s')) {
+              const term = String(params?.s ?? '')
+                .replace(/%/g, '')
+                .toLowerCase();
+              const hay = [
+                row.agresso_agreement_id,
+                row.clarisa_project_short_name,
+                row.description,
+                row.projectDescription,
+              ];
+              if (
+                !hay.some((value) => (value ?? '').toLowerCase().includes(term))
+              ) {
+                return false;
+              }
+            }
+          }
+          return true;
+        });
+
+      qb.getRawAndEntities = jest.fn(async () => {
+        const filtered = matching();
+        const page =
+          takeN === undefined ? filtered : filtered.slice(skipN, skipN + takeN);
+        return {
+          entities: page.map((row) => ({
+            id: row.id,
+            reporting_year: row.reporting_year,
+            is_active: row.is_active,
+            source: row.source,
+            agresso_agreement_id: row.agresso_agreement_id,
+            clarisa_project_short_name: row.clarisa_project_short_name,
+            clarisa_project_id: row.clarisa_project_id,
+            status_changed_by: row.status_changed_by,
+            status_changed_at: row.status_changed_at,
+          })),
+          raw: page.map((row) => ({
+            ac_description: row.description,
+            ac_projectDescription: row.projectDescription,
+            status_changed_by_name: row.status_changed_by_name,
+          })),
+        };
+      });
+      qb.getCount = jest.fn(async () => matching().length);
+      return qb;
+    };
+
+    const expectedIds = (query: {
+      search?: string;
+      source?: MappingSourceEnum;
+      status?: string;
+      is_active?: boolean;
+    }) => {
+      const term = query.search?.trim().toLowerCase();
+      return FIXTURE.filter((row) => {
+        if (row.reporting_year !== CURRENT_YEAR) return false;
+        if (query.status) {
+          const status = query.status.toLowerCase();
+          if (status === 'mapped' && row.is_active !== true) return false;
+          if (status === 'inactive' && row.is_active !== false) return false;
+          if (status === 'pending') return false;
+        } else if (
+          query.is_active !== undefined &&
+          row.is_active !== query.is_active
+        ) {
+          return false;
+        }
+        if (query.source !== undefined && row.source !== query.source) {
+          return false;
+        }
+        if (term) {
+          const hay = [
+            row.agresso_agreement_id,
+            row.clarisa_project_short_name,
+            row.description,
+            row.projectDescription,
+          ];
+          if (
+            !hay.some((value) => (value ?? '').toLowerCase().includes(term))
+          ) {
+            return false;
+          }
+        }
+        return true;
+      })
+        .map((row) => row.id)
+        .sort((a, b) => a - b);
+    };
+
+    const signature = (row: {
+      id: number;
+      clarisa_project_full_name?: string | null;
+      status_changed_by_name?: string | null;
+      agresso_description?: string | null;
+      source?: MappingSourceEnum;
+      is_active?: boolean;
+      status_changed_by?: number | null;
+    }) => ({
+      id: row.id,
+      full: row.clarisa_project_full_name ?? null,
+      changedByName: row.status_changed_by_name ?? null,
+      agresso: row.agresso_description ?? null,
+      source: row.source,
+      active: row.is_active,
+      changedBy: row.status_changed_by ?? null,
+    });
+
+    beforeEach(() => {
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+        projects: cohortFor(FIXTURE),
+        available: true,
+      });
+      mockRepo.createQueryBuilder.mockImplementation(() =>
+        makeFilteringQb(FIXTURE),
+      );
+    });
+
+    afterEach(() => {
+      mockRepo.createQueryBuilder.mockReset();
+      mockRepo.createQueryBuilder.mockReturnValue(makeQb());
+    });
+
+    it('returns the same row set as list() for each Search, Source and Status other than Pending', async () => {
+      const searches = [
+        undefined,
+        'rice',
+        'only-wheat',
+        'desc-maize',
+        'proj-bean',
+      ];
+      const sources = [
+        undefined,
+        MappingSourceEnum.MANUAL,
+        MappingSourceEnum.DERIVED,
+        MappingSourceEnum.AI_SUGGESTED,
+        MappingSourceEnum.AI_AUTO,
+      ];
+      const statuses = [undefined, 'all', 'mapped', 'inactive', 'bogus'];
+
+      for (const search of searches) {
+        for (const source of sources) {
+          for (const status of statuses) {
+            const query = { search, source, status };
+            const listed = await service.list(query);
+            const exported = await service.exportMappings(query);
+            const want = expectedIds(query);
+            const listIds = listed.items
+              .map((row) => row.id)
+              .sort((a, b) => a - b);
+            const exportIds = exported.rows
+              .map((row) => row.id)
+              .sort((a, b) => a - b);
+            expect({ query, listIds, exportIds }).toEqual({
+              query,
+              listIds: want,
+              exportIds: want,
+            });
+            expect(
+              exported.rows.map(signature).sort((a, b) => a.id - b.id),
+            ).toEqual(listed.items.map(signature).sort((a, b) => a.id - b.id));
+            expect(exported.reportingYear).toBe(CURRENT_YEAR);
+          }
+        }
+      }
+    });
+
+    it('returns all 201 matching rows without the list page', async () => {
+      const rows: FixtureRow[] = Array.from({ length: 201 }, (_, index) => ({
+        id: index + 1,
+        reporting_year: CURRENT_YEAR,
+        is_active: index % 2 === 0,
+        source:
+          index % 3 === 0
+            ? MappingSourceEnum.MANUAL
+            : index % 3 === 1
+              ? MappingSourceEnum.DERIVED
+              : MappingSourceEnum.AI_SUGGESTED,
+        agresso_agreement_id: `VOL-${index + 1}`,
+        clarisa_project_short_name: `short-${index + 1}`,
+        clarisa_project_id: 20000 + index,
+        description: `desc-${index + 1}`,
+        projectDescription: `proj-${index + 1}`,
+        status_changed_by: 1000 + index,
+        status_changed_at: changedAt(1),
+        status_changed_by_name: `User ${index + 1}`,
+      }));
+      mockRepo.createQueryBuilder.mockImplementation(() =>
+        makeFilteringQb(rows),
+      );
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+        projects: cohortFor(rows),
+        available: true,
+      });
+
+      const exported = await service.exportMappings({});
+
+      expect(exported.rows).toHaveLength(201);
+      expect(exported.rows.map((row) => row.id).sort((a, b) => a - b)).toEqual(
+        rows.map((row) => row.id),
+      );
+      expect(exported.reportingYear).toBe(CURRENT_YEAR);
+    });
+
+    it('returns the reporting year when no row matches', async () => {
+      const exported = await service.exportMappings({
+        search: 'no-such-token-zz',
+      });
+
+      expect(exported.rows).toEqual([]);
+      expect(exported.reportingYear).toBe(CURRENT_YEAR);
+      expect(exported.clarisaAvailable).toBe(true);
+      expect(mockReportingYearResolver.resolve).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the rows and reports clarisaAvailable false when the cohort is unavailable', async () => {
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+        projects: [],
+        available: false,
+      });
+
+      const exported = await service.exportMappings({ status: 'mapped' });
+
+      expect(exported.clarisaAvailable).toBe(false);
+      expect(exported.reportingYear).toBe(CURRENT_YEAR);
+      expect(exported.rows.map((row) => row.id).sort((a, b) => a - b)).toEqual([
+        1, 3, 4, 5,
+      ]);
+      expect(
+        exported.rows.every((row) => row.sciencePrograms.length === 0),
+      ).toBe(true);
+      expect(
+        exported.rows.every((row) => row.clarisa_project_full_name === null),
+      ).toBe(true);
+      expect(
+        mockClarisaProjectsService.loadBilateralCohort,
+      ).toHaveBeenCalledWith(CURRENT_YEAR, 10_000);
+    });
+
+    it('attaches science programs by project id', async () => {
+      const previous = process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      const projects = cohortFor(FIXTURE).map((project) =>
+        project.id === 501
+          ? {
+              ...project,
+              project_mappings_array: [
+                {
+                  id: 1,
+                  project_id: 501,
+                  program_id: 20,
+                  allocation: 40,
+                  status: 'Confirmed',
+                  global_unit_object: {
+                    id: 20,
+                    name: 'Plant Health',
+                    smo_code: 'SP01',
+                    portfolio_object: { id: 1, acronym: 'P25' },
+                  },
+                },
+                {
+                  id: 2,
+                  project_id: 501,
+                  program_id: 21,
+                  allocation: 60,
+                  status: 'Pending',
+                  global_unit_object: {
+                    id: 21,
+                    name: 'Gender',
+                    smo_code: 'SP02',
+                    portfolio_object: { id: 1, acronym: 'P25' },
+                  },
+                },
+                {
+                  id: 3,
+                  project_id: 501,
+                  program_id: 22,
+                  allocation: 10,
+                  status: 'Rejected',
+                  global_unit_object: {
+                    id: 22,
+                    name: 'Rejected program',
+                    smo_code: 'SP03',
+                    portfolio_object: { id: 1, acronym: 'P25' },
+                  },
+                },
+              ],
+            }
+          : project,
+      );
+      mockClarisaProjectsService.loadBilateralCohort.mockResolvedValue({
+        projects,
+        available: true,
+      });
+
+      try {
+        const exported = await service.exportMappings({
+          search: 'short-rice',
+          status: 'mapped',
+          source: MappingSourceEnum.MANUAL,
+        });
+        expect(exported.rows).toHaveLength(1);
+        expect(exported.rows[0].sciencePrograms).toEqual([
+          {
+            code: 'SP01',
+            name: 'Plant Health',
+            portfolio: 'P25',
+            allocation: 40,
+          },
+          {
+            code: 'SP02',
+            name: 'Gender',
+            portfolio: 'P25',
+            allocation: 60,
+          },
+        ]);
+      } finally {
+        if (previous === undefined) {
+          delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+        } else {
+          process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = previous;
+        }
+      }
+    });
+
+    it('list rows carry status_changed_by, status_changed_at and status_changed_by_name', async () => {
+      const listed = await service.list({});
+      const byId = new Map(listed.items.map((row) => [row.id, row]));
+
+      expect(byId.get(1)).toEqual(
+        expect.objectContaining({
+          status_changed_by: 7,
+          status_changed_at: changedAt(1),
+          status_changed_by_name: 'Ana Ruiz',
+        }),
+      );
+      expect(byId.get(3)).toEqual(
+        expect.objectContaining({
+          status_changed_by: null,
+          status_changed_at: null,
+          status_changed_by_name: null,
+        }),
+      );
+      expect(byId.has(7)).toBe(false);
     });
   });
 });

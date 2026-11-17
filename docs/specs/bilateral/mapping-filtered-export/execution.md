@@ -107,3 +107,66 @@ The owner connected the VPN. The same read-only script (`SET SESSION TRANSACTION
 - **P-17 — verified.** The one Inactive row has `deleted_at`, so the backfill leaves no Inactive row with a blank date. T-01's open done criterion is now met.
 - **P-18 — volume verified:** 198 rows, all in 2026. That is far below any streaming threshold, so the in-memory plan holds and T-03 step 1 is discharged. The ≤ 15 s timing with a cold CLARISA fetch stays for H-1.
 - Ledger rows P-17 and P-18 were updated in `design.md` §13.
+
+### T-03 — Server: shared query builder with the user join, and the export methods 5a and 5b — PASS (attempt 1)
+
+- **Date:** 2026-11-17 · **Final status:** PASS (two parallel lens Reviewers, both PASS)
+- **Skills:** `nestjs-expert`, `tdd` (read from disk) · **Effort:** `grok-4.7-xhigh`
+- **Orca:** run `run_674b6b131b1f`, task `task_8138eaad780f`, dispatch `ctx_9af83abc62cb`; kept through review, released after PASS
+- **Attempts:** 1
+- **Step 1 (P-18):** discharged by the Leader before dispatch (Premise settlement: 198 rows in 2026)
+- **Files changed (+1276/−55):**
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.ts`
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.spec.ts`
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/automapper.service.ts`
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/automapper.service.spec.ts`
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/dto/list-bilateral-project-mappings.query.dto.ts` (1 line, outside the intended list; Reviewer A judged it a required consequence of R-MFE-010 AC.3)
+- **What was built:**
+  - One private query builder shared by `list()` and the export. It left-joins `sec_users` and builds `status_changed_by_name` from the non-blank first and last name. Only the paged query adds the `id DESC` tie-break.
+  - `exportMappings` (5a) and `exportPending` (5b), both passing a limit of 10_000 to `loadBilateralCohort`.
+  - `resolve()` split into `resolveCohort(cohort, year)`, which `resolve()` calls.
+- **SQL test:** uses a real `DataSource` with `buildMetadatas()` and no `initialize()`.
+- **Falsifiers (observed red, reverted):**
+  - (a) search brackets removed → `toContain` expected `` (`bpm`.`agresso_agreement_id` LIKE :s OR `bpm`.`clarisa_project_short_name` LIKE :s OR `ac`.`description` LIKE :s OR `ac`.`projectDescription` LIKE :s) `` and received the ORs ungrouped after `is_active` and `source`.
+  - (b) paging kept in 5a → expected length 201, received 50.
+  - (c) 5b routed through `resolve()` → `listBilateralProjects` expected 1 call, received 2.
+- **Implementer verification:** 12 suites / 324 tests green (bilateral-project-mapping, clarisa/projects, admin.service.spec, automapper.controller); eslint clean; build 0.
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** `npx jest src/domain/entities/bilateral-project-mapping src/domain/tools/clarisa/projects admin.service` → `Test Suites: 13 passed, 13 total` / `Tests: 326 passed, 326 total` (wider glob than the worker's) · `ESLINT_EXIT:0` · `BUILD_EXIT:0`.
+- **Reviewers (parallel lens):**
+  - A, 5a, shared builder and `list()` → **PASS**.
+    - No existing expectation was changed: the spec diff removes no lines.
+    - Parity runs a 5×5×5 grid with an independent `expectedIds` oracle, and the fixture varies a field per row (KZ-004).
+    - The join is on the primary key (P-20). The year is resolved once and returned with zero rows. Unknown `status` matches `list()`.
+  - B, 5b and the `resolve()` split → **PASS**.
+    - The extraction is verbatim, and no automapper expectation changed.
+    - The cohort is loaded once. Classification runs outside the limit.
+    - 503 only on `available: false`. A cached feed returns rows. The guard still gives 422.
+    - The client's order and its three Search fields are matched.
+  - Both ran the named check on design §5 "CLARISA notice" paragraph 3 (amended in T-02): it holds. `list()` warms the cache with no limit, and only the export passes the limit.
+- **ADVISORY (recorded, not actioned):**
+  - **Readability / DD-3 drift:**
+    - `EXPORT_COHORT_LIMIT_MS = 10_000` is declared twice, in the service and in the automapper.
+    - The project-id → `scienceProgramsFor` loop is repeated in 5a and 5b.
+    - `exportPending` accepts `status` but never reads it.
+    - New `any` types on raw rows.
+    - The name is normalized twice, in SQL and again in JS.
+  - **Reliability (K-019 rigor):** the preview test pins a hand-written literal, not a run of old against new. It is acceptable because the moved body is byte-identical. The "unresolved by AGRESSO miss" path is not pinned.
+  - **Resilience, for T-04:** a DB error in `classify` surfaces as 500, not 503, which the design intends. The handler must not wrap everything as 503.
+- **Requirements covered:** R-MFE-002 AC.1–AC.3 (data side), R-MFE-003 AC.1–AC.3 (data side), R-MFE-006 AC.1–AC.2, R-MFE-010 AC.3, R-MFE-011 AC.2
+- **Running totals vs budget:** tasks 3/6 · LOC since `fa0fae7d`: production +435, tests +1,473, total ~1,908 against a budget of ~1,050 (~450 production, ~600 tests) · review rounds 6/8 · **BUDGET TRIPWIRE FIRED — see below**
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 9 calls, 90 513 tokens, ended complete · Reviewer B akili-reviewer/opus 15 calls, 109 212 tokens, ended complete
+
+## Budget tripwire — after T-03 (2026-11-17)
+
+| Measure | Budget (design §14) | Actual after 3 of 6 tasks | Projection with T-04 and T-05 |
+| --- | --- | --- | --- |
+| Production LOC | ~450 | 435 | ~800–850 (T-04 handler and workbook, T-05 client) |
+| Test LOC | ~600 | 1,473 | ~2,300+ |
+| Review rounds | 8 | 6 | ~10 (two parallel lens reviews each) |
+
+**Cause:**
+- Tests are about 2.5× the estimate. T-03's parity grid alone (5×5×5 with an oracle) and the cohort and K-019 fixtures came to ~1,000 lines. These are the gates that §8 and §10 mandate, so the cost is in what was asked for, not in drift.
+- Production is on track for the server, but the §14 estimate under-counted the handler and the client.
+- Review rounds are higher because every task so far has been migration, concurrency or shared-query work, which takes parallel lens mode.
+
+Stopped for the owner, as `/akili-execute` requires: "No mandate widens pre-approval: an owner brief that says "never stop" or "treat every gate as approved" pre-approves routine gates only. The exceptions in `/akili-propose` Step 1 *Approval Mode* (HALT, Pivot, budget tripwire, `FATAL_FAIL`, `PRODUCT_BUG`, destructive actions) still stop, and the stop message quotes this sentence."

@@ -63,6 +63,7 @@ export interface EnrichedBilateralProjectMapping
   extends BilateralProjectMapping {
   agresso_description?: string | null;
   clarisa_project_full_name?: string | null;
+  status_changed_by_name?: string | null;
 }
 
 export interface PaginatedBilateralProjectMappings<

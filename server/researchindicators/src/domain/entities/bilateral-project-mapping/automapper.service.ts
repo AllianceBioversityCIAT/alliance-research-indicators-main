@@ -1,4 +1,8 @@
-import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import {
+  Injectable,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Brackets, DataSource, Repository } from 'typeorm';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
@@ -9,6 +13,11 @@ import { normalizeExternalCode } from './utils/external-code.util';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
+import type {
+  BilateralMappingExportResult,
+  BilateralMappingScienceProgram,
+} from './bilateral-project-mapping.service';
+import type { ListBilateralProjectMappingsQueryDto } from './dto/list-bilateral-project-mappings.query.dto';
 
 // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-02 / R-CAM-001, NFR-CAM-001
 // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-03 / R-CAM-002 (idempotency),
@@ -100,6 +109,13 @@ export interface AutomapperApplyResult {
   inactive: number;
 }
 
+/** Pending export row (design §2.1 row 5b). Same result wrapper as 5a. */
+export interface PendingMappingExportRow extends AutomapperCandidate {
+  sciencePrograms: BilateralMappingScienceProgram[];
+}
+
+const EXPORT_COHORT_LIMIT_MS = 10_000;
+
 // §6.4 / R-APM-009. mapped + pending + inactive = reachable. Never a figure
 // computed against the AGRESSO contract table.
 export interface AutomapperCoverage {
@@ -128,7 +144,73 @@ export class AutomapperService {
     const cohort = await this.clarisaProjectsService.listBilateralProjects({
       phase: reportingYear,
     });
+    return this.resolveCohort(cohort, reportingYear);
+  }
 
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-03 /
+  // R-MFE-003, R-MFE-011, DD-4.
+  //
+  // Pending export (design §2.1 row 5b). The cohort is loaded once, under
+  // the 10s limit. Classification of that same cohort runs after the load
+  // returns, so it is outside the limit. `source` is ignored, as on screen.
+  async exportPending(
+    query: Pick<
+      ListBilateralProjectMappingsQueryDto,
+      'search' | 'source' | 'status'
+    > = {},
+  ): Promise<BilateralMappingExportResult<PendingMappingExportRow>> {
+    const reportingYear = await this.reportingYearResolver.resolve();
+    const { projects, available } =
+      await this.clarisaProjectsService.loadBilateralCohort(
+        reportingYear,
+        EXPORT_COHORT_LIMIT_MS,
+      );
+    if (!available) {
+      throw new ServiceUnavailableException(
+        'CLARISA /api/projects temporarily unreachable',
+      );
+    }
+
+    const cohort = Array.isArray(projects) ? projects : [];
+    const { resolved, ambiguous, unresolved } = await this.resolveCohort(
+      cohort,
+      reportingYear,
+    );
+    const classification = await this.classify(resolved, reportingYear);
+    const pending = [...classification.toCreate, ...ambiguous, ...unresolved];
+    const needle = query.search?.trim().toLowerCase();
+    const filtered = needle
+      ? pending.filter((candidate) =>
+          this.matchesPendingSearch(candidate, needle),
+        )
+      : pending;
+    const programs = new Map<number, BilateralMappingScienceProgram[]>();
+    for (const project of cohort) {
+      if (project.id === undefined || project.id === null) continue;
+      programs.set(
+        project.id,
+        this.clarisaProjectsService.scienceProgramsFor(project),
+      );
+    }
+
+    return {
+      reportingYear,
+      clarisaAvailable: available,
+      rows: filtered.map((candidate) => ({
+        clarisaProjectId: candidate.clarisaProjectId,
+        clarisaProjectFullName: candidate.clarisaProjectFullName,
+        clarisaProjectShortName: candidate.clarisaProjectShortName,
+        externalCode: candidate.externalCode,
+        derivedContractId: candidate.derivedContractId,
+        sciencePrograms: programs.get(candidate.clarisaProjectId) ?? [],
+      })),
+    };
+  }
+
+  private async resolveCohort(
+    cohort: ClarisaProject[],
+    reportingYear: number,
+  ): Promise<AutomapperResolution> {
     // Step 2: NFR-CAM-001 guard. Cohort non-empty AND zero projects carry
     // external_code -> abort loudly instead of silently reporting "0 to do".
     const withExternalCode = cohort.filter((p) => this.hasExternalCode(p));
@@ -545,6 +627,22 @@ export class AutomapperService {
    */
   getFeedFetchedAt(): number | null {
     return this.clarisaProjectsService.getCacheFetchedAt();
+  }
+
+  /**
+   * Same three fields as the screen's Pending search
+   * (`bilateral-mapping.service.ts` list, status pending).
+   */
+  private matchesPendingSearch(
+    candidate: AutomapperCandidate,
+    needle: string,
+  ): boolean {
+    return (
+      candidate.clarisaProjectShortName?.toLowerCase().includes(needle) ||
+      candidate.clarisaProjectFullName?.toLowerCase().includes(needle) ||
+      candidate.derivedContractId?.toLowerCase().includes(needle) ||
+      false
+    );
   }
 
   private hasExternalCode(project: ClarisaProject): boolean {

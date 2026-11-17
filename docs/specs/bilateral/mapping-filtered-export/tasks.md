@@ -165,7 +165,7 @@ graph TD
 
 ### T-03 — Server: shared query builder with the user join, and the export methods 5a and 5b
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01, T-02
+- **Status:** done · **Size:** L · **Dependencies:** T-01, T-02
 - **Requirements covered:** R-MFE-002 (AC.1–AC.3), R-MFE-003 (AC.1–AC.3), R-MFE-006 (AC.1, AC.2), R-MFE-010 (AC.3), R-MFE-011 (data half)
 - **Design references:** §2.1 rows 5a and 5b, §4 "List and detail responses", §5 "Row source", DD-3, DD-4, DD-8, P-3, P-16, P-18, P-20
 - **Files touched (intended):**
@@ -229,10 +229,10 @@ graph TD
 - **Review:** `full` — shared query and the automapper split.
 - **Effort:** `xhigh`.
 - **Done criteria:**
-  - [ ] P-18 count recorded (step 1), and the plan holds
-  - [ ] each test above passes; falsifiers (a)–(c) observed red
-  - [ ] existing list and preview tests green with no expectation changed
-  - [ ] suites green; eslint clean; build green
+  - [x] P-18 count recorded (step 1), and the plan holds
+  - [x] each test above passes; falsifiers (a)–(c) observed red
+  - [x] existing list and preview tests green with no expectation changed
+  - [x] suites green; eslint clean; build green
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-04 — Server: reports route, workbook handler, file name, CORS, Swagger, boot and e2e
