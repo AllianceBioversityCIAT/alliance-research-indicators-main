@@ -2492,6 +2492,29 @@ describe('AllianceAlignmentComponent', () => {
     });
   });
 
+  describe('strategic outcomes whose catalog entry is inactive', () => {
+    it('keeps the text from the GET relation and flags the outcome as inactive', () => {
+      getLeverStrategicOutcomesService.setCatalog([]);
+      const result = (component as any).strategicOutcomesForSignal({
+        lever_id: 6,
+        result_lever_strategic_outcomes: [
+          {
+            lever_strategic_outcome_id: 41,
+            lever_strategic_outcome: { id: 41, strategic_outcome: 'SO1: Conserve', is_active: false }
+          },
+          {
+            lever_strategic_outcome_id: 42,
+            lever_strategic_outcome: { id: 42, strategic_outcome: 'SO2: Use', is_active: true }
+          }
+        ]
+      });
+      expect(result[0]).toEqual(
+        expect.objectContaining({ id: 41, strategic_outcome: 'SO1: Conserve', is_catalog_inactive: true })
+      );
+      expect(result[1]).not.toHaveProperty('is_catalog_inactive');
+    });
+  });
+
   describe('pool funding visibility edge cases', () => {
     it('refreshPoolFundingVisibility falls back to the cached result id when the route has no id', async () => {
       route.snapshot.paramMap.get = () => null;
