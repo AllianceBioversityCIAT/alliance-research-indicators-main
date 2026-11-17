@@ -35,10 +35,34 @@ export interface Portfolio2AlignmentContractPayload {
   is_primary: boolean;
 }
 
+/**
+ * `is_primary` and `custom_lever_name` ride along so a save from this section keeps
+ * what Create OICR step 2 stored (primary vs contributing, the "Other" team name).
+ */
+export interface Portfolio2ResearchAreaPayload {
+  lever_id: string;
+  is_primary?: boolean;
+  custom_lever_name?: string;
+}
+
+/** Research Area "Other" (migration 1790688406000): carries a free-text team or area name. */
+export const OTHER_RESEARCH_AREA_ID = 18;
+
+export const isOtherResearchArea = (area: { lever_id?: number | string; id?: number | string } | null | undefined) =>
+  Number(area?.lever_id ?? area?.id) === OTHER_RESEARCH_AREA_ID;
+
+const toResearchAreaPayload = (area: GetLevers): Portfolio2ResearchAreaPayload => {
+  const payload: Portfolio2ResearchAreaPayload = { lever_id: String(area.lever_id ?? area.id) };
+  // The API may send the flag as 0/1; a catalog pick has none and the API defaults it to primary.
+  if (area.is_primary != null) payload.is_primary = Boolean(area.is_primary);
+  if (isOtherResearchArea(area)) payload.custom_lever_name = (area.custom_lever_name ?? '').trim();
+  return payload;
+};
+
 export interface Portfolio2AlignmentPatchBody {
   contracts: Portfolio2AlignmentContractPayload[];
   result_sdgs: { clarisa_sdg_id: number }[];
-  research_areas: { lever_id: string | number }[];
+  research_areas: Portfolio2ResearchAreaPayload[];
   strategic_objectives: { strategic_objective_id: number }[];
   impact_outcomes?: { impact_outcome_id: number }[];
   result_sdg_targets?: { sdg_target_id: number }[];
@@ -370,9 +394,7 @@ export const buildPortfolio2AlignmentPatch = (
           .map(sdg => ({ clarisa_sdg_id: Number(sdg.clarisa_sdg_id ?? sdg.id) }))
           .filter(item => Number.isFinite(item.clarisa_sdg_id) && item.clarisa_sdg_id > 0)
       : [],
-    research_areas: (body.research_areas ?? [])
-      .map(area => ({ lever_id: String(area.lever_id ?? area.id) }))
-      .filter(item => item.lever_id),
+    research_areas: (body.research_areas ?? []).map(toResearchAreaPayload).filter(item => item.lever_id),
     strategic_objectives: (body.strategic_objectives ?? [])
       .map(item => ({
         strategic_objective_id: Number(

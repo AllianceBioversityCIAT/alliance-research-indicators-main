@@ -1,3 +1,4 @@
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { TempExternalOicrsService } from './temp_external_oicrs.service';
@@ -175,7 +176,26 @@ describe('TempExternalOicrsService', () => {
       const [sql, params] = mockQuery.mock.calls[1];
       expect(sql).toContain('r.report_year_id < ?');
       expect(sql).toContain('r.is_snapshot = FALSE');
-      expect(params).toEqual([ExternalOicrSourceEnum.RESULT, 5, 2027]);
+      expect(params).toEqual([
+        ExternalOicrSourceEnum.RESULT,
+        5,
+        2027,
+        ResultStatusEnum.PUBLISHED,
+      ]);
+    });
+
+    it('only offers PUBLISHED OICR results, while TEMP rows keep every status', async () => {
+      mockExternalFind.mockResolvedValue([]);
+      arrangeQueries('2026', []);
+
+      await service.findExternalOicrs();
+
+      const [sql, params] = mockQuery.mock.calls[1];
+      expect(sql).toContain('r.result_status_id = ?');
+      expect(params[3]).toBe(ResultStatusEnum.PUBLISHED);
+      expect(mockExternalFind).toHaveBeenCalledWith({
+        where: { is_active: true },
+      });
     });
 
     it.each([null, '', 'next year'])(
