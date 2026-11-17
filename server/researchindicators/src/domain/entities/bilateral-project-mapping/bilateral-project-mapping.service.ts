@@ -1,10 +1,11 @@
 import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, SelectQueryBuilder } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
 import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { CreateBilateralProjectMappingDto } from './dto/create-bilateral-project-mapping.dto';
 import { UpdateBilateralProjectMappingDto } from './dto/update-bilateral-project-mapping.dto';
 import {
@@ -37,6 +38,36 @@ export type BilateralProjectMappingUpsertResult = BilateralProjectMapping & {
 };
 
 const RETRYABLE_MYSQL_ERRNOS: ReadonlySet<number> = new Set([1062, 1213, 1205]);
+
+// Non-blank first and last name, blank when neither has text (DD-8, R-MFE-010).
+// CONCAT_WS skips NULL, so a blank side is turned into NULL before the join.
+const STATUS_CHANGED_BY_NAME_SQL =
+  "NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(su.first_name), ''), NULLIF(TRIM(su.last_name), ''))), '')";
+
+/** CLARISA cohort bound for the export only. list() passes no limit (DD-12). */
+const EXPORT_COHORT_LIMIT_MS = 10_000;
+
+export interface BilateralMappingScienceProgram {
+  code: string | undefined;
+  name: string | undefined;
+  portfolio: string | undefined;
+  allocation: number | undefined;
+}
+
+/** One shape from the mapped export (5a) and the pending export (5b). */
+export interface BilateralMappingExportResult<TRow> {
+  reportingYear: number;
+  rows: TRow[];
+  clarisaAvailable: boolean;
+  /** True only when CLARISA answered with an empty cohort. */
+  clarisaCohortEmpty: boolean;
+}
+
+export interface MappedBilateralExportRow
+  extends EnrichedBilateralProjectMapping {
+  status_changed_by_name: string | null;
+  sciencePrograms: BilateralMappingScienceProgram[];
+}
 
 const mysqlErrno = (error: unknown): number | undefined => {
   if (!error || typeof error !== 'object') return undefined;
@@ -77,7 +108,80 @@ export class BilateralProjectMappingService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const reportingYear = await this.reportingYearResolver.resolve();
+    const qb = this.mappingQuery(query, reportingYear, true);
 
+    const [rawAndEntities, total] = await Promise.all([
+      qb.getRawAndEntities(),
+      qb.getCount(),
+    ]);
+
+    const projects = await this.cohortForList(reportingYear);
+    const items = this.enrichRows(
+      rawAndEntities.entities,
+      rawAndEntities.raw,
+      projects,
+    );
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  }
+
+  // @akili-spec docs/specs/bilateral/mapping-filtered-export — T-03 /
+  // R-MFE-002, R-MFE-006, R-MFE-010, R-MFE-011, DD-3, DD-8.
+  //
+  // Mapped and Inactive export (design §2.1 row 5a). Same filters as list(),
+  // no page, and the cohort load carries the 10s limit. The year is resolved
+  // once and returned even when nothing matches.
+  async exportMappings(
+    query: ListBilateralProjectMappingsQueryDto = {},
+  ): Promise<BilateralMappingExportResult<MappedBilateralExportRow>> {
+    const reportingYear = await this.reportingYearResolver.resolve();
+    const qb = this.mappingQuery(query, reportingYear, false);
+    const { entities, raw } = await qb.getRawAndEntities();
+    const { projects, available } =
+      await this.clarisaProjectsService.loadBilateralCohort(
+        reportingYear,
+        EXPORT_COHORT_LIMIT_MS,
+      );
+    const cohort = Array.isArray(projects) ? projects : [];
+    const programs = new Map<number, BilateralMappingScienceProgram[]>();
+    for (const project of cohort) {
+      if (project.id === undefined || project.id === null) continue;
+      programs.set(
+        project.id,
+        this.clarisaProjectsService.scienceProgramsFor(project),
+      );
+    }
+    const rows = this.enrichRows(entities, raw, cohort).map((row) => ({
+      ...row,
+      status_changed_by_name: row.status_changed_by_name ?? null,
+      sciencePrograms: programs.get(row.clarisa_project_id) ?? [],
+    }));
+
+    return {
+      reportingYear,
+      rows,
+      clarisaAvailable: available,
+      clarisaCohortEmpty: available && cohort.length === 0,
+    };
+  }
+
+  /**
+   * Shared by list() and exportMappings(). The paged query is the only one
+   * that adds the primary-key tie-break and skip/take (design §10).
+   */
+  private mappingQuery(
+    query: ListBilateralProjectMappingsQueryDto,
+    reportingYear: number,
+    paged: boolean,
+  ): SelectQueryBuilder<BilateralProjectMapping> {
     const qb = this.repo
       .createQueryBuilder('bpm')
       .leftJoin(
@@ -85,12 +189,29 @@ export class BilateralProjectMappingService {
         'ac',
         'ac.agreement_id = bpm.agresso_agreement_id',
       )
+      .leftJoin('sec_users', 'su', 'su.sec_user_id = bpm.status_changed_by')
       .addSelect(['ac.description', 'ac.projectDescription'])
+      .addSelect(STATUS_CHANGED_BY_NAME_SQL, 'status_changed_by_name')
       .andWhere('bpm.reporting_year = :reportingYear', { reportingYear })
-      .orderBy('bpm.updated_at', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+      .orderBy('bpm.updated_at', 'DESC');
 
+    this.applyMappingFilters(qb, query);
+
+    if (paged) {
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 50;
+      qb.addOrderBy('bpm.id', 'DESC')
+        .skip((page - 1) * limit)
+        .take(limit);
+    }
+
+    return qb;
+  }
+
+  private applyMappingFilters(
+    qb: SelectQueryBuilder<BilateralProjectMapping>,
+    query: ListBilateralProjectMappingsQueryDto,
+  ): void {
     if (query.status) {
       const normalizedStatus = query.status.toLowerCase();
       if (normalizedStatus === 'mapped') {
@@ -114,64 +235,62 @@ export class BilateralProjectMappingService {
         { s: `%${query.search.trim()}%` },
       );
     }
+  }
 
-    const [rawAndEntities, total] = await Promise.all([
-      qb.getRawAndEntities(),
-      qb.getCount(),
-    ]);
-
-    const { entities, raw } = rawAndEntities;
-
-    const clarisaNameMap = new Map<number, string>();
+  private async cohortForList(
+    reportingYear: number,
+  ): Promise<ClarisaProject[]> {
     try {
-      const clarisaProjects =
-        await this.clarisaProjectsService.listBilateralProjects({
-          phase: reportingYear,
-        });
-      if (clarisaProjects) {
-        for (const cp of clarisaProjects) {
-          if (cp.id !== undefined && cp.id !== null) {
-            clarisaNameMap.set(cp.id, cp.full_name ?? cp.short_name ?? '');
-          }
-        }
-      }
+      const { projects } =
+        await this.clarisaProjectsService.loadBilateralCohort(reportingYear);
+      return Array.isArray(projects) ? projects : [];
     } catch {
       // Non-blocking if CLARISA service is temporarily unavailable
+      return [];
+    }
+  }
+
+  private enrichRows(
+    entities: BilateralProjectMapping[],
+    raw: any[],
+    clarisaProjects: ClarisaProject[],
+  ): EnrichedBilateralProjectMapping[] {
+    const clarisaNameMap = new Map<number, string>();
+    for (const cp of clarisaProjects) {
+      if (cp.id !== undefined && cp.id !== null) {
+        clarisaNameMap.set(cp.id, cp.full_name ?? cp.short_name ?? '');
+      }
     }
 
-    const items: EnrichedBilateralProjectMapping[] = entities.map(
-      (entity, index) => {
-        const rawRow = raw[index];
-        const agressoDescription =
-          rawRow?.ac_description ??
-          rawRow?.ac_projectDescription ??
-          rawRow?.description ??
-          rawRow?.projectDescription ??
-          (entity as any).agresso_description ??
-          null;
+    return entities.map((entity, index) => {
+      const rawRow = raw[index];
+      const agressoDescription =
+        rawRow?.ac_description ??
+        rawRow?.ac_projectDescription ??
+        rawRow?.description ??
+        rawRow?.projectDescription ??
+        (entity as any).agresso_description ??
+        null;
 
-        const clarisaFullName =
-          clarisaNameMap.get(entity.clarisa_project_id) ??
-          (entity as any).clarisa_project_full_name ??
-          null;
+      const clarisaFullName =
+        clarisaNameMap.get(entity.clarisa_project_id) ??
+        (entity as any).clarisa_project_full_name ??
+        null;
 
-        return {
-          ...entity,
-          agresso_description: agressoDescription,
-          clarisa_project_full_name: clarisaFullName,
-        } as EnrichedBilateralProjectMapping;
-      },
-    );
+      return {
+        ...entity,
+        agresso_description: agressoDescription,
+        clarisa_project_full_name: clarisaFullName,
+        status_changed_by_name: this.statusChangedByName(rawRow),
+      };
+    });
+  }
 
-    return {
-      items,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.max(1, Math.ceil(total / limit)),
-      },
-    };
+  private statusChangedByName(rawRow: any): string | null {
+    const value = rawRow?.status_changed_by_name;
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
   }
 
   async findById(id: number): Promise<BilateralProjectMapping> {
@@ -262,8 +381,11 @@ export class BilateralProjectMappingService {
       row.updated_by = user.sec_user_id;
       return this.repo.save(row);
     }
+    const statusChangedAt = new Date();
     row.is_active = false;
-    row.deleted_at = new Date();
+    row.deleted_at = statusChangedAt;
+    row.status_changed_at = statusChangedAt;
+    row.status_changed_by = user.sec_user_id;
     row.updated_by = user.sec_user_id;
     if (writeJustification) {
       row.status_justification = justification;
@@ -309,6 +431,8 @@ export class BilateralProjectMappingService {
     }
     row.is_active = true;
     row.deleted_at = null;
+    row.status_changed_at = new Date();
+    row.status_changed_by = user.sec_user_id;
     row.updated_by = user.sec_user_id;
     if (notes !== undefined) {
       row.notes = notes;

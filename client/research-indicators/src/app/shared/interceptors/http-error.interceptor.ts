@@ -85,15 +85,14 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           // Toast burst: short-circuit if a concurrent 403 already ended the session, so
           // N concurrent SESSION_INVALID responses produce exactly one end + one toast.
           if (impersonation.active()) {
-            from(impersonation.end('server-invalid'))
-              .subscribe({
-                next: () => {
-                  actions.showToast({ severity: 'warning', summary: 'Simulation expired', detail: 'Simulation expired' });
-                },
-                error: (endError: unknown) => {
-                  console.error('Failed to end impersonation session after SESSION_INVALID', endError);
-                }
-              });
+            from(impersonation.end('server-invalid')).subscribe({
+              next: () => {
+                actions.showToast({ severity: 'warning', summary: 'Simulation expired', detail: 'Simulation expired' });
+              },
+              error: (endError: unknown) => {
+                console.error('Failed to end impersonation session after SESSION_INVALID', endError);
+              }
+            });
           }
           return throwError(() => error);
         }
@@ -102,7 +101,6 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           return throwError(() => error);
         }
 
-        
         const isAiFormalizeError = error.status === 502 && req.url.includes('results/ai/formalize');
 
         const isPoolFundingTagValidationError = error.status === 400 && req.url.includes('/pool-funding-tag');
@@ -132,6 +130,11 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         const isOicrLegacyDetailsError = req.url.includes('oicr/details');
         const isOicrLegacyTemplateError = req.url.includes('templates/2025_OICR_Template.docx');
 
+        // The bilateral mapping export owns its toast. The component reads the
+        // Blob error body and shows `errors`. A second toast here would duplicate it.
+        // URL only, like isPrmsSyncError: 400, 403, 422 and 503 are all handled there.
+        const isBilateralMappingExportError = req.url.includes('reports/bilateralMapping/xlsx');
+
         if (
           cache.isLoggedIn() &&
           error.status !== 409 &&
@@ -144,7 +147,8 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isAgrovocSearchError &&
           !isOicrWordTemplateError &&
           !isOicrLegacyDetailsError &&
-          !isOicrLegacyTemplateError
+          !isOicrLegacyTemplateError &&
+          !isBilateralMappingExportError
         ) {
           // `error.error.errors` alone silently produced a blank toast for every
           // endpoint whose envelope carries `description` instead of `errors`

@@ -5,7 +5,7 @@ import { CacheService } from './cache/cache.service';
 import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { environment } from '../../../environments/environment';
-import { HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpHeaders, HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { resultInterceptor } from '@shared/interceptors/result.interceptor';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -27,7 +27,8 @@ describe('ApiService', () => {
       patch: jest.fn(),
       delete: jest.fn(),
       getWithParams: jest.fn(),
-      getBlob: jest.fn()
+      getBlob: jest.fn(),
+      getBlobResponse: jest.fn()
     };
 
     mockCacheService = {
@@ -318,10 +319,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingAlignment(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        `v1/results/${encodeURIComponent(resultCode)}/pool-funding-alignment`,
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(`v1/results/${encodeURIComponent(resultCode)}/pool-funding-alignment`, {
+        useResultInterceptor: true
+      });
     });
 
     it('should call GET_PoolFundingSciencePrograms with the per-result /science-programs suffix and numeric code', () => {
@@ -738,11 +738,7 @@ describe('ApiService', () => {
 
       service.PATCH_PoolFundingTag(code, body);
 
-      expect(mockToPromiseService.patch).toHaveBeenCalledWith(
-        'agresso/contracts/AC-1594/pool-funding-tag',
-        body,
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.patch).toHaveBeenCalledWith('agresso/contracts/AC-1594/pool-funding-tag', body, { useResultInterceptor: true });
     });
 
     it('should call PATCH_PoolFundingTag with a code that needs URL-encoding', () => {
@@ -752,11 +748,9 @@ describe('ApiService', () => {
 
       service.PATCH_PoolFundingTag(code, body);
 
-      expect(mockToPromiseService.patch).toHaveBeenCalledWith(
-        `agresso/contracts/${encodeURIComponent(code)}/pool-funding-tag`,
-        body,
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.patch).toHaveBeenCalledWith(`agresso/contracts/${encodeURIComponent(code)}/pool-funding-tag`, body, {
+        useResultInterceptor: true
+      });
     });
 
     it('should call PATCH_PoolFundingAlignment with v1-prefixed URL and has_contribution=true + lever_codes', () => {
@@ -769,11 +763,7 @@ describe('ApiService', () => {
 
       service.PATCH_PoolFundingAlignment(resultCode, body);
 
-      expect(mockToPromiseService.patch).toHaveBeenCalledWith(
-        'v1/results/19792/pool-funding-alignment',
-        body,
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.patch).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', body, { useResultInterceptor: true });
     });
 
     it('should call PATCH_PoolFundingAlignment with has_contribution=false and no lever_codes', () => {
@@ -783,11 +773,7 @@ describe('ApiService', () => {
 
       service.PATCH_PoolFundingAlignment(resultCode, body);
 
-      expect(mockToPromiseService.patch).toHaveBeenCalledWith(
-        'v1/results/19792/pool-funding-alignment',
-        body,
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.patch).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', body, { useResultInterceptor: true });
     });
 
     it('should strip the STAR- prefix from the resultCode for PATCH_PoolFundingAlignment', () => {
@@ -797,11 +783,7 @@ describe('ApiService', () => {
 
       service.PATCH_PoolFundingAlignment(resultCode, body);
 
-      expect(mockToPromiseService.patch).toHaveBeenCalledWith(
-        'v1/results/19792/pool-funding-alignment',
-        body,
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.patch).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', body, { useResultInterceptor: true });
     });
   });
 
@@ -1133,10 +1115,7 @@ describe('ApiService', () => {
     it('should call GET_InnovationDevCard', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_InnovationDevCard(123);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'results/innovation-use/innovation-dev-card/123',
-        { useResultInterceptor: true }
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('results/innovation-use/innovation-dev-card/123', { useResultInterceptor: true });
     });
 
     it('should call GET_InnovationDetails', () => {
@@ -1444,55 +1423,37 @@ describe('ApiService', () => {
     it('should call GET_TopContributorsContracts', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
       service.GET_TopContributorsContracts('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-contributors-contracts?contract-id=A100&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-contributors-contracts?contract-id=A100&limit=5', {});
     });
 
     it('should call GET_TopPartners', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
       service.GET_TopPartners('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-partners?contract-id=A100&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-partners?contract-id=A100&limit=5', {});
     });
 
     it('should call GET_TopMainContactPersons', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
       service.GET_TopMainContactPersons('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-main-contact-persons?contract-id=A100&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-main-contact-persons?contract-id=A100&limit=5', {});
     });
 
     it('should call GET_TopMainContactPersons with the default limit', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
       service.GET_TopMainContactPersons('A100');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-main-contact-persons?contract-id=A100&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-main-contact-persons?contract-id=A100&limit=5', {});
     });
 
     it('should call GET_TopPrimaryLevers', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
       service.GET_TopPrimaryLevers('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-primary-levers?contract-id=A100&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-primary-levers?contract-id=A100&limit=5', {});
     });
 
     it('should call GET_GeoScope', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_GeoScope('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/geo-scope?contract-id=A100&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/geo-scope?contract-id=A100&limit=5', {});
     });
 
     it('should call GET_ResultsByContractId', () => {
@@ -1909,10 +1870,7 @@ describe('ApiService', () => {
 
       await service.GET_Results(resultFilter, resultConfig);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        `${v2Base}&indicators=101&status-codes=1%2C2&years=2024${ownFalse}`,
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(`${v2Base}&indicators=101&status-codes=1%2C2&years=2024${ownFalse}`, {});
     });
 
     it('should call GET_Results with empty arrays', async () => {
@@ -2111,6 +2069,37 @@ describe('ApiService', () => {
     });
   });
 
+  describe('GET_BilateralMappingXlsx', () => {
+    it('calls getBlobResponse on reports/bilateralMapping/xlsx with search, status and source only', async () => {
+      const file = { blob: new Blob(['x']), headers: new HttpHeaders() };
+      (mockToPromiseService.getBlobResponse as jest.Mock).mockResolvedValue(file);
+
+      const result = await service.GET_BilateralMappingXlsx({ search: 'rice', status: 'inactive', source: 'DERIVED' });
+
+      expect(result).toBe(file);
+      expect(mockToPromiseService.getBlob).not.toHaveBeenCalled();
+      expect(mockToPromiseService.getBlobResponse).toHaveBeenCalledWith('reports/bilateralMapping/xlsx', {
+        params: expect.any(HttpParams)
+      });
+      const params = (mockToPromiseService.getBlobResponse as jest.Mock).mock.calls[0][1].params as HttpParams;
+      expect(params.get('search')).toBe('rice');
+      expect(params.get('status')).toBe('inactive');
+      expect(params.get('source')).toBe('DERIVED');
+      expect(params.get('page')).toBeNull();
+      expect(params.get('limit')).toBeNull();
+      expect(params.get('is_active')).toBeNull();
+    });
+
+    it('omits status and source when they are all, and omits an empty search', async () => {
+      (mockToPromiseService.getBlobResponse as jest.Mock).mockResolvedValue({ blob: new Blob(['x']), headers: new HttpHeaders() });
+
+      await service.GET_BilateralMappingXlsx({ search: '   ', status: 'all' });
+
+      const params = (mockToPromiseService.getBlobResponse as jest.Mock).mock.calls[0][1].params as HttpParams;
+      expect(params.keys().length).toBe(0);
+    });
+  });
+
   describe('GET_ResultPdfReport', () => {
     it('should request the PDF report envelope with params and return the report URL response', async () => {
       const response = {
@@ -2217,55 +2206,37 @@ describe('ApiService', () => {
     it('should call GET_TopPartners with encoded contract id and custom limit', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_TopPartners('A 100/1', 8);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-partners?contract-id=A%20100%2F1&limit=8',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-partners?contract-id=A%20100%2F1&limit=8', {});
     });
 
     it('should call GET_TopPartners with the default limit', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_TopPartners('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-partners?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-partners?contract-id=A%20100%2F1&limit=5', {});
     });
 
     it('should call GET_TopPrimaryLevers with encoded contract id and custom limit', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_TopPrimaryLevers('A 100/1', 4);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-primary-levers?contract-id=A%20100%2F1&limit=4',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-primary-levers?contract-id=A%20100%2F1&limit=4', {});
     });
 
     it('should call GET_TopPrimaryLevers with the default limit', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_TopPrimaryLevers('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-primary-levers?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/top-primary-levers?contract-id=A%20100%2F1&limit=5', {});
     });
 
     it('should call GET_ContractStaff with encoded contract id', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_ContractStaff('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/contract-staff?contract-id=A%20100%2F1',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/contract-staff?contract-id=A%20100%2F1', {});
     });
 
     it('should call GET_GeoScope with encoded contract id and default limit', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_GeoScope('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/geo-scope?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/reports/geo-scope?contract-id=A%20100%2F1&limit=5', {});
     });
 
     it('should call GET_LinkedResults with id', () => {
@@ -2678,8 +2649,6 @@ describe('ApiService — pool funding outgoing URLs (HttpTestingController, R-PF
       await promise;
     });
   });
-
-
 });
 
 describe('ApiService - remaining endpoint coverage', () => {

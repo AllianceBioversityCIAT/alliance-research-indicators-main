@@ -30,6 +30,26 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
           /^SP\d/i.test(m.global_unit_object?.smo_code?.trim() ?? ''),
       ) ?? false,
   );
+  const scienceProgramsFor = jest.fn((project: ClarisaProject) => {
+    const flagged = (project as { has_science_programs?: boolean })
+      .has_science_programs;
+    const included = flagged ?? hasSciencePrograms(project);
+    if (!included) {
+      return [];
+    }
+    return (project.project_mappings_array ?? [])
+      .filter((mapping) =>
+        hasSciencePrograms({
+          project_mappings_array: [mapping],
+        } as ClarisaProject),
+      )
+      .map((mapping) => ({
+        code: mapping.global_unit_object?.smo_code,
+        name: mapping.global_unit_object?.name,
+        portfolio: mapping.global_unit_object?.portfolio_object?.acronym,
+        allocation: mapping.allocation,
+      }));
+  });
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -40,6 +60,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
           useValue: {
             listBilateralProjects,
             hasSciencePrograms,
+            scienceProgramsFor,
           },
         },
       ],

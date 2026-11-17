@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { BilateralMappingService } from './bilateral-mapping.service';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { BilateralMappingService, BILATERAL_MAPPING_EXPORT_ERROR } from './bilateral-mapping.service';
 import { ApiService } from './api.service';
 import { ToPromiseService } from './to-promise.service';
 import { CacheService } from './cache/cache.service';
@@ -27,6 +28,7 @@ describe('BilateralMappingService', () => {
     POST_AutomapperPreview: jest.Mock;
     POST_AutomapperApply: jest.Mock;
     PATCH_ActivateBilateralMapping: jest.Mock;
+    GET_BilateralMappingXlsx: jest.Mock;
   };
 
   beforeEach(() => {
@@ -41,7 +43,8 @@ describe('BilateralMappingService', () => {
       GET_BilateralMappingCoverage: jest.fn(),
       POST_AutomapperPreview: jest.fn(),
       POST_AutomapperApply: jest.fn(),
-      PATCH_ActivateBilateralMapping: jest.fn()
+      PATCH_ActivateBilateralMapping: jest.fn(),
+      GET_BilateralMappingXlsx: jest.fn()
     };
     TestBed.configureTestingModule({
       providers: [BilateralMappingService, { provide: ApiService, useValue: mockApi }]
@@ -543,6 +546,69 @@ describe('BilateralMappingService', () => {
         status: 422,
         message: 'No external codes in cohort'
       });
+    });
+  });
+
+  describe('exportXlsx', () => {
+    const envelope = (errors: unknown, description: string) =>
+      new Blob([JSON.stringify({ description, status: 400, errors, timestamp: 't', path: '/api/reports/bilateralMapping/xlsx' })], {
+        type: 'application/json'
+      });
+
+    const rejectWith = (status: number, body: Blob) => {
+      mockApi.GET_BilateralMappingXlsx.mockRejectedValue(
+        new HttpErrorResponse({ status, statusText: 'Error', url: 'http://test/api/reports/bilateralMapping/xlsx', error: body })
+      );
+    };
+
+    it('returns the blob and headers on success', async () => {
+      const file = { blob: new Blob(['xlsx']), headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="a.xlsx"' }) };
+      mockApi.GET_BilateralMappingXlsx.mockResolvedValue(file);
+
+      const result = await service.exportXlsx({ search: 'rice', status: 'inactive', source: 'DERIVED' });
+
+      expect(mockApi.GET_BilateralMappingXlsx).toHaveBeenCalledWith({ search: 'rice', status: 'inactive', source: 'DERIVED' });
+      expect(result).toEqual({ ok: true, data: file });
+    });
+
+    it('treats an empty blob as a failure', async () => {
+      mockApi.GET_BilateralMappingXlsx.mockResolvedValue({ blob: new Blob([]), headers: new HttpHeaders() });
+
+      const result = await service.exportXlsx();
+
+      expect(result).toEqual({ ok: false, status: 0, message: BILATERAL_MAPPING_EXPORT_ERROR });
+    });
+
+    it('uses errors when it is a string and ignores description', async () => {
+      rejectWith(400, envelope('Search is not valid', 'BadRequestException'));
+
+      const result = await service.exportXlsx();
+
+      expect(result).toEqual({ ok: false, status: 400, message: 'Search is not valid' });
+    });
+
+    it('joins an errors array and ignores description', async () => {
+      rejectWith(422, envelope(['Quota exceeded', 'Year is closed'], 'UnprocessableEntityException'));
+
+      const result = await service.exportXlsx();
+
+      expect(result).toEqual({ ok: false, status: 422, message: 'Quota exceeded, Year is closed' });
+    });
+
+    it('uses the fallback when the body is not JSON', async () => {
+      rejectWith(503, new Blob(['<html>down</html>'], { type: 'text/html' }));
+
+      const result = await service.exportXlsx();
+
+      expect(result).toEqual({ ok: false, status: 503, message: BILATERAL_MAPPING_EXPORT_ERROR });
+    });
+
+    it('uses the fallback when errors is empty', async () => {
+      rejectWith(400, envelope('', 'BadRequestException'));
+
+      const result = await service.exportXlsx();
+
+      expect(result).toEqual({ ok: false, status: 400, message: BILATERAL_MAPPING_EXPORT_ERROR });
     });
   });
 

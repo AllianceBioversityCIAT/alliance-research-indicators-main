@@ -22,6 +22,8 @@ import { ResultInnovationDevModule } from '../result-innovation-dev/result-innov
 import { PortfoliosModule } from '../portfolios/portfolios.module';
 import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
 import { ReportMsApp } from '../../tools/broker/report-ms.app';
+import { BilateralProjectMappingModule } from '../bilateral-project-mapping/bilateral-project-mapping.module';
+import { BilateralMappingWorkbookHandler } from './handlers/bilateral-mapping-workbook.handler';
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     PortfoliosModule,
     ClarisaLeversModule,
     PdfViewerModule,
+    BilateralProjectMappingModule,
   ],
   controllers: [ReportsController],
   providers: [
@@ -42,6 +45,7 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     StarResultsMetadataWorkbookHandler,
     ReportHandlerRegistry,
     ReportsGenerationService,
+    BilateralMappingWorkbookHandler,
     CapSharingPdfSectionHandler,
     InnDevPdfSectionHandler,
     {

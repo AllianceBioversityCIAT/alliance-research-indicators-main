@@ -1,5 +1,9 @@
+import { HttpService } from '@nestjs/axios';
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnprocessableEntityException } from '@nestjs/common';
+import {
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Brackets, DataSource } from 'typeorm';
 import { AutomapperService, AutomapperCandidate } from './automapper.service';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
@@ -29,6 +33,14 @@ describe('AutomapperService', () => {
   let mockClarisaProjectsService: {
     listBilateralProjects: jest.Mock;
     getCacheFetchedAt: jest.Mock;
+    hasSciencePrograms: (project: ClarisaProject) => boolean;
+    loadBilateralCohort: (
+      phase: number | string,
+      limitMs?: number,
+    ) => Promise<{ projects: ClarisaProject[]; available: boolean }>;
+    scienceProgramsFor: (
+      project: ClarisaProject,
+    ) => ReturnType<ClarisaProjectsService['scienceProgramsFor']>;
   };
   let mockAgressoRepo: { createQueryBuilder: jest.Mock };
   let mockMappingRepo: { createQueryBuilder: jest.Mock };
@@ -275,6 +287,25 @@ describe('AutomapperService', () => {
     mockClarisaProjectsService = {
       listBilateralProjects: jest.fn(),
       getCacheFetchedAt: jest.fn().mockReturnValue(null),
+      hasSciencePrograms(project: ClarisaProject) {
+        return ClarisaProjectsService.prototype.hasSciencePrograms.call(
+          mockClarisaProjectsService as unknown as ClarisaProjectsService,
+          project,
+        );
+      },
+      loadBilateralCohort(phase: number | string, limitMs?: number) {
+        return ClarisaProjectsService.prototype.loadBilateralCohort.call(
+          mockClarisaProjectsService as unknown as ClarisaProjectsService,
+          phase,
+          limitMs,
+        );
+      },
+      scienceProgramsFor(project: ClarisaProject) {
+        return ClarisaProjectsService.prototype.scienceProgramsFor.call(
+          mockClarisaProjectsService as unknown as ClarisaProjectsService,
+          project,
+        );
+      },
     };
     mockAgressoRepo = {
       createQueryBuilder: jest.fn().mockReturnValue(makeContractQb()),
@@ -1604,6 +1635,367 @@ describe('AutomapperService', () => {
       expect(store[0].is_active).toBe(true);
       expect(store[0].source).toBe(MappingSourceEnum.DERIVED);
       expect(txMappingRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resolve() cohort step (K-019)', () => {
+    it('returns the same preview resolution for a fixed stub', async () => {
+      const cohort = [
+        project({
+          id: 11,
+          short_name: 'Short-11',
+          full_name: 'Full-11',
+          external_code: 'C-KEEP',
+        }),
+        project({
+          id: 12,
+          short_name: 'Short-12',
+          full_name: null as unknown as string,
+          external_code: '  b-keep ',
+        }),
+        project({
+          id: 13,
+          short_name: 'Short-13',
+          full_name: 'Full-13',
+          external_code: 'C-ONLY',
+        }),
+        project({
+          id: 14,
+          short_name: 'Short-14',
+          full_name: 'Full-14',
+          external_code: null,
+        }),
+      ];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      mockAgressoRepo.createQueryBuilder.mockReturnValue(
+        makeContractQb([{ agreement_id: 'ONLY' }]),
+      );
+
+      const result = await service.resolve();
+
+      expect(result).toEqual({
+        reportingYear: YEAR,
+        resolved: [
+          {
+            clarisaProjectId: 13,
+            clarisaProjectFullName: 'Full-13',
+            clarisaProjectShortName: 'Short-13',
+            externalCode: 'C-ONLY',
+            derivedContractId: 'ONLY',
+          },
+        ],
+        ambiguous: [
+          {
+            clarisaProjectId: 11,
+            clarisaProjectFullName: 'Full-11',
+            clarisaProjectShortName: 'Short-11',
+            externalCode: 'C-KEEP',
+            derivedContractId: 'KEEP',
+          },
+          {
+            clarisaProjectId: 12,
+            clarisaProjectFullName: null,
+            clarisaProjectShortName: 'Short-12',
+            externalCode: '  b-keep ',
+            derivedContractId: 'KEEP',
+          },
+        ],
+        unresolved: [
+          {
+            clarisaProjectId: 14,
+            clarisaProjectFullName: 'Full-14',
+            clarisaProjectShortName: 'Short-14',
+            externalCode: null,
+            derivedContractId: '',
+          },
+        ],
+      });
+    });
+  });
+
+  describe('exportPending (R-MFE-003)', () => {
+    const pendingCohort = () => [
+      project({
+        id: 301,
+        short_name: 'ToCreateAlpha',
+        full_name: 'Full Alpha',
+        external_code: 'C-AAA',
+        project_mappings_array: [
+          {
+            id: 1,
+            project_id: 301,
+            program_id: 20,
+            allocation: 40,
+            status: 'Confirmed',
+            global_unit_object: {
+              id: 20,
+              name: 'Plant Health',
+              smo_code: 'SP01',
+              portfolio_object: { id: 1, acronym: 'P25' },
+            },
+          },
+          {
+            id: 2,
+            project_id: 301,
+            program_id: 21,
+            allocation: 60,
+            status: 'Pending',
+            global_unit_object: {
+              id: 21,
+              name: 'Gender',
+              smo_code: 'SP02',
+              portfolio_object: { id: 1, acronym: 'P25' },
+            },
+          },
+        ],
+      }),
+      project({
+        id: 302,
+        short_name: 'ToCreateBeta',
+        full_name: 'Full Beta',
+        external_code: 'C-BBB',
+      }),
+      project({
+        id: 303,
+        short_name: 'AmbiguousOne',
+        full_name: 'Full Amb One',
+        external_code: 'C-SAME',
+      }),
+      project({
+        id: 304,
+        short_name: 'AmbiguousTwo',
+        full_name: 'Full Amb Two',
+        external_code: 'B-SAME',
+      }),
+      project({
+        id: 305,
+        short_name: 'UnresolvedNone',
+        full_name: 'Full None',
+        external_code: null,
+      }),
+      project({
+        id: 306,
+        short_name: 'UnresolvedMiss',
+        full_name: 'Full Miss',
+        external_code: 'C-MISSING',
+      }),
+      project({
+        id: 307,
+        short_name: 'MappedDone',
+        full_name: 'Full Done',
+        external_code: 'C-DONE',
+      }),
+    ];
+
+    const armContracts = () => {
+      mockAgressoRepo.createQueryBuilder.mockReturnValue(
+        makeContractQb([
+          { agreement_id: 'AAA' },
+          { agreement_id: 'BBB' },
+          { agreement_id: 'DONE' },
+        ]),
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({
+            id: 90,
+            agresso_agreement_id: 'DONE',
+            clarisa_project_id: 307,
+            is_active: true,
+            source: MappingSourceEnum.DERIVED,
+            reporting_year: YEAR,
+          }),
+        ]),
+      );
+    };
+
+    const once = async (
+      query: { search?: string; source?: MappingSourceEnum } = {},
+    ) => {
+      mockClarisaProjectsService.listBilateralProjects.mockClear();
+      const result = await service.exportPending(query);
+      expect(
+        mockClarisaProjectsService.listBilateralProjects,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockClarisaProjectsService.listBilateralProjects,
+      ).toHaveBeenCalledWith({ phase: YEAR }, 10_000);
+      return result;
+    };
+
+    it('lists to-create, then ambiguous, then unresolved, and searches the same three fields', async () => {
+      const previous = process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        pendingCohort(),
+      );
+      armContracts();
+
+      try {
+        const all = await once();
+        expect(all.reportingYear).toBe(YEAR);
+        expect(all.clarisaAvailable).toBe(true);
+        expect(all.rows.map((row) => row.clarisaProjectId)).toEqual([
+          301, 302, 303, 304, 305, 306,
+        ]);
+        expect(all.rows[0].sciencePrograms).toEqual([
+          {
+            code: 'SP01',
+            name: 'Plant Health',
+            portfolio: 'P25',
+            allocation: 40,
+          },
+          {
+            code: 'SP02',
+            name: 'Gender',
+            portfolio: 'P25',
+            allocation: 60,
+          },
+        ]);
+        expect(all.rows[1].sciencePrograms).toEqual([]);
+
+        const byShort = await once({ search: 'aLpHa' });
+        expect(byShort.rows.map((row) => row.clarisaProjectId)).toEqual([301]);
+
+        const byFull = await once({ search: 'AMB ONE' });
+        expect(byFull.rows.map((row) => row.clarisaProjectId)).toEqual([303]);
+
+        const byContract = await once({ search: 'missing' });
+        expect(byContract.rows.map((row) => row.clarisaProjectId)).toEqual([
+          306,
+        ]);
+
+        const mappedOnly = await once({ search: 'done' });
+        expect(mappedOnly.rows).toEqual([]);
+
+        const withSource = await once({ source: MappingSourceEnum.MANUAL });
+        expect(withSource.rows.map((row) => row.clarisaProjectId)).toEqual([
+          301, 302, 303, 304, 305, 306,
+        ]);
+        expect(mockReportingYearResolver.resolve).toHaveBeenCalled();
+      } finally {
+        if (previous === undefined) {
+          delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+        } else {
+          process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = previous;
+        }
+      }
+    });
+
+    it('returns the year and no rows when the cohort is empty', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue([]);
+
+      const result = await once();
+
+      expect(result).toEqual({
+        reportingYear: YEAR,
+        rows: [],
+        clarisaAvailable: true,
+        clarisaCohortEmpty: true,
+      });
+    });
+
+    it('throws 503 when the cohort load fails and no feed is cached', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockRejectedValue(
+        new Error('upstream down'),
+      );
+
+      await expect(service.exportPending({})).rejects.toBeInstanceOf(
+        ServiceUnavailableException,
+      );
+      await expect(service.exportPending({})).rejects.toMatchObject({
+        status: 503,
+      });
+      expect(mockDataSource.getRepository).not.toHaveBeenCalled();
+    });
+
+    it('returns rows when the cohort refresh fails and a same-phase feed is cached', async () => {
+      const connectionGet = jest.fn();
+      const clarisa = new ClarisaProjectsService(
+        { get: jest.fn(), post: jest.fn() } as unknown as HttpService,
+        mockReportingYearResolver as unknown as ReportingYearResolver,
+      );
+      (clarisa as unknown as { connection: { get: jest.Mock } }).connection = {
+        get: connectionGet,
+      };
+      clarisa.resetCacheForTests();
+
+      connectionGet.mockResolvedValueOnce([
+        project({
+          id: 301,
+          short_name: 'ToCreateAlpha',
+          full_name: 'Full Alpha',
+          external_code: 'C-AAA',
+          source_center_acronym: 'CIAT',
+          project_mappings_array: [],
+        }),
+      ]);
+      await clarisa.listBilateralProjects({ phase: YEAR });
+
+      const clock = jest
+        .spyOn(Date, 'now')
+        .mockReturnValue(Date.now() + 10 * 60 * 1000);
+      connectionGet.mockRejectedValue(new Error('upstream down'));
+      armContracts();
+      const local = new AutomapperService(
+        clarisa,
+        mockDataSource as unknown as DataSource,
+        mockReportingYearResolver as unknown as ReportingYearResolver,
+      );
+
+      try {
+        const result = await local.exportPending({});
+
+        expect(connectionGet).toHaveBeenCalledTimes(2);
+        expect(result.reportingYear).toBe(YEAR);
+        expect(result.clarisaAvailable).toBe(true);
+        expect(result.rows.map((row) => row.clarisaProjectId)).toEqual([301]);
+      } finally {
+        clock.mockRestore();
+      }
+    });
+
+    it('reports clarisaCohortEmpty false when the answered cohort has projects', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        pendingCohort(),
+      );
+      armContracts();
+
+      const result = await once();
+
+      expect(result.clarisaAvailable).toBe(true);
+      expect(result.clarisaCohortEmpty).toBe(false);
+      expect(result.rows.length).toBeGreaterThan(0);
+    });
+
+    it('reports clarisaCohortEmpty false when the cohort is unavailable', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockRejectedValue(
+        new Error('upstream down'),
+      );
+
+      const settled = await service
+        .exportPending({})
+        .catch((caught: unknown) => caught);
+
+      expect(settled).toBeInstanceOf(ServiceUnavailableException);
+      expect(settled).not.toHaveProperty('clarisaCohortEmpty');
+    });
+
+    it('throws 422 when the automapper guard trips', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue([
+        project({ id: 1, external_code: null }),
+        project({ id: 2, external_code: '   ' }),
+      ]);
+
+      const error = await service.exportPending({}).catch((caught) => caught);
+
+      expect(error).toBeInstanceOf(UnprocessableEntityException);
+      expect((error as UnprocessableEntityException).getStatus()).toBe(422);
+      expect(
+        mockClarisaProjectsService.listBilateralProjects,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 });

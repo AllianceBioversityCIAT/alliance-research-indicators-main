@@ -83,7 +83,7 @@ import { ExtendedHttpErrorResponse } from '@shared/interfaces/http-error-respons
 import { GetVersions } from '@shared/interfaces/get-versions.interface';
 import { AskForHelp } from '../components/all-modals/modals-content/ask-for-help-modal/interfaces/ask-for-help.interface';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
-import { HttpParams } from '@angular/common/http';
+import { HttpHeaders, HttpParams } from '@angular/common/http';
 import { AgrovocTerm } from '@shared/interfaces/agrovoc-term.interface';
 import { GetInnovationDetails } from '@shared/interfaces/get-innovation-details.interface';
 import { GetInnovationUseDetails } from '@shared/interfaces/get-innovation-use-details.interface';
@@ -388,6 +388,22 @@ export class ApiService {
     }
 
     return this.TP.getBlob('reports/resultCenter/xlsx', { params });
+  };
+
+  /**
+   * Filtered bilateral-mapping workbook.
+   * Query is only `search`, `status` and `source`. The server rejects any other param.
+   * Omit `status`/`source` for "all", and omit an empty search.
+   */
+  GET_BilateralMappingXlsx = (
+    filters: Pick<BilateralMappingListQuery, 'search' | 'status' | 'source'> = {}
+  ): Promise<{ blob: Blob; headers: HttpHeaders }> => {
+    let params = new HttpParams();
+    const search = filters.search?.trim();
+    if (search) params = params.set('search', search);
+    if (filters.status && filters.status !== 'all') params = params.set('status', filters.status);
+    if (filters.source) params = params.set('source', filters.source);
+    return this.TP.getBlobResponse('reports/bilateralMapping/xlsx', { params });
   };
 
   GET_ResultPdfReport = async (

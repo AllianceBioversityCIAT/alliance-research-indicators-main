@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { ApiService } from './api.service';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import {
@@ -21,6 +22,14 @@ import { FindContracts } from '@shared/interfaces/find-contracts.interface';
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-02)
 // @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements (T-BTE-02 / R-BTE-003)
 export type MappingMutationResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string };
+
+/** Shown when the export error body is not the server envelope, or `errors` is empty. */
+export const BILATERAL_MAPPING_EXPORT_ERROR = 'The export could not be downloaded. Please try again.';
+
+export interface BilateralMappingExportFile {
+  blob: Blob;
+  headers: HttpHeaders;
+}
 
 @Injectable({ providedIn: 'root' })
 export class BilateralMappingService {
@@ -181,6 +190,70 @@ export class BilateralMappingService {
   async applyAutoMap(): Promise<MappingMutationResult<AutomapperApplyResponse>> {
     const res = await this.api.POST_AutomapperApply({});
     return this.toMutationResult<AutomapperApplyResponse>(res);
+  }
+
+  /**
+   * Downloads the filtered workbook. An empty file is a failure.
+   * On error the Blob body is the server envelope: the toast text is `errors`
+   * (a string, or an array joined). `description` is the exception class name and is never used.
+   */
+  async exportXlsx(
+    query: Pick<BilateralMappingListQuery, 'search' | 'status' | 'source'> = {}
+  ): Promise<MappingMutationResult<BilateralMappingExportFile>> {
+    try {
+      const file = await this.api.GET_BilateralMappingXlsx(query);
+      if (!file?.blob || file.blob.size === 0) {
+        return { ok: false, status: 0, message: BILATERAL_MAPPING_EXPORT_ERROR };
+      }
+      return { ok: true, data: file };
+    } catch (error) {
+      return {
+        ok: false,
+        status: error instanceof HttpErrorResponse ? error.status : 0,
+        message: await this.exportErrorMessage(error)
+      };
+    }
+  }
+
+  private async exportErrorMessage(error: unknown): Promise<string> {
+    const body = error instanceof HttpErrorResponse ? error.error : undefined;
+    if (!(body instanceof Blob) || body.size === 0) return BILATERAL_MAPPING_EXPORT_ERROR;
+
+    let text: string;
+    try {
+      text = await this.readBlob(body);
+    } catch {
+      return BILATERAL_MAPPING_EXPORT_ERROR;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return BILATERAL_MAPPING_EXPORT_ERROR;
+    }
+
+    if (!parsed || typeof parsed !== 'object') return BILATERAL_MAPPING_EXPORT_ERROR;
+    const errors = (parsed as { errors?: unknown }).errors;
+    if (typeof errors === 'string') {
+      return errors.trim() ? errors : BILATERAL_MAPPING_EXPORT_ERROR;
+    }
+    if (Array.isArray(errors)) {
+      const parts = errors.map(item => (typeof item === 'string' ? item.trim() : '')).filter(part => part.length > 0);
+      return parts.length > 0 ? parts.join(', ') : BILATERAL_MAPPING_EXPORT_ERROR;
+    }
+    return BILATERAL_MAPPING_EXPORT_ERROR;
+  }
+
+  /** `Blob.text()` is missing in this repo's jsdom. FileReader is the fallback that still reads the real Blob. */
+  private readBlob(blob: Blob): Promise<string> {
+    if (typeof blob.text === 'function') return blob.text();
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => reject(reader.error ?? new Error('blob read failed'));
+      reader.readAsText(blob);
+    });
   }
 
   // Shared mutation-envelope mapper: success → { ok:true, data }; failure →

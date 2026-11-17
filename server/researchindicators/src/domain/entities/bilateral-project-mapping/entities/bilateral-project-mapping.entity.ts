@@ -96,4 +96,20 @@ export class BilateralProjectMapping extends AuditableEntity {
       'Last inactivation justification. Overwritten on each deactivate. Independent of notes.',
   })
   status_justification?: string | null;
+
+  @Column({
+    type: 'bigint',
+    name: 'status_changed_by',
+    nullable: true,
+    comment: 'sec_user_id of the last status change. No FK.',
+  })
+  status_changed_by?: number | null;
+
+  @Column({
+    name: 'status_changed_at',
+    type: 'timestamp',
+    nullable: true,
+    comment: 'Date of the last status change.',
+  })
+  status_changed_at?: Date | null;
 }

@@ -728,11 +728,30 @@ describe('httpErrorInterceptor', () => {
   };
 
   it('should not show toast when /prms-sync is refused with 422', done => {
-    prmsSyncFailure(
-      422,
-      { description: "Missing mandatory field 'actors'", errors: null },
-      done
-    );
+    prmsSyncFailure(422, { description: "Missing mandatory field 'actors'", errors: null }, done);
+  });
+
+  it('should not show toast when the bilateral mapping export fails', done => {
+    const request = new HttpRequest('GET', 'http://test.com/api/reports/bilateralMapping/xlsx?status=inactive');
+    const errorResponse = new HttpErrorResponse({
+      error: new Blob([JSON.stringify({ description: 'BadRequestException', errors: 'Search is not valid' })]),
+      status: 400,
+      statusText: 'Bad Request'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(request, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: error => {
+        expect(error).toBe(errorResponse);
+        expect(mockApiService.saveErrors).toHaveBeenCalled();
+        expect(mockActionsService.showToast).not.toHaveBeenCalled();
+        done();
+      }
+    });
   });
 
   it('should not show toast when /prms-sync fails with 503 (transport, no errors key)', done => {
@@ -854,9 +873,7 @@ describe('httpErrorInterceptor', () => {
           await Promise.resolve();
           expect(mockImpersonationService.end).toHaveBeenCalledWith('server-invalid');
           expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
-          expect(mockActionsService.showToast).toHaveBeenCalledWith(
-            expect.objectContaining({ summary: 'Simulation expired' })
-          );
+          expect(mockActionsService.showToast).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Simulation expired' }));
           done();
         }
       });
@@ -962,9 +979,7 @@ describe('httpErrorInterceptor', () => {
       expect(results.length).toBe(2);
       expect(mockImpersonationService.end).toHaveBeenCalledTimes(1);
       expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
-      expect(mockActionsService.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ summary: 'Simulation expired' })
-      );
+      expect(mockActionsService.showToast).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Simulation expired' }));
     });
 
     // Leader-adopted item 3: unhandled rejection — a rejected `end(...)` must be caught,
@@ -993,13 +1008,8 @@ describe('httpErrorInterceptor', () => {
           expect(error).toBe(errorResponse);
           await Promise.resolve();
           await Promise.resolve();
-          expect(consoleErrorSpy).toHaveBeenCalledWith(
-            expect.stringContaining('Failed to end impersonation session'),
-            expect.any(Error)
-          );
-          expect(mockActionsService.showToast).not.toHaveBeenCalledWith(
-            expect.objectContaining({ summary: 'Simulation expired' })
-          );
+          expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to end impersonation session'), expect.any(Error));
+          expect(mockActionsService.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ summary: 'Simulation expired' }));
           consoleErrorSpy.mockRestore();
           done();
         }

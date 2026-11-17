@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExcelWorkbookBuilder } from './core/excel-workbook.builder';
 import { ReportHandlerRegistry } from './report-handler.registry';
 import type { FullFiltersReportDto } from './dto/filters-report.dto';
+import { BilateralMappingWorkbookHandler } from './handlers/bilateral-mapping-workbook.handler';
 import { ReportsGenerationService } from './reports-generation.service';
 import { ResultSortEnum } from '../results/enum/result-sort.enum';
 
@@ -9,10 +10,12 @@ describe('ReportsGenerationService', () => {
   let service: ReportsGenerationService;
   const buildWorkbookSpec = jest.fn();
   const toBuffer = jest.fn();
+  const buildBilateral = jest.fn();
 
   beforeEach(async () => {
     buildWorkbookSpec.mockReset();
     toBuffer.mockReset();
+    buildBilateral.mockReset();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReportsGenerationService,
@@ -28,6 +31,10 @@ describe('ReportsGenerationService', () => {
         {
           provide: ExcelWorkbookBuilder,
           useValue: { toBuffer },
+        },
+        {
+          provide: BilateralMappingWorkbookHandler,
+          useValue: { build: buildBilateral },
         },
       ],
     }).compile();
@@ -62,5 +69,23 @@ describe('ReportsGenerationService', () => {
       }),
     );
     expect(toBuffer).toHaveBeenCalledWith(spec);
+  });
+
+  it('returns the bilateral buffer and the handler file name', async () => {
+    const spec = { sheets: [] };
+    buildBilateral.mockResolvedValue({
+      spec,
+      fileName: 'Bilateral_Mapping_2031_20261020.xlsx',
+    });
+    toBuffer.mockResolvedValue(Buffer.from('xlsx-bytes'));
+
+    const out = await service.buildBilateralMappingWorkbook({
+      status: 'mapped',
+    });
+
+    expect(buildBilateral).toHaveBeenCalledWith({ status: 'mapped' });
+    expect(toBuffer).toHaveBeenCalledWith(spec);
+    expect(out.fileName).toBe('Bilateral_Mapping_2031_20261020.xlsx');
+    expect(out.buffer.equals(Buffer.from('xlsx-bytes'))).toBe(true);
   });
 });
