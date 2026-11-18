@@ -262,6 +262,13 @@ export class ResultsCenterService {
   resultsTablePaginatorRows = signal(10);
   resultsTableTotalRecords = signal(0);
   private lastSuccessfulResultsFetchKey: string | null = null;
+  /**
+   * Bumped by every `main()` call. A response is applied only when its call is still the
+   * latest one: `main()` runs from the page load, the table's lazy load, the search box and
+   * the tab switch, so an older, unfiltered request that resolves last must not overwrite
+   * the list of the filters the chips and the search box already show.
+   */
+  private resultsRequestSeq = 0;
   resultsTableSortField = signal<string>('result_official_code');
   resultsTableSortOrder = signal<-1 | 1>(-1);
 
@@ -494,6 +501,8 @@ export class ResultsCenterService {
   }
 
   async main() {
+    const requestSeq = ++this.resultsRequestSeq;
+    const isLatestRequest = () => requestSeq === this.resultsRequestSeq;
     this.loading.set(true);
     const primaryContractIdAtRequest = this.primaryContractId();
     const activeTabIdAtRequest = this.myResultsFilterItem()?.id;
@@ -581,21 +590,22 @@ export class ResultsCenterService {
       });
 
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
-      if (stillSameContext) {
+      if (stillSameContext && isLatestRequest()) {
         this.resultsTableTotalRecords.set(total);
         this.list.set(enhancedResults);
         this.lastSuccessfulResultsFetchKey = fetchKey;
       }
     } catch (error) {
       console.error('Error loading results:', error);
-      this.lastSuccessfulResultsFetchKey = null;
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
-      if (stillSameContext) {
+      if (stillSameContext && isLatestRequest()) {
+        this.lastSuccessfulResultsFetchKey = null;
         this.resultsTableTotalRecords.set(0);
         this.list.set([]);
       }
     } finally {
-      this.loading.set(false);
+      // A superseded call leaves the spinner to the call that replaced it.
+      if (isLatestRequest()) this.loading.set(false);
     }
   }
   handleResultsTableLazyLoad(event: TableLazyLoadEvent): void {
