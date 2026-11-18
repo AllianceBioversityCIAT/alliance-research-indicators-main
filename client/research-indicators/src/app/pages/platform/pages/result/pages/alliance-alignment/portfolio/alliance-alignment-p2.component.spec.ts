@@ -84,10 +84,55 @@ describe('AllianceAlignmentP2Component', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Contribution to SDG');
   });
 
-  it('filters the "Other" Research Area (18) out of the options, and nothing else', () => {
-    expect(component.researchAreaOptionFilter({ lever_id: 18 })).toBe(false);
-    expect(component.researchAreaOptionFilter({ id: '18' })).toBe(false);
-    expect(component.researchAreaOptionFilter({ lever_id: 12 })).toBe(true);
+  describe('"Other" Research Area (18)', () => {
+    const area = (lever_id: number, extra: Record<string, unknown> = {}) =>
+      ({ id: lever_id, lever_id, full_name: `Area ${lever_id}`, ...extra }) as never;
+    // The parent hands one body signal for the life of the section and writes into it (load, picks).
+    const setAreas = (research_areas: unknown[]) => {
+      const body = component.body as unknown as ReturnType<
+        typeof signal<{ research_areas: { lever_id: number; custom_lever_name?: string }[] }>
+      >;
+      body.update(current => ({ ...current, research_areas: research_areas as never }));
+      return body;
+    };
+
+    it('is no longer filtered out of the options, so it can be picked in this section', () => {
+      expect((component as unknown as Record<string, unknown>)['researchAreaOptionFilter']).toBeUndefined();
+      expect(component.isOtherResearchArea({ lever_id: 18 })).toBe(true);
+      expect(component.isOtherResearchArea({ id: '18' })).toBe(true);
+      expect(component.isOtherResearchArea({ lever_id: 12 })).toBe(false);
+    });
+
+    it('shows the team name saved in the OICR modal', () => {
+      setAreas([area(18, { custom_lever_name: 'ImpactSF team' })]);
+      fixture.detectChanges();
+
+      expect(component.getCustomNameSignal(area(18))().custom_lever_name).toBe('ImpactSF team');
+    });
+
+    it('copies a typed team name onto the "Other" row only, which the save sends', () => {
+      const body = setAreas([area(18), area(12)]);
+      fixture.detectChanges();
+      expect(body().research_areas[0].custom_lever_name).toBeUndefined();
+
+      component.getCustomNameSignal(area(18)).set({ custom_lever_name: 'Accelerate team' });
+      fixture.detectChanges();
+
+      expect(body().research_areas[0].custom_lever_name).toBe('Accelerate team');
+      expect(body().research_areas[1].custom_lever_name).toBeUndefined();
+    });
+
+    it('keeps the team name when "Other" is removed and picked again', () => {
+      const body = setAreas([area(18, { custom_lever_name: 'Kept' })]);
+      fixture.detectChanges();
+
+      body.set({ ...body(), research_areas: [] });
+      fixture.detectChanges();
+      body.set({ ...body(), research_areas: [area(18)] });
+      fixture.detectChanges();
+
+      expect(body().research_areas[0].custom_lever_name).toBe('Kept');
+    });
   });
 
   it('should use default input callbacks', () => {
