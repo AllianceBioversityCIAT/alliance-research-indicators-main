@@ -36,6 +36,14 @@ describe('date-format-time.util', () => {
       const config = fullConfig({ time: { hour12: false, twoDigitMinute: true } });
       expect(buildTimeString(d, config, 'en-GB', 'UTC')).toBeDefined();
     });
+
+    it('formats UTC midnight as 12:00 for en-GB when hour12 is true', () => {
+      const config = fullConfig({ time: { hour12: true, twoDigitMinute: true } });
+      const midnight = new Date(Date.UTC(2019, 5, 1, 0, 0));
+      const result = buildTimeString(midnight, config, 'en-GB', 'UTC');
+      expect(result).toContain('12:00');
+      expect(result).not.toContain('0:00');
+    });
   });
 
   describe('buildDisplaySuffix', () => {

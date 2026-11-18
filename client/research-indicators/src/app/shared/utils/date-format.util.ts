@@ -45,7 +45,7 @@ export function formatUtcToCet(raw: DateInput): CetFormatted | null {
     timeZone: CET_TZ,
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true
+    hourCycle: 'h12'
   }).format(d);
   return { date: dateStr, time: timeStr };
 }
@@ -100,7 +100,7 @@ export function formatUtcWithConfigParts(raw: DateInput, config: DateFormatJsonV
       timeZone: 'UTC',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hourCycle: 'h12'
     }).format(d);
     return { date: dateStr, time: timeStr, timezoneLabel: 'UTC' };
   }

@@ -8,7 +8,7 @@ export function buildTimeString(d: Date, config: DateFormatJsonValue, locale: st
     timeZone,
     hour: 'numeric',
     minute: minuteOpt,
-    hour12
+    hourCycle: hour12 ? 'h12' : 'h23'
   }).format(d);
 }
 

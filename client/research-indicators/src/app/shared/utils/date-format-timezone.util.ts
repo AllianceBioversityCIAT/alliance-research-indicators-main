@@ -54,7 +54,7 @@ export function formatUtcToUtcDisplay(d: Date): string {
     timeZone: 'UTC',
     hour: 'numeric',
     minute: '2-digit',
-    hour12: true
+    hourCycle: 'h12'
   }).format(d);
   return `${dateStr} at ${timeStr} (UTC)`;
 }
