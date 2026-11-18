@@ -180,6 +180,10 @@ describe('date-format-timezone.util', () => {
       expect(result).toContain(' at ');
       expect(result).toContain('(UTC)');
     });
+
+    it('formats UTC midnight as 12:00 am', () => {
+      expect(formatUtcToUtcDisplay(new Date(Date.UTC(2019, 5, 1, 0, 0)))).toBe('01/06/2019 at 12:00 am (UTC)');
+    });
   });
 
   describe('getLocalDateAndTime', () => {
