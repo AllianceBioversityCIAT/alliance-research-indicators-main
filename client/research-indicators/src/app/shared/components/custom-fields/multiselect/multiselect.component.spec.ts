@@ -2006,15 +2006,13 @@ describe('MultiselectComponent', () => {
       expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
     });
 
-    it('marks the inactive selected row and leaves active rows unmarked', () => {
+    it('shows the inactive selected row by its own label, with no inactive tag', () => {
       const { fixture } = render([active, inactive]);
       const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.selected-items .item'));
 
       expect(rows).toHaveLength(2);
-      expect(rows[0].querySelector('[data-testid="multiselect-inactive-tag"]')).toBeNull();
-      const tag = rows[1].querySelector('[data-testid="multiselect-inactive-tag"]') as HTMLElement;
-      expect(tag).not.toBeNull();
-      expect(tag.textContent?.trim()).toContain('Inactive');
+      expect(rows[1].textContent).toContain('Retired option');
+      expect(rows[1].textContent).not.toContain('Inactive');
     });
   });
 });
