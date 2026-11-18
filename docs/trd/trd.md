@@ -409,7 +409,7 @@ The server package also ships an SSR frontend under `src/admin/` (React 19 + rea
 | **ROAR Management** | HTTP (axios) | ARI → ROAR | Validates JWT, returns user with roles. |
 | **CLARISA** | HTTP (`ClarisaConnection`) | ARI ↔ CLARISA | Master data; routes via `clarisa.routes.ts`. |
 | **AGRESSO** | MSSQL (`mssql`) + SOAP (`soap`) | ARI → AGRESSO | Contracts, staff, contract countries; cron-driven. |
-| **TIP** | HTTP | ARI ↔ TIP | Pull + reconcile. |
+| **TIP** | HTTP | ARI ↔ TIP | Pull + reconcile. **One TIP result per handle** (`public_link` = the `Handled` evidence): one live row (stable `result_id` and official code, holding the highest saved year) plus one `is_snapshot = 1` version row per year, created or updated in place by the sync — never `SP_versioning`. A run is refused (409) while another TIP run is `IN_PROGRESS` < 6 h. Spec: `docs/specs/changes/tip-prms-phase-2/tip-versioning` (2026-10). |
 | **OpenSearch** | HTTP | ARI → OpenSearch | Results, PRMS, Alliance Staff indexes; mapping via `@OpenSearchProperty`. |
 | **DynamoDB feedback** | AWS SDK v3 | ARI ↔ DynamoDB | Feedback store. |
 | **RabbitMQ broker** | AMQPS | ARI ↔ broker | Queue `ARI_QUEUE` + outbound message apps. |

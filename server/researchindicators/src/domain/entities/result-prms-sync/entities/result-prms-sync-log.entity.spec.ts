@@ -145,7 +145,15 @@ describe('ResultPrmsSyncLog entity metadata', () => {
     expect(column.options.nullable).toBe(true);
   });
 
-  it('declares the migration indexes -- keyed on the code/year pair', () => {
+  it('platform_code is varchar(50) NOT NULL with no default', () => {
+    const column = getColumn('platform_code');
+    expect(column.options.type).toBe('varchar');
+    expect(column.options.length).toBe(50);
+    expect(column.options.nullable).toBe(false);
+    expect(column.options.default).toBeUndefined();
+  });
+
+  it('declares the migration indexes -- keyed on platform, code and year', () => {
     const indexNames = storage.indices
       .filter((index) => index.target === ResultPrmsSyncLog)
       .map((index) => index.name)
@@ -153,6 +161,16 @@ describe('ResultPrmsSyncLog entity metadata', () => {
     expect(indexNames).toEqual([
       'idx_result_prms_sync_log_code_year',
       'idx_result_prms_sync_log_request_id',
+    ]);
+    const codeYear = storage.indices.find(
+      (index) =>
+        index.target === ResultPrmsSyncLog &&
+        index.name === 'idx_result_prms_sync_log_code_year',
+    );
+    expect(codeYear?.columns).toEqual([
+      'platform_code',
+      'external_reference',
+      'result_year',
     ]);
   });
 
@@ -162,6 +180,7 @@ describe('ResultPrmsSyncLog entity metadata', () => {
       [
         'id',
         'result_year',
+        'platform_code',
         'attempt_number',
         'environment',
         'prms_type',

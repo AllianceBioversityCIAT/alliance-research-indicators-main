@@ -1,4 +1,6 @@
 import { inject, Injectable, signal, effect, computed } from '@angular/core';
+import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { formatUtcDateWithConfig } from '@shared/utils/date-format.util';
 import { GetResultsService } from '../../../../shared/services/control-list/get-results.service';
 import {
   GetResultsPaginationOptions,
@@ -37,6 +39,7 @@ interface ResultsCenterPersistedState {
 export class ResultsCenterService {
   private readonly storagePrefix = 'results-center-view-state:';
   api = inject(ApiService);
+  private readonly dateFormatConfig = inject(DateFormatConfigService);
   hasFilters = signal(false);
   showFiltersSidebar = signal(false);
   showConfigurationSidebar = signal(false);
@@ -175,7 +178,8 @@ export class ResultsCenterService {
       minWidth: 'min-w-[110px]',
       maxWidth: 'max-w-[110px]',
 
-      getValue: (result: Result) => (result.created_at ? new Date(result.created_at).toLocaleDateString() : '-')
+      // Same date-format configuration as My Latest Result, date only (no time) in a table.
+      getValue: (result: Result) => formatUtcDateWithConfig(result.created_at, this.dateFormatConfig.config()) ?? '-'
     },
     {
       field: 'public_link',

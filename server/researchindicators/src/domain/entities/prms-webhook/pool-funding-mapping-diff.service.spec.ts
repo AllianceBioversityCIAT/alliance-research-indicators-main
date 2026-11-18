@@ -22,6 +22,7 @@ interface ResultRow {
   result_id: number;
   result_official_code: string;
   report_year_id: number;
+  platform_code: string;
   is_snapshot: boolean;
   is_active: boolean;
 }
@@ -50,6 +51,7 @@ interface SpRow {
 
 interface HistoryRow {
   id: number;
+  platform_code: string | null;
   result_official_code: string | null;
   result_year: number | null;
   raw_body: unknown;
@@ -89,6 +91,7 @@ const decoy = {
 
 const historyRow = (overrides: Partial<HistoryRow> = {}): HistoryRow => ({
   id: HISTORY_ID,
+  platform_code: 'STAR',
   result_official_code: CODE,
   result_year: YEAR,
   raw_body: callbackBody([
@@ -107,6 +110,7 @@ const liveResult = (): ResultRow => ({
   result_id: LIVE_ID,
   result_official_code: CODE,
   report_year_id: YEAR,
+  platform_code: 'STAR',
   is_snapshot: false,
   is_active: true,
 });
@@ -115,6 +119,7 @@ const versionResult = (overrides: Partial<ResultRow> = {}): ResultRow => ({
   result_id: VERSION_ID,
   result_official_code: CODE,
   report_year_id: YEAR,
+  platform_code: 'STAR',
   is_snapshot: true,
   is_active: true,
   ...overrides,
@@ -214,10 +219,15 @@ class FakeVersionDb {
     const wantsSnapshot = /is_snapshot\s*=\s*TRUE\b/i.test(sql);
     const wantsLive = /is_snapshot\s*=\s*FALSE\b/i.test(sql);
     const wantsActive = /is_active\s*=\s*TRUE\b/i.test(sql);
-    const code = params[0];
-    const year = params[1];
+    const filtersPlatform = /\bplatform_code\b/i.test(sql);
+    const platform = filtersPlatform ? params[0] : null;
+    const code = filtersPlatform ? params[1] : params[0];
+    const year = filtersPlatform ? params[2] : params[1];
     return this.results
       .filter((row) => {
+        if (filtersPlatform && (row.platform_code ?? 'STAR') !== platform) {
+          return false;
+        }
         if (row.result_official_code !== code || row.report_year_id !== year) {
           return false;
         }
@@ -374,9 +384,9 @@ describe('PoolFundingMappingDiffService', () => {
 
       const snapshot = queryFor(table, /\bFROM\s+results\b/i);
       expect(normalizeSql(snapshot.sql)).toBe(
-        'SELECT result_id FROM results WHERE result_official_code = ? AND report_year_id = ? AND is_snapshot = TRUE AND is_active = TRUE',
+        "SELECT result_id FROM results WHERE COALESCE(platform_code, 'STAR') = ? AND result_official_code = ? AND report_year_id = ? AND is_snapshot = TRUE AND is_active = TRUE",
       );
-      expect(snapshot.params).toEqual([CODE, YEAR]);
+      expect(snapshot.params).toEqual(['STAR', CODE, YEAR]);
       const toc = queryFor(
         table,
         /\bFROM\s+result_pool_funding_toc_alignment\b/i,
@@ -969,6 +979,66 @@ describe('PoolFundingMappingDiffService', () => {
 
       expect(parsedChanges(table)).toEqual({
         'Science Program': { before: 'SP06', after: 'SP07' },
+      });
+    });
+  });
+
+  describe('R-PPI-002 — mapping diff stays on the history platform', () => {
+    const TIP_VERSION_ID = 30;
+
+    it('resolves the snapshot of the history row platform when TIP and STAR share the code and year', async () => {
+      arm({
+        platform_code: 'TIP',
+        raw_body: callbackBody([
+          primary([
+            {
+              title: 'Callback title',
+              toc_result_id: 7290,
+              level: 'Intermediate Outcome',
+            },
+          ]),
+        ]),
+      });
+      table.results = [
+        liveResult(),
+        versionResult({ result_id: VERSION_ID, platform_code: 'STAR' }),
+        versionResult({
+          result_id: TIP_VERSION_ID,
+          platform_code: 'TIP',
+        }),
+      ];
+      table.tocs = [
+        versionToc({
+          result_id: VERSION_ID,
+          toc_result_title: 'STAR version title',
+        }),
+        versionToc({
+          result_id: TIP_VERSION_ID,
+          toc_result_title: 'TIP version title',
+        }),
+      ];
+      table.sps = [
+        versionSp({ result_id: VERSION_ID }),
+        versionSp({ result_id: TIP_VERSION_ID }),
+      ];
+
+      await record();
+
+      const history = queryFor(table, /\bFROM\s+result_prms_sync_history\b/i);
+      expect(normalizeSql(history.sql)).toContain('platform_code');
+      const snapshot = queryFor(table, /\bFROM\s+results\b/i);
+      expect(normalizeSql(snapshot.sql)).toBe(
+        "SELECT result_id FROM results WHERE COALESCE(platform_code, 'STAR') = ? AND result_official_code = ? AND report_year_id = ? AND is_snapshot = TRUE AND is_active = TRUE",
+      );
+      expect(snapshot.params).toEqual(['TIP', CODE, YEAR]);
+      const toc = queryFor(
+        table,
+        /\bFROM\s+result_pool_funding_toc_alignment\b/i,
+      );
+      expect(toc.params).toEqual([TIP_VERSION_ID]);
+      expect(parsedChanges(table)['Theory of Change result']).toEqual({
+        before: 'TIP version title',
+        after: 'Callback title',
       });
     });
   });

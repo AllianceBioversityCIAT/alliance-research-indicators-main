@@ -17,7 +17,7 @@
       <i class="pi pi-chevron-right text-[#777C83] mx-2 !text-[12px]"></i>
       }
 
-      @if (item.route && $index < breadcrumb().length - 1) { <a [routerLink]="item.route"
+      @if (item.route && $index < breadcrumb().length - 1) { <a [routerLink]="item.route" [queryParams]="item.queryParams"
         class="text-[#777C83] hover:underline cursor-pointer !font-[space_grotesk]" [pTooltip]="item.tooltip"
         tooltipPosition="bottom">
         {{ item.label }}

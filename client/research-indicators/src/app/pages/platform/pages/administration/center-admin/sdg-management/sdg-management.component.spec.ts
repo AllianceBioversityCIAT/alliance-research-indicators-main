@@ -602,4 +602,229 @@ describe('SdgManagementComponent', () => {
     expect(c.portfolioLabel(2)).toBe('Portfolio (2026–2030)');
     expect(c.portfolioLabel(1)).toBe('Portfolio');
   });
+
+  describe('additional coverage', () => {
+    const portfolio1Lever = (over: Partial<GetLevers> = {}) => baseLever({ id: 1, lever_id: 1, short_name: 'Lever 1', portfolio_id: 1, ...over });
+
+    async function createLoaded(extraApi: Record<string, unknown> = {}) {
+      Object.assign(api, extraApi);
+      await configureBed();
+      const f = TestBed.createComponent(SdgManagementComponent);
+      mockGetLevers.mockResolvedValue({ data: [portfolio1Lever()] });
+      mockGetMappings.mockResolvedValue({ data: [{ id: 10, lever_id: 1, sdg_target_id: 12 }] });
+      mockGetClarisa.mockResolvedValue({ data: [{ id: 12, sdg_target_code: '1.1', sdg_target: 'T1.1' }] });
+      f.detectChanges();
+      await f.whenStable();
+      await delayMs(0);
+      f.detectChanges();
+      return f;
+    }
+
+    afterEach(() => {
+      delete (api as Record<string, unknown>)['GET_Portfolios'];
+    });
+
+    it('loads portfolios when the API exposes GET_Portfolios and ignores failures or non-array data', async () => {
+      const getPortfolios = jest.fn().mockResolvedValue({ data: [{ portfolio_id: 2, start_year: 2026, end_year: 2030 }] });
+      const f = await createLoaded({ GET_Portfolios: getPortfolios });
+      expect(getPortfolios).toHaveBeenCalled();
+      expect(f.componentInstance.portfolios()).toHaveLength(1);
+      // portfolio id resolved through portfolio_id when id is absent
+      expect(f.componentInstance.portfolioLabel(2)).toBe('Portfolio (2026–2030)');
+
+      getPortfolios.mockRejectedValue(new Error('x'));
+      await (f.componentInstance as unknown as { load: () => Promise<void> }).load();
+      expect(f.componentInstance.portfolios()).toEqual([]);
+      expect(f.componentInstance.loadError()).toBe(false);
+
+      getPortfolios.mockResolvedValue({ data: 'nope' });
+      await (f.componentInstance as unknown as { load: () => Promise<void> }).load();
+      expect(f.componentInstance.portfolios()).toEqual([]);
+    });
+
+    it('labels a portfolio with only one valid year as the plain label and sorts missing years last', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      c.portfolios.set([
+        { id: 1, name: 'P1', description: '', start_year: 2026, end_year: undefined as never },
+        { id: 2, name: 'P2', description: '', start_year: undefined as never, end_year: 2030 }
+      ]);
+      expect(c.portfolioLabel(1)).toBe('Portfolio');
+      expect(c.portfolioLabel(2)).toBe('Portfolio');
+      expect(c.portfolioSections()).toEqual([1, 2]);
+      c.portfolios.set([]);
+      expect(c.portfolioSections()).toEqual([1, 2]);
+    });
+
+    it('targetsForLever drops invalid ids, falls back to a placeholder row and sorts by code', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      const lever = portfolio1Lever();
+      c.sdgSignalFor(lever).set({
+        result_lever_sdgs: [],
+        result_lever_sdg_targets: [
+          { sdg_target_id: 0 },
+          { sdg_target_id: 'abc' as never },
+          { sdg_target_id: 99 },
+          { sdg_target_id: 12 }
+        ]
+      });
+      const rows = c.targetsForLever(lever);
+      expect(rows.map(r => r.sdg_target_code)).toEqual(['1.1', '99']);
+      expect(rows[1]).toEqual({ id: 99, sdg_target_code: '99', sdg_target: '' });
+    });
+
+    it('portfolio 2025 modal actions: confirm saves, cancel closes, confirm is disabled while saving', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      mockPatch.mockResolvedValue({ data: {} });
+      c.openPortfolio2025Editor(portfolio1Lever({ short_name: '', other_names: '' }));
+      const cfg = modalConfig() as unknown as Record<
+        string,
+        { title: string; confirmAction: () => void; cancelAction: () => void; disabledConfirmAction: () => boolean }
+      >;
+      const modal = cfg['portfolio2025LeverSdgs'];
+      expect(modal.title).toBe('SDG targets');
+      expect(modal.disabledConfirmAction()).toBe(false);
+      c.savingLeverId.set(1);
+      expect(modal.disabledConfirmAction()).toBe(true);
+      c.savingLeverId.set(null);
+
+      modal.cancelAction();
+      expect(modals.closeModal).toHaveBeenCalledWith('portfolio2025LeverSdgs');
+
+      modal.confirmAction();
+      await delayMs(0);
+      expect(mockPatch).toHaveBeenCalled();
+    });
+
+    it('portfolio 2025 modal title handles a lever without short_name', async () => {
+      const f = await createLoaded();
+      f.componentInstance.openPortfolio2025Editor(portfolio1Lever({ short_name: undefined as never, other_names: 'Climate' }));
+      const cfg = modalConfig() as unknown as Record<string, { title: string }>;
+      expect(cfg['portfolio2025LeverSdgs'].title).toBe(': Climate');
+    });
+
+    it('savePortfolio2025 does nothing without an editing lever or while saving, and keeps the modal open on error', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      await c.savePortfolio2025();
+      expect(mockPatch).not.toHaveBeenCalled();
+
+      c.editingLever.set(portfolio1Lever());
+      c.savingLeverId.set(5);
+      await c.savePortfolio2025();
+      expect(mockPatch).not.toHaveBeenCalled();
+      c.savingLeverId.set(null);
+
+      c.portfolio2025EditSignal.set({
+        result_lever_sdg_targets: [
+          { id: 0, sdg_target_id: 0 } as never,
+          { id: 12, sdg_target_id: 12 } as never
+        ]
+      });
+      mockPatch.mockRejectedValue(new Error('x'));
+      modals.closeModal.mockReset();
+      await c.savePortfolio2025();
+      expect(c.saveError()).toBe('Failed to save. Please try again.');
+      expect(modals.closeModal).not.toHaveBeenCalled();
+      expect(c.sdgSignalFor(portfolio1Lever())().result_lever_sdg_targets).toEqual([{ sdg_target_id: 12 }]);
+    });
+
+    it('portfolio 2026 modal actions: confirm saves, cancel closes, confirm disabled while saving', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      mockPatchPortfolio2026.mockResolvedValue({ data: {} });
+      c.openPortfolio2026Editor();
+      const cfg = modalConfig() as unknown as Record<
+        string,
+        { confirmAction: () => void; cancelAction: () => void; disabledConfirmAction: () => boolean }
+      >;
+      const modal = cfg['portfolio2026SdgTargets'];
+      expect(modal.disabledConfirmAction()).toBe(false);
+      c.savingPortfolio2026.set(true);
+      expect(modal.disabledConfirmAction()).toBe(true);
+      c.savingPortfolio2026.set(false);
+
+      modal.cancelAction();
+      expect(modals.closeModal).toHaveBeenCalledWith('portfolio2026SdgTargets');
+
+      modal.confirmAction();
+      await delayMs(0);
+      expect(mockPatchPortfolio2026).toHaveBeenCalledWith({ sdg_target_ids: [12] });
+    });
+
+    it('savePortfolio2026 ignores re-entry and reports an error on failure', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      c.savingPortfolio2026.set(true);
+      await c.savePortfolio2026();
+      expect(mockPatchPortfolio2026).not.toHaveBeenCalled();
+      c.savingPortfolio2026.set(false);
+
+      c.portfolio2026EditSignal.set({
+        result_lever_sdg_targets: [{ id: 0, sdg_target_id: 0 } as never, { id: 40, sdg_target_id: 40 } as never]
+      });
+      mockPatchPortfolio2026.mockRejectedValue(new Error('x'));
+      await c.savePortfolio2026();
+      expect(mockPatchPortfolio2026).toHaveBeenCalledWith({ sdg_target_ids: [40] });
+      expect(c.saveError()).toBe('Failed to save the SDG targets. Please try again.');
+      expect(c.saveSuccess()).toBe(false);
+      expect(c.savingPortfolio2026()).toBe(false);
+    });
+
+    it('falls back to the default 2026 codes when the config call fails and skips clarisa when not exposed', async () => {
+      mockGetPortfolio2026.mockRejectedValue(new Error('x'));
+      const f = await createLoaded();
+      mockGetClarisa.mockResolvedValue({
+        data: [
+          { id: 1, sdg_target_code: '12.1', sdg_target: 'a' },
+          { id: 2, sdg_target_code: '1.1', sdg_target: 'b' },
+          { id: 3, sdg_target_code: '9.9', sdg_target: 'c' }
+        ]
+      });
+      await (f.componentInstance as unknown as { load: () => Promise<void> }).load();
+      expect(f.componentInstance.portfolio2026Targets().map(t => t.sdg_target_code)).toEqual(['1.1', '12.1']);
+    });
+
+    it('handles clarisa failures and missing optional endpoints', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance as unknown as { load: () => Promise<void> };
+      mockGetClarisa.mockRejectedValue(new Error('x'));
+      await c.load();
+      expect(f.componentInstance.clarisaSdgTargets()).toEqual([]);
+
+      delete (api as Record<string, unknown>)['GET_ClarisaSdgTargets'];
+      await c.load();
+      expect(f.componentInstance.loadError()).toBe(false);
+
+      const saved = mockGetPortfolio2026;
+      delete (api as Record<string, unknown>)['GET_Portfolio2026SdgTargets'];
+      api.GET_ClarisaSdgTargets = mockGetClarisa;
+      mockGetClarisa.mockResolvedValue({ data: [{ id: 1, sdg_target_code: '1.1', sdg_target: 'a' }] });
+      await c.load();
+      expect(f.componentInstance.portfolio2026Targets()).toHaveLength(1);
+      api.GET_Portfolio2026SdgTargets = saved;
+    });
+
+    it('treats a clarisa response without array data as empty', async () => {
+      const f = await createLoaded();
+      mockGetClarisa.mockResolvedValue({ data: null });
+      await (f.componentInstance as unknown as { load: () => Promise<void> }).load();
+      expect(f.componentInstance.clarisaSdgTargets()).toEqual([]);
+    });
+
+    it('lever helpers resolve ids and images', async () => {
+      const f = await createLoaded();
+      const c = f.componentInstance;
+      expect(c.leverNumericId(baseLever({ id: 9, lever_id: 99 }))).toBe(99);
+      expect(c.leverNumericId(baseLever({ id: 9, lever_id: undefined }))).toBe(9);
+      expect(c.leverImageSrc(baseLever({ icon: undefined, lever_url: undefined } as Partial<GetLevers>))).toBe('');
+      expect(c.leverImageSrc(baseLever({ icon: undefined, lever_url: 'https://x/y.png' } as Partial<GetLevers>))).toBe('https://x/y.png');
+      expect(c.isSelected(baseLever({ id: 500, lever_id: 500 }))).toBe(false);
+      c.levers.set([]);
+      expect(c.isSelected(portfolio1Lever())).toBe(false);
+      expect(c.selectedLever()).toBeNull();
+    });
+  });
 });

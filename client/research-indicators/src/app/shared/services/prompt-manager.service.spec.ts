@@ -135,4 +135,75 @@ describe('PromptManagerService', () => {
     expect(service.sectionLabel('system_role')).toBe('System role');
     expect(service.sectionLabel('extra_notes_section')).toBe('Extra notes section');
   });
+
+  // ── Coverage completion ───────────────────────────────────────────────────
+
+  const bare = (overrides: Record<string, unknown>): PromptItem => ({ ...promptRow, ...overrides }) as unknown as PromptItem;
+
+  it('resets the edit state when the editPrompt modal is closed from outside the service', () => {
+    service.openEdit(promptRow);
+    TestBed.flushEffects();
+    expect(service.editingItem()).toEqual(promptRow);
+
+    allModals.closeModal('editPrompt');
+    TestBed.flushEffects();
+
+    expect(service.editingItem()).toBeNull();
+    expect(service.editForm()).toEqual({});
+    expect(service.saveError()).toBeNull();
+  });
+
+  it('loadList ignores a second call while one is in flight', async () => {
+    http.get.mockReturnValue(of({ prompts: [promptRow] }));
+    const first = service.loadList();
+    const second = service.loadList();
+    await Promise.all([first, second]);
+    expect(http.get).toHaveBeenCalledTimes(1);
+    expect(service.loading()).toBe(false);
+  });
+
+  it('loadList falls back to an empty list when the response has no prompts', async () => {
+    http.get.mockReturnValue(of(null));
+    await service.loadList();
+    expect(service.items()).toEqual([]);
+    expect(service.loadError()).toBe(false);
+  });
+
+  it('isDirty is false when nothing is being edited', () => {
+    expect(service.isDirty()).toBe(false);
+  });
+
+  it('isDirty treats missing draft and stored values as empty strings', () => {
+    service.openEdit(bare({ user_prompt: undefined, default_prompt: undefined }));
+    expect(service.isDirty()).toBe(false);
+    service.editForm.set({});
+    expect(service.isDirty()).toBe(false);
+    service.editForm.set({ system_role: 'x' });
+    expect(service.isDirty()).toBe(true);
+  });
+
+  it('saveEdit does nothing when no prompt is being edited', async () => {
+    await service.saveEdit();
+    expect(http.post).not.toHaveBeenCalled();
+    expect(service.saving()).toBe(false);
+  });
+
+  it('saveEdit sends empty strings for sections missing from the draft', async () => {
+    http.get.mockReturnValue(of({ prompts: [] }));
+    http.post.mockReturnValue(of({}));
+    service.openEdit(promptRow);
+    service.editForm.set({});
+    await service.saveEdit();
+    expect(http.post.mock.calls[0][1].user_prompt).toEqual({ system_role: '', context: '' });
+  });
+
+  it('sectionKeys falls back to default_prompt keys and then to no keys', () => {
+    expect(service.sectionKeys(bare({ sections: undefined, user_prompt: null }))).toEqual(['system_role', 'context']);
+    expect(service.sectionKeys(bare({ sections: undefined, user_prompt: null, default_prompt: null }))).toEqual([]);
+  });
+
+  it('openEdit seeds empty strings when neither stored nor default prompt has the section', () => {
+    service.openEdit(bare({ user_prompt: null, default_prompt: null }));
+    expect(service.editForm()).toEqual({ system_role: '', context: '' });
+  });
 });

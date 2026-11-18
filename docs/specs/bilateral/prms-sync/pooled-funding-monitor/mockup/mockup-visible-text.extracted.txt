@@ -1,0 +1,170 @@
+★
+Testing Environment
+Home
+Projects
+Results Center
+Results Dashboard
+⊕ Create Result
+⌕
+Search
+DZ
+RESOURCES
+«
+About Indicators
+ADMINISTRATION
+Principal Investigator
+PI
+⌃
+My PI Delegates
+My results
+Pooled Funding Contribution Monitor
+Center admin
+⌃
+Bulk upload
+SDG Management
+Pool funding mapping
+Portfolio Management
+System admin
+⌃
+Environment variables
+ACCOUNT
+Ask for Help
+Log out
+Pooled Funding Contribution Monitor
+Monitor eligibility, sync approved results contributing to Pool funding to PRMS, and track returning QA statuses and Theory of Change mapping.
+Viewing
+Only my results as PI
+Whole portfolio
+PRMS sync: today 09:30
+Sync now
+{{ c.label }}
+{{ c.value }}
+{{ c.of }}
+Portfolio coverage
+Results queue
+Result pipeline — Pool funding mapping to PRMS
+{{ pc.createdNote }}
+{{ pl.total }}
+results · {{ pl.inScope }} in PRMS scope
+{{ pl.notSynced }}
+in STAR, not synced yet · {{ pl.notSyncedShare }}
+{{ pl.inPrms }}
+in PRMS · {{ pl.inPrmsShare }}
+{{ pl.noSp }}
+out of scope · {{ pl.noSpShare }}
+{{ s.value }}
+{{ s.share }}
+{{ s.label }}
+{{ s.group }}
+Coverage by Science Program
+{{ spCoverageSub }}
+{{ spCoverageLegend }}
+{{ spCoverageLegend2 }}
+{{ row.label }}
+{{ row.count }}
+Sync activity
+{{ pc.monthSub }}
+Results synced per month
+Feb
+Mar
+Apr
+May
+Jun
+Jul
+{{ pc.monthFoot }}
+Project contributing to Pool funding
+{{ o }}
+Science Program
+All Science Programs
+{{ o.label }}
+Status
+{{ o }}
+Result type
+{{ o }}
+Reset
+Quick views
+{{ c.label }}
+{{ c.count }}
+{{ p.code }}
+{{ p.name }}
+Lead PI: {{ p.pi }} · {{ p.donor }}
+{{ p.countLabel }}
+{{ p.flagLabel }}
+{{ p.caret }}
+Result
+STAR status
+Pool funding mapping
+PRMS status
+Updated
+Action
+{{ r.title }}
+{{ r.code }}
+{{ r.type }}
+{{ r.starStatus }}
+{{ r.piLine }}
+{{ r.mapping }}
+{{ r.spLine }}
+{{ r.prmsStatus }}
+{{ r.updated }}
+View
+{{ r.actionLabel }}
+{{ countLine }}
+Approved in PRMS
+Pending review
+Rejected
+Not synced
+Theory of Change mapping returned by PRMS
+Mappings are authored in PRMS after QA. STAR stores them read-only and flags conflicts with the submitted contribution.
+Result
+Science Program
+PRMS TOC node
+Mapping
+Received
+{{ t.title }}
+{{ t.code }}
+{{ t.sp }}
+{{ t.node }}
+{{ t.level }}
+{{ t.mapping }}
+{{ t.received }}
+{{ l.when }}
+{{ l.title }}
+{{ l.tag }}
+{{ l.detail }}
+{{ d.code }}
+Out of sync
+{{ d.title }}
+{{ d.project }} · {{ d.type }} · {{ d.year }}
+×
+Overview
+STAR ↔ PRMS diff
+Activity
+Eligibility for PRMS
+{{ c.icon }}
+{{ c.label }}
+{{ c.detail }}
+{{ d.gateText }}
+{{ d.actionLabel }}
+Complete Pool funding mapping
+Request PI approval
+Primary Science Program
+{{ d.primarySP }}
+Contributing
+{{ d.contrib }}
+Principal Investigator
+{{ d.pi }}
+{{ d.piLine }}
+PRMS record
+{{ d.prmsRef }}
+{{ d.diffIntro }}
+Field
+STAR (v{{ d.starVer }})
+PRMS (v{{ d.prmsVer }})
+{{ f.field }}
+{{ f.star }}
+{{ f.prms }}
+Push STAR v{{ d.starVer }} to PRMS
+{{ a.when }}
+{{ a.title }}
+{{ a.detail }}
+{{ toast }}

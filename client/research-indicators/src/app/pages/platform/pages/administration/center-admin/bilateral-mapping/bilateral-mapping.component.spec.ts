@@ -1765,8 +1765,203 @@ describe('BilateralMappingComponent', () => {
       expect(tableHeaders.some(h => h?.includes('CLARISA Project (Bilateral)'))).toBe(true);
     });
   });
+
+  // ── Coverage completion: edge branches ────────────────────────────────────
+
+  describe('edge branches (coverage completion)', () => {
+    beforeEach(() => {
+      mockService.list.mockResolvedValue(makePage([makeRow()]));
+    });
+
+    async function init(): Promise<void> {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+    }
+
+    it('exposes legacy activeFilter / activeOptions aliases', () => {
+      expect(component.activeFilter).toBe(component.statusFilter);
+      expect(component.activeOptions).toBe(component.statusOptions);
+    });
+
+    it('selectedProject is null when the selected id is not in clarisaOptions', () => {
+      component.clarisaOptions.set(CLARISA_OPTIONS);
+      component.selectedProjectId.set(12345);
+      expect(component.selectedProject()).toBeNull();
+      component.selectedProjectId.set(22);
+      expect(component.selectedProject()?.short_name).toBe('ACIAR');
+    });
+
+    it('canSave is false in edit mode when there is no snapshot', () => {
+      component.dialogMode.set('edit');
+      expect(component['editSnapshot']).toBeNull();
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('onSearchInput debounces and applies the term, resetting to page 1', async () => {
+      await init();
+      mockService.list.mockClear();
+      component.page.set(3);
+      component.onSearchInput('aciar');
+      await delayMs(350);
+      expect(component.search()).toBe('aciar');
+      expect(component.page()).toBe(1);
+      expect(mockService.list.mock.calls[0][0]).toMatchObject({ search: 'aciar', page: 1 });
+    });
+
+    it('onClarisaFilter with empty term loads options without a query', async () => {
+      await init();
+      mockService.loadClarisaProjectOptions.mockClear();
+      component.onClarisaFilter('');
+      await delayMs(350);
+      expect(mockService.loadClarisaProjectOptions).toHaveBeenCalledWith(undefined);
+      expect(component.clarisaOptions()).toEqual(CLARISA_OPTIONS);
+      expect(component.clarisaOptionsLoading()).toBe(false);
+    });
+
+    it('onClarisaFilter with a term forwards it; nullish term is coerced to empty', async () => {
+      await init();
+      mockService.loadClarisaProjectOptions.mockClear();
+      component.onClarisaFilter('usa');
+      await delayMs(350);
+      expect(mockService.loadClarisaProjectOptions).toHaveBeenCalledWith('usa');
+      component.onClarisaFilter(null as unknown as string);
+      await delayMs(350);
+      expect(mockService.loadClarisaProjectOptions).toHaveBeenLastCalledWith(undefined);
+    });
+
+    it('onAgressoFilter coerces a nullish term to empty', async () => {
+      await init();
+      mockService.loadAgressoOptions.mockClear();
+      component.onAgressoFilter(null as unknown as string);
+      await delayMs(350);
+      expect(mockService.loadAgressoOptions).toHaveBeenCalledWith(undefined);
+    });
+
+    it('onActiveFilterChange maps "active" to "mapped" and passes other values through', async () => {
+      await init();
+      component.onActiveFilterChange('active');
+      expect(component.statusFilter()).toBe('mapped');
+      component.onActiveFilterChange('all');
+      expect(component.statusFilter()).toBe('all');
+    });
+
+    it('onPageChange converts the zero-based page and defaults a missing page to 1', async () => {
+      await init();
+      component.onPageChange({ page: 2 });
+      expect(component.page()).toBe(3);
+      component.onPageChange({});
+      expect(component.page()).toBe(1);
+    });
+
+    it('onSort ignores events without data, field or order', () => {
+      const data = [makeRow({ id: 2 }), makeRow({ id: 1 })];
+      component.onSort({ field: 'id', order: 1 });
+      component.onSort({ data, order: 1 });
+      component.onSort({ data, field: 'id' });
+      expect(data.map(r => r.id)).toEqual([2, 1]);
+    });
+
+    it('onSort sorts, treats null values as empty strings and returns 0 for ties', () => {
+      const data = [
+        makeRow({ id: 1, notes: 'b' }),
+        makeRow({ id: 2, notes: null }),
+        makeRow({ id: 3, notes: null }),
+        makeRow({ id: 4, notes: 'A' })
+      ];
+      component.onSort({ data, field: 'notes', order: 1 });
+      expect(data.map(r => r.id)).toEqual([2, 3, 4, 1]);
+      component.onSort({ data, field: 'notes', order: -1 });
+      expect(data.map(r => r.id)).toEqual([1, 4, 2, 3]);
+    });
+
+    it('openMapDialogForPending drops placeholder / derived / empty agreement ids', () => {
+      component.openMapDialogForPending(makeRow({ agresso_agreement_id: '—' }));
+      expect(component.selectedAgreement()).toBeNull();
+      component.openMapDialogForPending(makeRow({ agresso_agreement_id: 'Derived from X' }));
+      expect(component.selectedAgreement()).toBeNull();
+      component.openMapDialogForPending(makeRow({ agresso_agreement_id: '' }));
+      expect(component.selectedAgreement()).toBeNull();
+      component.openMapDialogForPending(makeRow({ agresso_agreement_id: 'A511' }));
+      expect(component.selectedAgreement()).toBe('A511');
+      expect(component.selectedProjectId()).toBe(22);
+    });
+
+    it('openEditDialog uses an empty string when the row has no notes', () => {
+      component.openEditDialog(makeRow({ notes: null }));
+      expect(component.notes()).toBe('');
+      expect(component['editSnapshot']).toEqual({ clarisa_project_id: 22, notes: '' });
+    });
+
+    it('onNotesInput keeps short values untouched', () => {
+      component.onNotesInput('short');
+      expect(component.notes()).toBe('short');
+    });
+
+    it('clarisaOptionLabel returns the title when there is no code', () => {
+      const opt = { id: 5, short_name: '', full_name: 'Only Title' } as ClarisaBilateralProjectOption;
+      expect(component.clarisaOptionLabel(opt)).toBe('Only Title');
+    });
+
+    it('onSave does nothing when canSave is false', async () => {
+      await component.onSave();
+      expect(mockService.create).not.toHaveBeenCalled();
+      expect(mockService.update).not.toHaveBeenCalled();
+      expect(component.saving()).toBe(false);
+    });
+
+    it('handleCreate returns early when the form selection is incomplete', async () => {
+      component.selectedAgreement.set(null);
+      component.selectedProjectId.set(null);
+      await component['handleCreate']();
+      expect(mockService.create).not.toHaveBeenCalled();
+    });
+
+    it('create failure without a message surfaces the generic error', async () => {
+      mockService.create.mockResolvedValue({ ok: false, status: 500, message: '' });
+      component.openCreateDialog();
+      component.selectedAgreement.set('A511');
+      component.selectedProjectId.set(22);
+      await component.onSave();
+      expect(component.saveError()).toBe('An error occurred. Please try again.');
+      expect(component.dialogOpen()).toBe(true);
+    });
+
+    it('deactivate failure without a message shows the generic error toast', async () => {
+      mockService.deactivate.mockResolvedValue({ ok: false, status: 500, message: '' });
+      await component.confirmDeactivate(makeRow());
+      expect(mockActions.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'error', detail: 'Could not deactivate mapping. Please try again.' })
+      );
+    });
+
+    it('handleUpdate returns early without an editing id or snapshot', async () => {
+      await component['handleUpdate']();
+      expect(mockService.update).not.toHaveBeenCalled();
+      component.editingId.set(7);
+      await component['handleUpdate']();
+      expect(mockService.update).not.toHaveBeenCalled();
+    });
+
+    it('update sends only notes and tracks an empty project id when the project is cleared', async () => {
+      mockService.update.mockResolvedValue({ ok: true, data: null });
+      component.openEditDialog(makeRow({ id: 9, notes: 'old' }));
+      component.selectedProjectId.set(null);
+      component.notes.set(' new ');
+      await component.onSave();
+      expect(mockService.update).toHaveBeenCalledWith(9, { notes: 'new' });
+      expect(mockClarity.trackEvent).toHaveBeenCalledWith('bilateral.mapping.updated', {
+        mapping_id: 9,
+        clarisa_project_id: ''
+      });
+    });
+
+    it('update failure without a message surfaces the generic error', async () => {
+      mockService.update.mockResolvedValue({ ok: false, status: 400, message: '' });
+      component.openEditDialog(makeRow({ id: 9, notes: 'old' }));
+      component.notes.set('changed');
+      await component.onSave();
+      expect(component.saveError()).toBe('An error occurred. Please try again.');
+    });
+  });
 });
-
-
-
-

@@ -9,7 +9,8 @@ import { ActionsService } from '@services/actions.service';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { DropdownsCacheService } from '../../services/cache/dropdowns-cache.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subject } from 'rxjs';
 // @akili-spec changes/profile-simulation
 import { ImpersonationService } from '@services/impersonation.service';
 import { RolesService } from '@services/cache/roles.service';
@@ -1819,6 +1820,109 @@ describe('AllianceNavbarComponent', () => {
         detail: 'Simulation ended — you are back as Ana'
       });
       expect(component.showDropdown).toBe(false);
+    });
+  });
+  describe('coverage: websocket injection, router events, observer target', () => {
+    function recreate(websocketProvider: unknown) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [AllianceNavbarComponent, HttpClientTestingModule, RouterTestingModule.withRoutes([])],
+        schemas: [NO_ERRORS_SCHEMA],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: DarkModeService, useValue: mockDarkModeService },
+          { provide: ActionsService, useValue: mockActionsService },
+          { provide: AllModalsService, useValue: mockAllModalsService },
+          { provide: DropdownsCacheService, useValue: {} },
+          { provide: ServiceLocatorService, useValue: mockServiceLocator },
+          { provide: RolesService, useValue: mockRolesService },
+          { provide: ImpersonationService, useValue: mockImpersonationService },
+          websocketProvider as never
+        ]
+      });
+      const f = TestBed.createComponent(AllianceNavbarComponent);
+      f.detectChanges();
+      return f;
+    }
+
+    it('skips configUser when the websocket service does not expose it', async () => {
+      const f = recreate({ provide: WebsocketService, useValue: {} });
+      mockImpersonationService.end.mockResolvedValue({ actor: { first_name: 'Ana', sec_user_id: 1 } });
+      mockCacheService.bumpContentReload.mockClear();
+      await f.componentInstance.endSimulation();
+      expect(mockWebsocketService.configUser).not.toHaveBeenCalled();
+      expect(mockCacheService.bumpContentReload).toHaveBeenCalledTimes(1);
+    });
+
+    it('still ends the simulation when injecting the websocket service throws', async () => {
+      const f = recreate({
+        provide: WebsocketService,
+        useFactory: () => {
+          throw new Error('no socket');
+        }
+      });
+      mockImpersonationService.end.mockResolvedValue({ actor: { first_name: 'Ana', sec_user_id: 1 } });
+      mockActionsService.showToast.mockClear();
+      await f.componentInstance.endSimulation();
+      expect(mockActionsService.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: 'Simulation ended — you are back as Ana' })
+      );
+    });
+
+    it('uses an empty name in the toast when end() returns no actor', async () => {
+      mockImpersonationService.end.mockResolvedValue({ actor: null });
+      mockActionsService.showToast.mockClear();
+      await component.endSimulation();
+      expect(mockWebsocketService.configUser).not.toHaveBeenCalled();
+      expect(mockActionsService.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: 'Simulation ended — you are back as ' })
+      );
+    });
+
+    it('updates the active-projects flag on NavigationEnd and ignores other events', () => {
+      const events = mockRouter.events as unknown as Subject<unknown>;
+      expect(component.isProjectsOrDetailActive()).toBe(false);
+
+      events.next(new NavigationEnd(1, '/x', '/projects/list'));
+      expect(component.isProjectsOrDetailActive()).toBe(true);
+
+      events.next(new NavigationEnd(2, '/y', '/home'));
+      expect(component.isProjectsOrDetailActive()).toBe(false);
+
+      events.next(new NavigationEnd(3, '/z', '/project-detail/5'));
+      expect(component.isProjectsOrDetailActive()).toBe(true);
+
+      events.next({ type: 'not-a-navigation-end' });
+      expect(component.isProjectsOrDetailActive()).toBe(true);
+    });
+
+    it('falls back to the #navbar element as the resize target when the host element is unavailable', () => {
+      const observe = jest.fn();
+      const original = (globalThis as any).ResizeObserver;
+      (globalThis as any).ResizeObserver = jest.fn(() => ({ observe, disconnect: jest.fn() }));
+      try {
+        const navbarEl = document.createElement('div');
+        component.elementRef = { nativeElement: null } as any;
+        component.navbarElement = { nativeElement: navbarEl } as any;
+        component.ngAfterViewInit();
+        expect(observe).toHaveBeenCalledWith(navbarEl);
+      } finally {
+        (globalThis as any).ResizeObserver = original;
+      }
+    });
+
+    it('does not create a resize observer when no target element exists', () => {
+      const ctor = jest.fn();
+      const original = (globalThis as any).ResizeObserver;
+      (globalThis as any).ResizeObserver = ctor;
+      try {
+        component.elementRef = { nativeElement: null } as any;
+        component.navbarElement = undefined as any;
+        component.ngAfterViewInit();
+        expect(ctor).not.toHaveBeenCalled();
+      } finally {
+        (globalThis as any).ResizeObserver = original;
+      }
     });
   });
 });

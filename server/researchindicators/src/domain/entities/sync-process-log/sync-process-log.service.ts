@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SyncProcessLog } from './entities/sync-process-log.entity';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, MoreThan, Repository } from 'typeorm';
 import { CreateSyncProcessDto } from './dto/create-sync-procees.dto';
 import {
   CurrentUserUtil,
@@ -46,6 +46,36 @@ export class SyncProcessLogService {
       throw new BadRequestException(`Error creating sync process log`);
     });
     return this.mainRepo.findOne({ where: { id: result.identifiers[0].id } });
+  }
+
+  async isInProgressYoungerThan(
+    processName: SyncProcessEnum,
+    hours: number,
+  ): Promise<boolean> {
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const inProgress = await this.mainRepo.findOne({
+      where: {
+        process_name: processName,
+        process_status: SyncProcessStatusEnum.IN_PROGRESS,
+        created_at: MoreThan(cutoff),
+      },
+    });
+    return inProgress != null;
+  }
+
+  async markFailed(id: number): Promise<void> {
+    const syncProcessLog = await this.mainRepo.findOne({ where: { id } });
+    if (!syncProcessLog) {
+      throw new NotFoundException(`Sync process log not found`);
+    }
+    await this.mainRepo
+      .update(id, {
+        process_status: SyncProcessStatusEnum.FAILED,
+        ...this.currentUser.audit(SetAuditEnum.UPDATE),
+      })
+      .catch(() => {
+        throw new BadRequestException(`Error updating sync process log`);
+      });
   }
 
   async update(

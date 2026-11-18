@@ -121,7 +121,11 @@ export class InnovationUseBuilder {
     // because those fire only when a row EXISTS but is malformed. Sending a
     // half-built row would make PRMS reject for the wrong reason and teach us
     // nothing about the contract.
-    const numbers: Record<string, unknown> = {};
+    // `innov_use_to_be_determined` is a required boolean. Owner decision
+    // 2026-11-13: always send `false`, independent of whether measures survive.
+    const numbers: Record<string, unknown> = {
+      innov_use_to_be_determined: false,
+    };
     if (actors.length > 0) {
       numbers.actors = actors;
     }

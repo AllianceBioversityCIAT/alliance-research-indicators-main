@@ -1,4 +1,6 @@
-import { writeFileSync } from 'fs';
+import { mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import type { QueryRunner } from 'typeorm';
 import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
 import { ActorRolesEnum } from '../../../src/domain/entities/actor-roles/enum/actor-roles.enum';
@@ -10,6 +12,12 @@ import { emptyFullFiltersReportDto } from '../../../src/domain/entities/reports/
 import { StarResultsExportRepository } from '../../../src/domain/entities/reports/repositories/star-results-export.repository';
 import { AppConfig } from '../../../src/domain/shared/utils/app-config.util';
 import { ResultRepository } from '../../../src/domain/entities/results/repositories/result.repository';
+
+// EXPLAIN and timing artifacts go to a private per-run directory, not a
+// shared path under the system temp dir.
+let artifactDirPath: string | undefined;
+const artifactDir = (): string =>
+  (artifactDirPath ??= mkdtempSync(join(tmpdir(), 'report-innovation-use-')));
 
 /**
  * T-02 (`docs/specs/innovation-use/excel-export`) — parity, one-row,
@@ -1722,8 +1730,8 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     const withPlan = planText(
       await q(`EXPLAIN FORMAT=TREE ${withView}`, params),
     );
-    writeFileSync('/tmp/t02-explain-base.txt', basePlan);
-    writeFileSync('/tmp/t02-explain-with.txt', withPlan);
+    writeFileSync(join(artifactDir(), 't02-explain-base.txt'), basePlan);
+    writeFileSync(join(artifactDir(), 't02-explain-with.txt'), withPlan);
 
     const phase2Rows = await q(withView, params);
     const basePrimary = countPrimaryLookups(basePlan);
@@ -1731,7 +1739,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     const baseScans = countResultsScans(basePlan);
     const withScans = countResultsScans(withPlan);
     writeFileSync(
-      '/tmp/t02-plan-counts.json',
+      join(artifactDir(), 't02-plan-counts.json'),
       JSON.stringify(
         {
           phase2Rows: phase2Rows.length,
@@ -1769,7 +1777,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       });
     }
     writeFileSync(
-      '/tmp/t02-explain-laterals.txt',
+      join(artifactDir(), 't02-explain-laterals.txt'),
       lateralExcerpts.join('\n---\n'),
     );
     expect(baseScans).toBeGreaterThanOrEqual(BASELINE_RESULTS_SCAN_COUNT - 1);
@@ -1796,7 +1804,10 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       after,
       rows: phase2Rows.length,
     };
-    writeFileSync('/tmp/t02-timing.json', JSON.stringify(timing, null, 2));
+    writeFileSync(
+      join(artifactDir(), 't02-timing.json'),
+      JSON.stringify(timing, null, 2),
+    );
     expect(beforeRaw).toHaveLength(3);
     expect(afterRaw).toHaveLength(3);
 
@@ -1817,7 +1828,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
          FROM results GROUP BY indicator_id`,
     );
     writeFileSync(
-      '/tmp/t02-cardinalities.json',
+      join(artifactDir(), 't02-cardinalities.json'),
       JSON.stringify(cardinalities, null, 2),
     );
   });

@@ -15,7 +15,9 @@ import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DownloadOicrTemplateComponent } from '../download-oicr-template/download-oicr-template.component';
 import { RolesService } from '@shared/services/cache/roles.service';
-import { isHomeEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
+import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
+import { lastPfmScope } from '@shared/utils/pfm-last-scope.util';
+import { isHomeEntryFromUrl, isPfmMonitorEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import {
@@ -32,8 +34,15 @@ const OICR_INDICATOR_ID = 5;
 export interface BreadcrumbItem {
   label: string;
   route?: string;
+  /** Query params for `route` (e.g. `{ tab: 'queue' }`); a `?` inside `route` is not parsed by routerLink. */
+  queryParams?: Record<string, string>;
   tooltip?: string;
 }
+
+/** result_status.result_status_id of Published (server ResultStatusEnum.PUBLISHED). */
+const PUBLISHED_STATUS_ID = 14;
+/** Revised (5) and Rejected (7): any user who opens the result may delete it. */
+const OPEN_DELETE_STATUS_IDS = [5, 7];
 
 @Component({
   selector: 'app-section-header',
@@ -51,6 +60,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   api = inject(ApiService);
   submissionService = inject(SubmissionService);
   whatsNewService = inject(WhatsNewService);
+  private readonly resultsCenterService = inject(ResultsCenterService);
 
   private currentProject = signal<GetProjectDetail>({});
   private contractId = signal('');
@@ -60,8 +70,11 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   private currentResultId = signal('');
   showDeleteOption = computed(() => {
     if (this.cache.isExternalResult()) return false;
-    const statusId = this.cache.currentMetadata()?.status_id;
-    return statusId === 5 || statusId === 7 || (statusId === 4 && this.cache.isMyResult()) || this.rolesService.isAdmin();
+    // Any status except Published can be deleted (the API enforces the same rule).
+    // Who may delete is unchanged: the creator or an admin, and anyone on a Revised/Rejected result.
+    const statusId = Number(this.cache.currentMetadata()?.status_id);
+    if (statusId === PUBLISHED_STATUS_ID) return false;
+    return this.cache.isMyResult() || this.rolesService.isAdmin() || OPEN_DELETE_STATUS_IDS.includes(statusId);
   });
   showStarPdfReport = computed(() => {
     const resultId = this.cache.currentResultId() || this.currentResultId();
@@ -101,6 +114,9 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
                 try {
                   const res = await this.api.DELETE_Result(this.cache.getCurrentNumericResultId());
                   if (res.successfulRequest) {
+                    // Results Center skips a fetch whose filters match the last one, so
+                    // without this it would show the cached list with the deleted result.
+                    this.resultsCenterService.invalidateResultsListFetchCache();
                     this.actions.hideGlobalAlert(0);
                     this.actions.showToast({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
                     this.router.navigate(['/results-center']);
@@ -217,6 +233,11 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     const contractId = this.contractId();
     const fullUrl = this.currentUrl();
 
+    const pfmMonitorEntryBreadcrumb = this.breadcrumbForPfmMonitorEntry(fullUrl);
+    if (pfmMonitorEntryBreadcrumb) {
+      return pfmMonitorEntryBreadcrumb;
+    }
+
     const homeEntryBreadcrumb = this.breadcrumbForHomeEntry(fullUrl);
     if (homeEntryBreadcrumb) {
       return homeEntryBreadcrumb;
@@ -289,6 +310,28 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
       if (resultId) {
         return [
           { label: 'Home', route: '/home' },
+          { label: `Result ${resultId}`, tooltip: this.resultTitle() }
+        ];
+      }
+    }
+    return undefined;
+  }
+
+  /** Back to the queue tab, in the scope the user was viewing (omitted when none is remembered). */
+  // Reads sessionStorage, which signals do not track: `breadcrumb` stays fresh only because it recomputes on every currentUrl change.
+  private pfmMonitorQueryParams(): Record<string, string> {
+    const scope = lastPfmScope();
+    return scope ? { tab: 'queue', scope } : { tab: 'queue' };
+  }
+
+  private breadcrumbForPfmMonitorEntry(fullUrl: string): BreadcrumbItem[] | undefined {
+    if (this.isResultPage() && isPfmMonitorEntryFromUrl(fullUrl)) {
+      const pathOnly = fullUrl.split(/[?#]/)[0];
+      const segs = pathOnly.split('/').filter(Boolean);
+      const resultId = segs[0] === 'result' && segs.length >= 2 ? segs[1] : '';
+      if (resultId) {
+        return [
+          { label: 'CGIAR Portfolio Contribution Monitor', route: '/cgiar-portfolio-contribution-monitor', queryParams: this.pfmMonitorQueryParams() },
           { label: `Result ${resultId}`, tooltip: this.resultTitle() }
         ];
       }

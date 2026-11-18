@@ -158,4 +158,12 @@ describe('CreateResultManagementService', () => {
     service.setStatusId(null);
     expect(service.statusId()).toBeNull();
   });
+
+  it('should set carried contract ID', () => {
+    service.setCarriedContractId('C-9');
+    expect(service.carriedContractId()).toBe('C-9');
+
+    service.setCarriedContractId(null);
+    expect(service.carriedContractId()).toBeNull();
+  });
 });

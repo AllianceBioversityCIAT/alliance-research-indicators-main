@@ -330,6 +330,27 @@ describe('portfolio-2-alignment.mapper', () => {
     });
   });
 
+  it('sends the "Other" team name and the primary flag of each Research Area', () => {
+    const body: GetAllianceAlignment = {
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: [],
+      research_areas: [
+        { id: 18, lever_id: 18, is_primary: true, custom_lever_name: '  ImpactSF  ' } as never,
+        { id: 12, lever_id: 12, is_primary: 0, custom_lever_name: 'ignored' } as never,
+        { id: 7, lever_id: 7 } as never
+      ],
+      strategic_objectives: []
+    };
+
+    expect(buildPortfolio2AlignmentPatch(body, false).research_areas).toEqual([
+      { lever_id: '18', is_primary: true, custom_lever_name: 'ImpactSF' },
+      { lever_id: '12', is_primary: false },
+      { lever_id: '7' }
+    ]);
+  });
+
   it('omits impact_outcomes when indicator does not use them', () => {
     const body: GetAllianceAlignment = {
       contracts: [],
@@ -933,6 +954,40 @@ describe('portfolio-2-alignment.mapper', () => {
 
     expect(enrichAlignmentSdgTargets([{ sdg_target_id: '27' }])).toEqual([{ sdg_target_id: 27 }]);
     expect(enrichAlignmentSdgTargets([{ id: '' }, { id: 'not-a-number' }])).toEqual([]);
+  });
+
+  describe('buildPortfolio2AlignmentPatch result_sdg_targets', () => {
+    const base = {
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: [],
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: []
+    } as unknown as GetAllianceAlignment;
+
+    it('includes only valid positive sdg targets when requested', () => {
+      const payload = buildPortfolio2AlignmentPatch(
+        {
+          ...base,
+          result_sdg_targets: [{ sdg_target_id: '27' }, { sdg_target_id: 'abc' }, { sdg_target_id: 0 }, { sdg_target_id: -3 }]
+        } as unknown as GetAllianceAlignment,
+        false,
+        true,
+        true
+      );
+      expect(payload.result_sdg_targets).toEqual([{ sdg_target_id: 27 }]);
+    });
+
+    it('defaults to an empty list when result_sdg_targets is missing', () => {
+      const payload = buildPortfolio2AlignmentPatch(base, false, true, true);
+      expect(payload.result_sdg_targets).toEqual([]);
+    });
+
+    it('omits result_sdg_targets when not requested', () => {
+      expect(buildPortfolio2AlignmentPatch(base, false).result_sdg_targets).toBeUndefined();
+    });
   });
 
   describe('defensive coalescing branches', () => {

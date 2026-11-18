@@ -150,11 +150,12 @@ export class ResultRepository
                                 AND rl.is_primary = TRUE
                                 AND rl.is_active = TRUE
                     LEFT JOIN clarisa_levers cl ON cl.id  = rl.lever_id 
-                    LEFT JOIN (SELECT GROUP_CONCAT(r2.report_year_id SEPARATOR ', ') ap_year, r2.result_official_code   
+                    LEFT JOIN (SELECT GROUP_CONCAT(r2.report_year_id SEPARATOR ', ') ap_year, r2.result_official_code, r2.platform_code
                           FROM results r2
                           WHERE r2.is_active = TRUE
                             AND r2.is_snapshot = TRUE
-                          GROUP BY r2.result_official_code ) ry ON ry.result_official_code = r.result_official_code
+                          GROUP BY r2.result_official_code, r2.platform_code ) ry ON ry.result_official_code = r.result_official_code
+                                AND ry.platform_code = r.platform_code
                     LEFT JOIN sec_users su ON su.sec_user_id = r.created_by 
                     LEFT JOIN result_evidences re ON re.result_id = r.result_id 
                                   AND re.is_active = TRUE
@@ -483,6 +484,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
 		${queryParts.contracts?.select}
 	FROM results r
 		LEFT JOIN (SELECT temp.result_official_code,
+                                        temp.platform_code,
                                         IF(
 								        COUNT(temp.report_year_id) = 0,
 								        JSON_ARRAY(),
@@ -491,7 +493,8 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
                                         FROM results temp
                                         WHERE temp.is_active = TRUE
                                         AND temp.is_snapshot = TRUE
-                                        GROUP BY result_official_code) r2 ON r.result_official_code = r2.result_official_code
+                                        GROUP BY temp.result_official_code, temp.platform_code) r2 ON r.result_official_code = r2.result_official_code
+                                        AND r.platform_code = r2.platform_code
     ${this.filterByPrimaryContract(filters?.filter_primary_contract)}
 		${queryParts.result_audit_data?.join}
 		${queryParts.result_status?.join}
@@ -695,6 +698,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
               SELECT 1
               FROM results s
               WHERE s.result_official_code = r.result_official_code
+                AND s.platform_code = r.platform_code
                 AND s.is_snapshot = TRUE
                 AND s.report_year_id IN (?)
             )
@@ -744,6 +748,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
             SELECT 1
             FROM results s
             WHERE s.result_official_code = r.result_official_code
+              AND s.platform_code = r.platform_code
               AND s.is_snapshot = TRUE
               AND s.report_year_id IN (?)
           ) THEN 130 ELSE 0 END) +
@@ -867,6 +872,7 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
     INNER JOIN result_status rs ON rs.result_status_id = r.result_status_id
     LEFT JOIN results r2
       ON r2.result_official_code = r.result_official_code
+      AND r2.platform_code = r.platform_code
       AND r2.is_snapshot = TRUE
     LEFT JOIN result_contracts rc on rc.result_id = r.result_id 
       AND rc.is_active 

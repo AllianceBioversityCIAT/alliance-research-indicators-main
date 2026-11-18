@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { SectionHeaderComponent } from './section-header.component';
 import { ActivatedRoute, Router, NavigationEnd } from '@angular/router';
 import { of } from 'rxjs';
@@ -208,6 +209,7 @@ describe('SectionHeaderComponent', () => {
   });
 
   it('should execute delete confirm flow successfully', async () => {
+    const invalidate = jest.spyOn(TestBed.inject(ResultsCenterService), 'invalidateResultsListFetchCache');
     // Trigger menu open to register the alert with confirm callback
     const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
     const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
@@ -224,11 +226,15 @@ describe('SectionHeaderComponent', () => {
 
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
     expect(actionsService.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
-    expect((routerSpy.navigate as jest.Mock)).toHaveBeenCalledWith(['/results-center']);
+    expect(routerSpy.navigate as jest.Mock).toHaveBeenCalledWith(['/results-center']);
+    // Results Center must re-fetch instead of showing its cached list with the deleted result.
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate.mock.invocationCallOrder[0]).toBeLessThan((routerSpy.navigate as jest.Mock).mock.invocationCallOrder.at(-1)!);
   });
 
   it('should handle unsuccessful delete response', async () => {
     (apiService.DELETE_Result as jest.Mock).mockResolvedValueOnce({ successfulRequest: false });
+    const invalidate = jest.spyOn(TestBed.inject(ResultsCenterService), 'invalidateResultsListFetchCache');
 
     const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
     const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
@@ -245,6 +251,7 @@ describe('SectionHeaderComponent', () => {
     const innerErrorPayload = (actionsService.showGlobalAlert as jest.Mock).mock.calls.pop()?.[0];
     innerErrorPayload.confirmCallback.event();
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('should handle delete API throwing error', async () => {
@@ -289,54 +296,45 @@ describe('SectionHeaderComponent', () => {
     expect(result).toBe('Test Item');
   });
 
-  it('should not show delete option when status_id is not 4, 5, or 7', () => {
-    cacheService.currentMetadata?.set({ status_id: 1 });
-    fixture.detectChanges();
+  describe('delete option by status: any status except Published', () => {
+    const expectDeleteShown = (shown: boolean) => {
+      fixture.detectChanges();
+      expect(component.showDeleteOption()).toBe(shown);
+      const items = component.items();
+      expect(items[0].items?.length).toBe(shown ? 1 : 0);
+      if (shown) expect(items[0].items?.[0].label).toBe('Delete Result');
+    };
 
-    expect(component.showDeleteOption()).toBe(false);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(0);
-  });
+    it.each([1, 2, 4, 5, 6, 7, 9, 10, 12, 13])('shows it to the creator when status_id is %p', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (cacheService as any).isMyResult.mockReturnValue(true);
+      expectDeleteShown(true);
+    });
 
-  it('should show delete option when status_id is 5', () => {
-    cacheService.currentMetadata?.set({ status_id: 5 });
-    fixture.detectChanges();
+    it.each([4, 6, 2])('shows it to an admin who is not the creator when status_id is %p', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (rolesService.isAdmin as unknown as jest.Mock).mockReturnValue(true);
+      expectDeleteShown(true);
+    });
 
-    expect(component.showDeleteOption()).toBe(true);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(1);
-    expect(items[0].items?.[0].label).toBe('Delete Result');
-  });
+    it('hides it for a Published result (14), even for the creator who is also an admin', () => {
+      cacheService.currentMetadata?.set({ status_id: 14 });
+      (cacheService as any).isMyResult.mockReturnValue(true);
+      (rolesService.isAdmin as unknown as jest.Mock).mockReturnValue(true);
+      expectDeleteShown(false);
+    });
 
-  it('should show delete option when status_id is 7', () => {
-    cacheService.currentMetadata?.set({ status_id: 7 });
-    fixture.detectChanges();
+    it.each([5, 7])('shows it to any user on a Revised/Rejected result (status_id %p)', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (cacheService as any).isMyResult.mockReturnValue(false);
+      expectDeleteShown(true);
+    });
 
-    expect(component.showDeleteOption()).toBe(true);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(1);
-    expect(items[0].items?.[0].label).toBe('Delete Result');
-  });
-
-  it('should show delete option when status_id is 4 and isMyResult is true', () => {
-    cacheService.currentMetadata?.set({ status_id: 4 });
-    (cacheService as any).isMyResult.mockReturnValue(true);
-    fixture.detectChanges();
-
-    expect(component.showDeleteOption()).toBe(true);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(1);
-    expect(items[0].items?.[0].label).toBe('Delete Result');
-  });
-
-  it('should not show delete option when status_id is 4 and isMyResult is false', () => {
-    cacheService.currentMetadata?.set({ status_id: 4 });
-    (cacheService as any).isMyResult.mockReturnValue(false);
-    fixture.detectChanges();
-
-    expect(component.showDeleteOption()).toBe(false);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(0);
+    it.each([1, 2, 4, 6])('hides it from a user who is neither the creator nor an admin (status_id %p)', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (cacheService as any).isMyResult.mockReturnValue(false);
+      expectDeleteShown(false);
+    });
   });
 
   it('F-1: should not show delete option for an external result even for an admin (status_id 5)', () => {
@@ -806,6 +804,53 @@ describe('SectionHeaderComponent', () => {
         { label: 'Results Center', route: '/results-center' },
         { label: 'Result ROAR-7', tooltip: 'OICR title' }
       ]);
+    });
+
+    it('should return Monitor → Result when result was opened from the PFM monitor queue (from query)', () => {
+      component['contractId'].set('A132');
+      component['currentUrl'].set('/result/STAR-1706/general-information?from=pfm-monitor');
+      component['resultTitle'].set('Queue result title');
+
+      const breadcrumb = component.breadcrumb();
+      expect(breadcrumb.map(b => b.label)).toEqual(['CGIAR Portfolio Contribution Monitor', 'Result STAR-1706']);
+      expect(breadcrumb[0].route).toBe('/cgiar-portfolio-contribution-monitor');
+      expect(breadcrumb[0].queryParams).toEqual({ tab: 'queue' });
+      expect(breadcrumb[1].tooltip).toBe('Queue result title');
+    });
+
+    it('PFM monitor breadcrumb reopens the remembered scope', () => {
+      sessionStorage.setItem('ari.pfm.lastScope', 'all');
+      try {
+        component['contractId'].set('A132');
+        component['currentUrl'].set('/result/STAR-1706?from=pfm-monitor');
+        expect(component.breadcrumb()[0].queryParams).toEqual({ tab: 'queue', scope: 'all' });
+      } finally {
+        sessionStorage.clear();
+      }
+    });
+
+    it('PFM monitor breadcrumb helper returns undefined when the path does not start with /result/<id>', () => {
+      const url = '/nested/result/STAR-1706?from=pfm-monitor';
+      component['currentUrl'].set(url);
+      expect(component['breadcrumbForPfmMonitorEntry'](url)).toBeUndefined();
+    });
+
+    it('PFM monitor breadcrumb omits scope when none is remembered', () => {
+      sessionStorage.clear();
+      component['contractId'].set('A132');
+      component['currentUrl'].set('/result/STAR-1706?from=pfm-monitor');
+      expect(component.breadcrumb()[0].queryParams).toEqual({ tab: 'queue' });
+      expect('scope' in (component.breadcrumb()[0].queryParams ?? {})).toBe(false);
+    });
+
+    it('should keep the Results Center breadcrumb unchanged (no queryParams) for from=results-center', () => {
+      component['contractId'].set('A132');
+      component['currentUrl'].set('/result/STAR-1706?from=results-center');
+      component['resultTitle'].set('T');
+
+      const breadcrumb = component.breadcrumb();
+      expect(breadcrumb.map(b => b.label)).toEqual(['Results Center', 'Result STAR-1706']);
+      expect(breadcrumb[0].queryParams).toBeUndefined();
     });
 
     it('should return Home → Result when result was opened from Home (from query)', () => {

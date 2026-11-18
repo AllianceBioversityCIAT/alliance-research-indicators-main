@@ -583,10 +583,9 @@ export class ResultsService {
           throw new NotFoundException('Result not found');
         }
 
-        if (result.result_status_id !== ResultStatusEnum.DRAFT) {
-          throw new ConflictException(
-            'Only results in editing status can be deleted',
-          );
+        // Any status can be deleted except Published.
+        if (result.result_status_id === ResultStatusEnum.PUBLISHED) {
+          throw new ConflictException('Published results cannot be deleted');
         }
 
         return result;
@@ -648,7 +647,7 @@ export class ResultsService {
         .findOne({
           where: {
             result_id: Not(result_id),
-            title: generalInformation.title,
+            title: generalInformation.title?.trim(),
             is_active: true,
             is_snapshot: false,
           },
@@ -674,7 +673,7 @@ export class ResultsService {
       );
 
       await manager.getRepository(this.mainRepo.target).update(result_id, {
-        title: generalInformation.title,
+        title: generalInformation.title?.trim(),
         description: generalInformation.description,
         report_year_id: generalInformation.year,
         ...this.currentUser.audit(SetAuditEnum.UPDATE),
@@ -712,7 +711,7 @@ export class ResultsService {
       this._openSearchResultApi.uploadSingleToOpenSearch(
         {
           result_id,
-          title: generalInformation.title,
+          title: generalInformation.title?.trim(),
           description: generalInformation.description,
           keywords: keywords.map((el) => el.keyword),
         },

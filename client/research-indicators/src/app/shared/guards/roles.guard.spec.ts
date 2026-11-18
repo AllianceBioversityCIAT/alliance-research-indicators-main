@@ -270,4 +270,37 @@ describe('rolesGuard', () => {
       expect(result).toBe(true);
     });
   });
+
+  describe('isDeclaredUnder (route children)', () => {
+    const seg = (path: string) => [{ path, parameters: {} }] as any;
+    const run = (children: any[], path: string) => {
+      mockCacheService.isLoggedIn.set(false);
+      return rolesGuard({ data: { isLoggedIn: true }, children } as any, seg(path));
+    };
+
+    it('redirects to login when a child path matches the first segment', () => {
+      expect(run([{ path: 'projects/list' }], 'projects')).toBe(mockUrlTree);
+    });
+
+    it('redirects to login when a child is a :param route', () => {
+      expect(run([{ path: ':id' }], 'anything')).toBe(mockUrlTree);
+    });
+
+    it('redirects to login when a child is a wildcard route', () => {
+      expect(run([{ path: '**' }], 'anything')).toBe(mockUrlTree);
+    });
+
+    it('falls through (false) when no child declares the first segment', () => {
+      expect(run([{ path: 'projects' }], 'typo')).toBe(false);
+      expect(mockRouter.createUrlTree).not.toHaveBeenCalled();
+    });
+
+    it('ignores empty-path and path-less children', () => {
+      expect(run([{ path: '' }, {}], 'projects')).toBe(false);
+    });
+
+    it('treats a route with empty children array as the protected page itself', () => {
+      expect(run([], 'whatever')).toBe(mockUrlTree);
+    });
+  });
 });

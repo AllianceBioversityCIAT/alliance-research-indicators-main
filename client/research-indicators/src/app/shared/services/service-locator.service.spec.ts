@@ -558,4 +558,19 @@ describe('ServiceLocatorService', () => {
       warnSpy.mockRestore();
     });
   });
+
+  describe('previously uncovered cases', () => {
+    it('returns policyAmountStatus from the tertiary group', () => {
+      expect((service as any).getTertiaryServices('policyAmountStatus')).toBe(serviceMock);
+      expect(injectorMock.get).toHaveBeenCalled();
+    });
+
+    it.each(['sciencePrograms', 'bilateralSciencePrograms', 'portfolio2026SdgTargets', 'piDelegatePeople', 'piDelegateProjects'])(
+      'returns %s from the other group',
+      name => {
+        expect((service as any).getOtherServices(name)).toBe(serviceMock);
+        expect(injectorMock.get).toHaveBeenCalledTimes(1);
+      }
+    );
+  });
 });

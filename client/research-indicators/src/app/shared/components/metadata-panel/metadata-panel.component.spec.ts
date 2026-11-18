@@ -42,4 +42,35 @@ describe('MetadataPanelComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('sets websocket to null when the service has no listen() method', () => {
+    expect(component.websocket).toBeNull();
+  });
+
+  describe('websocket injection', () => {
+    const create = (provider: unknown) => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [MetadataPanelComponent, NoopAnimationsModule],
+        providers: [provider as never]
+      });
+      return TestBed.createComponent(MetadataPanelComponent).componentInstance;
+    };
+
+    it('keeps the websocket service when it exposes listen()', () => {
+      const service = { listen: jest.fn() };
+      const cmp = create({ provide: WebsocketService, useValue: service });
+      expect(cmp.websocket).toBe(service);
+    });
+
+    it('sets websocket to null when injection throws', () => {
+      const cmp = create({
+        provide: WebsocketService,
+        useFactory: () => {
+          throw new Error('no socket');
+        }
+      });
+      expect(cmp.websocket).toBeNull();
+    });
+  });
 });

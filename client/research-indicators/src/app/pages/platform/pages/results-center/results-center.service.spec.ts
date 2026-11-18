@@ -1,3 +1,4 @@
+import { provideDateFormatConfigMock } from '../../../../testing/date-format-config.mock';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { signal, WritableSignal } from '@angular/core';
@@ -73,7 +74,8 @@ describe('ResultsCenterService', () => {
         ResultsCenterService,
         { provide: ApiService, useValue: mockApiServiceObj },
         { provide: CacheService, useValue: mockCacheServiceObj },
-        { provide: GetResultsService, useValue: mockGetResultsServiceObj }
+        { provide: GetResultsService, useValue: mockGetResultsServiceObj },
+        provideDateFormatConfigMock()
       ]
     });
 
@@ -285,9 +287,10 @@ describe('ResultsCenterService', () => {
       const getValue = dateColumn?.getValue;
 
       if (getValue) {
-        const result = { created_at: '2024-01-01T00:00:00Z' } as Result;
-        const dateValue = getValue(result);
-        expect(dateValue).toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/);
+        // Owner: the platform date-format configuration (as My Latest Result), date only, not the
+        // browser locale. 23:30 UTC on 31 Dec is already 1 Jan in the configured Europe/Paris.
+        expect(getValue({ created_at: '2024-01-15T09:00:00Z' } as Result)).toBe('15/01/2024');
+        expect(getValue({ created_at: '2023-12-31T23:30:00Z' } as Result)).toBe('01/01/2024');
       }
     });
 

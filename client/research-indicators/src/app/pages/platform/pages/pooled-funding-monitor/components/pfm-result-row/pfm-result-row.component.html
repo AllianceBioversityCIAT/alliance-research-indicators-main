@@ -1,0 +1,113 @@
+<!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-13 -->
+  <td class="min-w-[7.2rem]">
+  <div class="flex" data-testid="pfm-row-code">
+    <span
+      class="min-w-[58px] max-w-[58px] rounded-l-lg px-2 py-1 text-center text-[13px] font-[600]"
+      data-testid="pfm-row-code-platform"
+      [style.color]="platformColors().text"
+      [style.background-color]="platformColors().background"
+      >{{ row().platform_code }}</span
+    >
+    <span
+      class="min-w-[43px] rounded-r-lg bg-[var(--ac-pfm-neutral-bg)] px-2 py-1 text-center text-[13px] text-[var(--ac-pfm-neutral-fg)]"
+      data-testid="pfm-row-code-number"
+      >{{ codeNumber() }}</span
+    >
+  </div>
+  </td>
+  <td class="min-w-[12rem] max-w-[22rem]">
+  <div class="min-w-0 break-words" lang="es">
+    <a
+      class="block h-full w-full text-inherit no-underline hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2"
+      data-testid="pfm-row-title"
+      [attr.title]="fullTitle()"
+      [routerLink]="link().commands"
+      [queryParams]="link().queryParams"
+      ><div class="overflow-hidden line-clamp-3 xl:line-clamp-2">{{ fullTitle() }}</div></a
+    >
+  </div>
+  </td>
+  <td class="min-w-[7rem]"><div class="min-w-0 break-words" data-testid="pfm-row-indicator">{{ row().type }}</div></td>
+  <td class="min-w-[7rem]"><div class="min-w-0 break-words" data-testid="pfm-row-creator">{{ row().creator || '-' }}</div></td>
+  <td class="min-w-[7.5rem]">
+  <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-star">
+    <!-- Same tag as the Results Center status column (HITL 20) -->
+    <app-custom-tag
+      [statusId]="row().star_status_id"
+      [statusName]="row().star_status_name ?? row().star_label"
+      [statusColor]="row().star_status_config?.color?.text ?? undefined"
+      [statusBackground]="row().star_status_config?.color?.background ?? undefined"
+      [statusBorder]="row().star_status_config?.color?.border ?? undefined"
+      [icon]="true"
+      [iconName]="row().star_status_config?.icon?.name ?? undefined"
+      [iconColor]="row().star_status_config?.icon?.color ?? undefined"
+      [tiny]="true"
+      [tooltip]="starTooltip()"
+      [multiline]="true" />
+    @if (starTooltip(); as tip) {
+      <span class="sr-only" data-testid="pfm-row-star-description">{{ tip }}</span>
+    }
+  </div>
+  </td>
+  <td class="min-w-[8rem]">
+  <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-mapping">
+    <app-custom-tag
+      [statusName]="row().mapping_state"
+      [statusColor]="mappingTone().fg"
+      [statusBorder]="mappingTone().border"
+      [icon]="true"
+      [iconColor]="mappingTone().fg"
+      [tooltip]="row().mapping_note"
+      [tiny]="true"
+      [multiline]="true" />
+    <span class="sr-only" data-testid="pfm-row-mapping-sr">{{ row().mapping_note }}</span>
+  </div>
+  </td>
+  <td class="min-w-[7rem]">
+  <!-- Plain text like Indicator / Creator: "☆ SP01, SP02". Outline star = primary; the name is in the STAR tooltip. -->
+  <div class="min-w-0 break-words" data-testid="pfm-row-sp">
+    @for (sp of row().science_programs; track sp.code; let last = $last) {
+      <span
+        class="cursor-help whitespace-nowrap"
+        tabindex="0"
+        [attr.data-primary]="sp.primary"
+        [pTooltip]="sp.code + ': ' + sp.name + (sp.primary ? ' (primary)' : ' (contributing)')"
+        tooltipEvent="both"
+        tooltipPosition="top"
+        data-testid="pfm-row-sp-tag"
+        >@if (sp.primary) {<i class="pi pi-star !text-[11px] mr-1" aria-hidden="true" data-testid="pfm-row-sp-star"></i>}{{ sp.code }}<span class="sr-only">
+          {{ sp.name }}{{ sp.primary ? ', primary' : ', contributing' }}</span
+        ></span
+      >@if (!last) {<span aria-hidden="true">, </span>}
+    } @empty {
+      <span class="text-[var(--ac-pfm-neutral-fg)]">—</span>
+    }
+  </div>
+  </td>
+  <td class="min-w-[7rem]">
+  <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-prms">
+    @if (isPrmsNotSent()) {
+      <span
+        class="text-[var(--ac-pfm-neutral-fg)]"
+        role="img"
+        [attr.aria-label]="'Not sent: ' + row().prms_hint"
+        [pTooltip]="row().prms_hint"
+        tooltipPosition="right"
+        data-testid="pfm-badge-not-sent"
+        >—</span
+      >
+    } @else {
+      <app-custom-tag
+        [statusName]="row().prms_status"
+        [statusColor]="prmsTone().fg"
+        [statusBorder]="prmsTone().border"
+        [icon]="true"
+        [iconColor]="prmsTone().fg"
+        [tooltip]="row().prms_hint"
+        [tiny]="true"
+        [multiline]="true" />
+      <span class="sr-only" data-testid="pfm-row-prms-sr">{{ row().prms_hint }}</span>
+    }
+  </div>
+  </td>
+  <td class="min-w-[6rem]"><p class="m-0 text-[12px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-updated">{{ (row().updated_at_iso | formatDate: null : 'date') || '—' }}</p></td>

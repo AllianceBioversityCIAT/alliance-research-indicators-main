@@ -195,3 +195,28 @@ describe('RolesService', () => {
     expect(service.canEditAppConfiguration()).toBe(false);
   });
 });
+
+describe('RolesService.canAccessPooledFundingMonitor', () => {
+  const access = (roleIds: number[]) => {
+    const roles = roleIds.map(role_id => ({ role_id }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        RolesService,
+        { provide: CacheService, useValue: { dataCache: signal({ user: { user_role_list: roles } }) } },
+        { provide: CreateResultManagementService, useValue: { editingOicr: () => false } }
+      ]
+    });
+    return TestBed.inject(RolesService).canAccessPooledFundingMonitor();
+  };
+
+  it.each([
+    [[3], false],
+    [[3, 9], true],
+    [[], false],
+    [[1], true],
+    [[2], true]
+  ])('roles %j -> %s', (roleIds, expected) => {
+    expect(access(roleIds)).toBe(expected);
+  });
+});

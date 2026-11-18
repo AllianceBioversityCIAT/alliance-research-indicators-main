@@ -355,4 +355,36 @@ describe('EditEnvironmentVariableModalComponent', () => {
 
     expect(getPhases).not.toHaveBeenCalled();
   });
+
+  // ── Coverage completion ─────────────────────────────────────────────────────
+
+  it('onPhaseValueChange writes the chosen phase into the edit form, keeping other fields', () => {
+    fixture.detectChanges();
+    editForm.set({ simple_value: '2026', json_value: null });
+
+    component.onPhaseValueChange('2025');
+
+    expect(editForm()).toEqual({ simple_value: '2025', json_value: null });
+  });
+
+  it('treats a successful phases response without data as an empty cohort', async () => {
+    getPhases.mockResolvedValue(phasesResponse(undefined as unknown as ClarisaProjectPhasesResponse));
+    open(row({ key: CLARISA_PHASE_CONFIG_KEY, simple_value: '2026' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.phaseOptions()).toEqual([]);
+    expect(component.phaseAbsentCount()).toBe(0);
+    expect(component.phaseOptionsError()).toBe(false);
+    expect(component.phaseOptionsLoading()).toBe(false);
+  });
+
+  it('treats a successful phases response with missing fields as empty / zero', async () => {
+    getPhases.mockResolvedValue(phasesResponse({} as ClarisaProjectPhasesResponse));
+    open(row({ key: CLARISA_PHASE_CONFIG_KEY, simple_value: '2026' }));
+    await fixture.whenStable();
+
+    expect(component.phaseOptions()).toEqual([]);
+    expect(component.phaseAbsentCount()).toBe(0);
+  });
 });

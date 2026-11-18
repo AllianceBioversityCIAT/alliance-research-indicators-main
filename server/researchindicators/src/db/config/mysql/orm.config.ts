@@ -57,7 +57,7 @@ export const getDataSource = (
     metadataTableName: 'orm_metadata',
     extra: {
       namedPlaceholders: true,
-      charset: 'utf8mb4_unicode_520_ci',
+      charset: 'utf8mb4_0900_ai_ci',
     },
   };
 

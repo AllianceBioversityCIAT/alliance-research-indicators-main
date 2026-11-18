@@ -1759,4 +1759,202 @@ describe('MultiselectComponent', () => {
     });
   });
 
+  describe('coverage completion: sizing, tracking and filter reset', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('listWithDisabled tolerates a null options signal value', () => {
+      component.optionsSig.set(null as unknown as any[]);
+      expect(component.listWithDisabled()).toEqual([]);
+    });
+
+    it('effectiveScrollHeight omits the inline filter height when the service uses OpenSearch', () => {
+      component.enableVirtualScroll = true;
+      component.scrollHeight = '268px';
+      component.itemHeight = 41;
+      (component as any).service = { isOpenSearch: () => true };
+      component.optionsSig.set([
+        { id: 1, name: 'A' },
+        { id: 2, name: 'B' }
+      ]);
+      // no filter (0) + 2 rows (82) + padding (4) = 86
+      expect(component.effectiveScrollHeight()).toBe('86px');
+    });
+
+    it('effectiveScrollHeight falls back to 268px as the cap when scrollHeight is not parseable or not positive', () => {
+      component.enableVirtualScroll = false;
+      component.itemHeight = 41;
+      (component as any).service = { isOpenSearch: () => false };
+      component.optionsSig.set(Array.from({ length: 20 }, (_, i) => ({ id: i, name: `Item ${i}` })));
+      component.scrollHeight = 'auto';
+      expect(component.effectiveScrollHeight()).toBe('268px');
+      component.scrollHeight = '0px';
+      expect(component.effectiveScrollHeight()).toBe('268px');
+    });
+
+    it('watchOptionList stores an empty list when the source is not an array', () => {
+      (component as any).watchOptionList(() => null);
+      TestBed.flushEffects();
+      expect(component.optionsSig()).toEqual([]);
+      (component as any).watchOptionList(() => [{ id: 1 }]);
+      TestBed.flushEffects();
+      expect(component.optionsSig()).toEqual([{ id: 1 }]);
+    });
+
+    it('singleSelection treats a non-array event as empty', () => {
+      component.singleSelection = true;
+      component.setValue(null as unknown as number[]);
+      expect(component.body().value).toEqual([]);
+    });
+
+    it('singleSelection keeps the last id when the incoming ids were all already selected', () => {
+      component.singleSelection = true;
+      component.body.set({ value: [1, 2] });
+      component.setValue([1, 2]);
+      expect(component.body().value).toEqual([2]);
+    });
+
+    describe('trigger tracking', () => {
+      const setupTrigger = (rects: Array<Partial<DOMRect>>) => {
+        const host = document.createElement('div');
+        const trigger = document.createElement('div');
+        trigger.className = 'p-multiselect';
+        const spy = jest.spyOn(trigger, 'getBoundingClientRect');
+        rects.forEach(r => spy.mockReturnValueOnce({ top: 0, left: 0, width: 100, height: 40, ...r } as DOMRect));
+        spy.mockReturnValue({ top: 0, left: 0, width: 100, height: 40, ...rects[rects.length - 1] } as DOMRect);
+        host.appendChild(trigger);
+        (component as any).hostEl = { nativeElement: host };
+        return trigger;
+      };
+
+      const captureFrames = () => {
+        const frames: FrameRequestCallback[] = [];
+        jest.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+          frames.push(cb);
+          return frames.length;
+        });
+        return frames;
+      };
+
+      it('does nothing when the trigger element is missing', () => {
+        (component as any).hostEl = { nativeElement: document.createElement('div') };
+        const frames = captureFrames();
+        (component as any).startTriggerTracking();
+        expect(frames).toHaveLength(0);
+      });
+
+      it.each([
+        ['top', { top: 5 }],
+        ['left', { left: 5 }],
+        ['width', { width: 120 }],
+        ['height', { height: 60 }]
+      ])('realigns the overlay when the trigger %s changes and keeps tracking', (_name, change) => {
+        setupTrigger([{}, change]);
+        const alignOverlay = jest.fn();
+        (component as any).primeMultiSelect = { overlayViewChild: { alignOverlay } };
+        const frames = captureFrames();
+
+        (component as any).startTriggerTracking();
+        expect(frames).toHaveLength(1);
+
+        frames[0](0); // trigger moved
+        expect(alignOverlay).toHaveBeenCalledTimes(1);
+        expect(frames).toHaveLength(2);
+
+        frames[1](0); // stable now
+        expect(alignOverlay).toHaveBeenCalledTimes(1);
+        expect(frames).toHaveLength(3);
+      });
+
+      it('does not realign when the trigger rect is unchanged and tolerates a missing overlay', () => {
+        setupTrigger([{}]);
+        (component as any).primeMultiSelect = undefined;
+        const frames = captureFrames();
+        (component as any).startTriggerTracking();
+        expect(() => frames[0](0)).not.toThrow();
+        expect(frames).toHaveLength(2);
+      });
+
+      it('realigns safely when the overlay view child is not available', () => {
+        setupTrigger([{}, { top: 9 }]);
+        (component as any).primeMultiSelect = {};
+        const frames = captureFrames();
+        (component as any).startTriggerTracking();
+        expect(() => frames[0](0)).not.toThrow();
+      });
+
+      it('stopTriggerTracking cancels the pending frame once and is a no-op afterwards', () => {
+        setupTrigger([{}]);
+        captureFrames();
+        const cancel = jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => undefined);
+        (component as any).startTriggerTracking();
+        expect((component as any).trackingFrame).toBe(1);
+
+        (component as any).stopTriggerTracking();
+        expect(cancel).toHaveBeenCalledWith(1);
+        expect((component as any).trackingFrame).toBeNull();
+
+        (component as any).stopTriggerTracking();
+        expect(cancel).toHaveBeenCalledTimes(1);
+      });
+
+      it('onMultiselectPanelShow starts tracking the trigger', () => {
+        setupTrigger([{}]);
+        const frames = captureFrames();
+        jest.spyOn(component as any, 'applyMultiselectPanelMaxWidth').mockImplementation(() => undefined);
+        component.onMultiselectPanelShow();
+        // one frame for the width apply + one for the tracking loop
+        expect(frames).toHaveLength(2);
+        expect((component as any).trackingFrame).not.toBeNull();
+      });
+
+      it('onMultiselectPanelHide stops tracking', () => {
+        setupTrigger([{}]);
+        captureFrames();
+        jest.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => undefined);
+        (component as any).startTriggerTracking();
+        component.onMultiselectPanelHide();
+        expect((component as any).trackingFrame).toBeNull();
+      });
+    });
+
+    describe('search filter reset', () => {
+      it('onMultiselectPanelHide clears the search filter when clearFilterOnClose is set', () => {
+        const clearSpy = jest.spyOn(component, 'clearSearchFilter').mockImplementation(() => undefined);
+        component.clearFilterOnClose = true;
+        component.onMultiselectPanelHide();
+        expect(clearSpy).toHaveBeenCalled();
+      });
+
+      it('onMultiselectPanelHide leaves the search filter when clearFilterOnClose is off', () => {
+        const clearSpy = jest.spyOn(component, 'clearSearchFilter').mockImplementation(() => undefined);
+        component.clearFilterOnClose = false;
+        component.onMultiselectPanelHide();
+        expect(clearSpy).not.toHaveBeenCalled();
+      });
+
+      it('clearSearchFilter resets PrimeNG filter and, with OpenSearch, requests an empty filter', () => {
+        const resetFilter = jest.fn();
+        (component as any).primeMultiSelect = { resetFilter };
+        (component as any).service = { isOpenSearch: () => true };
+        const onFilterSpy = jest.spyOn(component, 'onFilter').mockImplementation(() => undefined as any);
+
+        component.clearSearchFilter();
+
+        expect(resetFilter).toHaveBeenCalled();
+        expect(onFilterSpy).toHaveBeenCalledWith({ filter: '' });
+      });
+
+      it('clearSearchFilter does not call onFilter without OpenSearch and tolerates a missing PrimeNG ref', () => {
+        (component as any).primeMultiSelect = undefined;
+        (component as any).service = { isOpenSearch: () => false };
+        const onFilterSpy = jest.spyOn(component, 'onFilter').mockImplementation(() => undefined as any);
+
+        component.clearSearchFilter();
+
+        expect(onFilterSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

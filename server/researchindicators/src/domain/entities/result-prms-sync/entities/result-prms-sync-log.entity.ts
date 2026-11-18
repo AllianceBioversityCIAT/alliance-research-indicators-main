@@ -13,6 +13,7 @@ import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-o
  */
 @Entity('result_prms_sync_log')
 @Index('idx_result_prms_sync_log_code_year', [
+  'platform_code',
   'external_reference',
   'result_year',
 ])
@@ -41,6 +42,14 @@ export class ResultPrmsSyncLog extends AuditableEntity {
     nullable: true,
   })
   result_year?: number | null;
+
+  @Column({
+    type: 'varchar',
+    name: 'platform_code',
+    length: 50,
+    nullable: false,
+  })
+  platform_code!: string;
 
   @Column({
     type: 'int',

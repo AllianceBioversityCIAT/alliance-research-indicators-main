@@ -574,4 +574,181 @@ describe('PiDelegatesClientService', () => {
       expect(() => service.exportByPerson([1], {})).toThrow();
     });
   });
+
+  // ── Coverage completion: fallbacks, non-Error rejections, revokeDelegate ──
+
+  describe('export with administrator scope', () => {
+    it("includes scope='all' in the export context for an admin", async () => {
+      isAdmin = true;
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse([]));
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+      mockApi.POST_PiDelegatesExportByProjectXlsx.mockResolvedValue(new Blob(['x']));
+      await service.loadByUser(9);
+
+      await service.exportByProject(['P1'], {});
+
+      expect(mockApi.POST_PiDelegatesExportByProjectXlsx.mock.calls[0][0]).toEqual({
+        user_id: 9,
+        scope: 'all',
+        project_codes: ['P1'],
+        filters: {}
+      });
+    });
+  });
+
+  describe('null data and non-Error rejections', () => {
+    it('loadByUser falls back to empty arrays when successful responses carry no data', async () => {
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue({ successfulRequest: true } as unknown as MainResponse<ProjectDelegates[]>);
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue({ successfulRequest: true } as unknown as MainResponse<DelegateProjects[]>);
+
+      await service.loadByUser(1);
+
+      expect(service.byProjectCache()).toEqual([]);
+      expect(service.byPersonCache()).toEqual([]);
+      expect(service.error()).toBeNull();
+    });
+
+    it('loadByUser uses the generic message for a non-Error rejection', async () => {
+      mockApi.GET_PIDelegatesByUserProjects.mockRejectedValue('boom');
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+
+      await service.loadByUser(1);
+
+      expect(service.error()).toBe('Failed to load PI delegates data');
+    });
+
+    it('loadByProject uses the generic message for a non-Error rejection and skips null data', async () => {
+      mockApi.GET_PIDelegatesByProject.mockRejectedValue('boom');
+      await service.loadByProject(['P001']);
+      expect(service.error()).toBe('Failed to load by-project data');
+
+      mockApi.GET_PIDelegatesByProject.mockResolvedValue({ successfulRequest: true, data: null } as unknown as MainResponse<ProjectDelegates>);
+      await service.loadByProject(['P001']);
+      expect(service.byProjectCache()).toEqual([]);
+    });
+
+    it('loadByPerson reports Error messages, the generic message otherwise, and skips null data', async () => {
+      mockApi.GET_PIDelegatesByDelegate.mockRejectedValueOnce(new Error('person fail'));
+      await service.loadByPerson([1]);
+      expect(service.error()).toBe('person fail');
+
+      mockApi.GET_PIDelegatesByDelegate.mockRejectedValueOnce('boom');
+      await service.loadByPerson([1]);
+      expect(service.error()).toBe('Failed to load by-person data');
+
+      mockApi.GET_PIDelegatesByDelegate.mockResolvedValue({ successfulRequest: true, data: null } as unknown as MainResponse<DelegateProjects>);
+      await service.loadByPerson([1]);
+      expect(service.byPersonCache()).toEqual([]);
+    });
+
+    it('assign reports Error messages and the generic message for non-Error rejections', async () => {
+      mockApi.POST_PIDelegates.mockRejectedValueOnce(new Error('post fail'));
+      await service.assign([{ project_id: 'P001', delegates: [{ delegate_user_id: 1 }] }]);
+      expect(service.error()).toBe('post fail');
+
+      mockApi.POST_PIDelegates.mockRejectedValueOnce('boom');
+      await service.assign([{ project_id: 'P001', delegates: [{ delegate_user_id: 1 }] }]);
+      expect(service.error()).toBe('Failed to assign PI delegates');
+    });
+
+    it('revokePair and revokeById use the generic message for non-Error rejections', async () => {
+      mockApi.DELETE_PIDelegates.mockRejectedValueOnce('boom');
+      await service.revokePair('P001', 1);
+      expect(service.error()).toBe('Failed to revoke delegate');
+
+      mockApi.DELETE_PIDelegates.mockRejectedValueOnce('boom');
+      await service.revokeById([1]);
+      expect(service.error()).toBe('Failed to revoke delegates by id');
+    });
+  });
+
+  describe('revokeDelegate', () => {
+    it('does nothing when there are no project ids', async () => {
+      await service.revokeDelegate(5, []);
+
+      expect(mockApi.DELETE_PIDelegates).not.toHaveBeenCalled();
+      expect(service.loading()).toBe(false);
+    });
+
+    it('deletes every pair and reloads both caches', async () => {
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse([]));
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+      await service.loadByUser(3);
+      mockApi.DELETE_PIDelegates.mockResolvedValue(makeOkResponse(null));
+
+      await service.revokeDelegate(5, ['P1', 'P2']);
+
+      expect(mockApi.DELETE_PIDelegates).toHaveBeenCalledWith({ project_ids: ['P1', 'P2'], delegate_user_ids: [5] });
+      expect(mockApi.GET_PIDelegatesByUserProjects).toHaveBeenCalledTimes(2);
+      expect(service.error()).toBeNull();
+      expect(service.loading()).toBe(false);
+    });
+
+    it('sets the Error message, or the generic one, when the DELETE rejects', async () => {
+      mockApi.DELETE_PIDelegates.mockRejectedValueOnce(new Error('del fail'));
+      await service.revokeDelegate(5, ['P1']);
+      expect(service.error()).toBe('del fail');
+
+      mockApi.DELETE_PIDelegates.mockRejectedValueOnce('boom');
+      await service.revokeDelegate(5, ['P1']);
+      expect(service.error()).toBe('Failed to revoke the delegate');
+    });
+  });
+
+  describe('_reloadForUser fallback (no user loaded)', () => {
+    it('does not refetch anything when no project is cached', async () => {
+      mockApi.DELETE_PIDelegates.mockResolvedValue(makeOkResponse(null));
+
+      await service.revokeById([1]);
+
+      expect(mockApi.GET_PIDelegatesByProject).not.toHaveBeenCalled();
+    });
+
+    it('merges refetched projects: keeps unmatched ones, replaces matches, appends new, skips failures', async () => {
+      const p1 = makeProjectDelegates({ project_code: 'P1' });
+      const p2 = makeProjectDelegates({ project_code: 'P2' });
+      mockApi.GET_PIDelegatesByProject
+        .mockResolvedValueOnce(makeOkResponse(p1))
+        .mockResolvedValueOnce(makeOkResponse(p2));
+      await service.loadByProject(['P1', 'P2']);
+
+      // Refetch of [P1, P2]: P1 comes back updated, P2 fails and keeps its cached value.
+      const p1b = makeProjectDelegates({ project_code: 'P1', project_name: 'Renamed' });
+      mockApi.GET_PIDelegatesByProject
+        .mockResolvedValueOnce(makeOkResponse(p1b))
+        .mockResolvedValueOnce(makeErrResponse<ProjectDelegates>());
+      mockApi.DELETE_PIDelegates.mockResolvedValue(makeOkResponse(null));
+
+      await service.revokeById([1]);
+
+      expect(service.byProjectCache()).toEqual([p1b, p2]);
+    });
+
+    it('appends refetched projects that are not in the cache yet', async () => {
+      const p1 = makeProjectDelegates({ project_code: 'P1' });
+      mockApi.GET_PIDelegatesByProject.mockResolvedValueOnce(makeOkResponse(p1));
+      await service.loadByProject(['P1']);
+
+      // The cached code list is [P1]; make the refetch answer with a different project code.
+      const other = makeProjectDelegates({ project_code: 'P9' });
+      mockApi.GET_PIDelegatesByProject.mockResolvedValueOnce(makeOkResponse(other));
+      mockApi.DELETE_PIDelegates.mockResolvedValue(makeOkResponse(null));
+
+      await service.revokeById([1]);
+
+      expect(service.byProjectCache().map(p => p.project_code)).toEqual(['P1', 'P9']);
+    });
+
+    it('swallows a refetch failure', async () => {
+      const p1 = makeProjectDelegates({ project_code: 'P1' });
+      mockApi.GET_PIDelegatesByProject.mockResolvedValueOnce(makeOkResponse(p1));
+      await service.loadByProject(['P1']);
+      mockApi.GET_PIDelegatesByProject.mockRejectedValueOnce(new Error('net'));
+      mockApi.DELETE_PIDelegates.mockResolvedValue(makeOkResponse(null));
+
+      await expect(service.revokeById([1])).resolves.toBeUndefined();
+
+      expect(service.byProjectCache()).toEqual([p1]);
+    });
+  });
 });

@@ -263,4 +263,33 @@ describe('ConfirmStepComponent', () => {
       expect.objectContaining({ severity: 'success', detail: expect.stringContaining('Mariana Rojas') })
     );
   });
+  it('cancel() is ignored while a start call is pending', () => {
+    const backSpy = jest.fn();
+    component.back.subscribe(backSpy);
+    component.pending.set(true);
+
+    component.cancel();
+
+    expect(backSpy).not.toHaveBeenCalled();
+  });
+
+  it('adminName tolerates a cached admin without names or without a user', () => {
+    const cache = TestBed.inject(CacheService) as unknown as { dataCache: () => unknown };
+    cache.dataCache = () => ({ user: {} });
+    expect(component.adminName()).toBe('');
+  });
+
+  it('adminName is empty when the cache holds no user at all', () => {
+    const cache = TestBed.inject(CacheService) as unknown as { dataCache: () => unknown };
+    cache.dataCache = () => ({});
+    expect(component.adminName()).toBe('');
+  });
+
+  it('initials are derived from the first letters and tolerate missing names', () => {
+    expect(component.initials()).toBe('MR');
+    fixture.componentRef.setInput('user', targetRow({ first_name: '', last_name: '' }));
+    expect(component.initials()).toBe('');
+    fixture.componentRef.setInput('user', targetRow({ first_name: undefined as never, last_name: 'rojas' }));
+    expect(component.initials()).toBe('R');
+  });
 });

@@ -595,4 +595,10 @@ describe('AllModalsService', () => {
       expect(config.createResult.title).toBe('Create A Result');
     });
   });
+
+  it('simulateProfile cancelAction toggles the modal', () => {
+    const toggleSpy = jest.spyOn(service, 'toggleModal');
+    service.modalConfig().simulateProfile.cancelAction?.();
+    expect(toggleSpy).toHaveBeenCalledWith('simulateProfile');
+  });
 });

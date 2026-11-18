@@ -102,6 +102,7 @@ import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impa
 import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
 import { AiReportsModule } from './ai-reports/ai-reports.module';
 import { PiDelegatesModule } from './pi-delegates/pi-delegates.module';
+import { PooledFundingMonitorModule } from './pooled-funding-monitor/pooled-funding-monitor.module';
 import { UsersModule } from './users/users.module';
 import { ImpersonationModule } from './impersonation/impersonation.module';
 
@@ -204,6 +205,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module';
     PrmsWebhookModule,
     BilateralProjectMappingModule,
     PiDelegatesModule,
+    PooledFundingMonitorModule,
     UsersModule,
     PortfoliosModule,
     StrategicObjectivesModule,

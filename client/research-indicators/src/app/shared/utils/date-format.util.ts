@@ -72,6 +72,20 @@ export function formatUtcWithConfig(raw: DateInput, config: DateFormatJsonValue 
   return `${dateStr}${sep}${timeStr}${suffix}`;
 }
 
+/**
+ * Date only, in the platform date-format configuration (order, separator, digits, timezone): the
+ * same date part My Latest Result shows, without the time. Tables that list dates use this, so a
+ * date reads the same everywhere. Without a configuration it falls back to dd/mm/yyyy in UTC.
+ */
+export function formatUtcDateWithConfig(raw: DateInput, config: DateFormatJsonValue | null): string | null {
+  const d = toDate(raw);
+  if (d == null) return null;
+  if (config?.timezone == null) {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+  }
+  return buildDateString(d, config, config.locale ?? 'en-GB', getResolvedTimezone(config));
+}
+
 export function formatUtcWithConfigParts(raw: DateInput, config: DateFormatJsonValue | null): (CetFormatted & { timezoneLabel: string }) | null {
   const d = toDate(raw);
   if (d == null) return null;

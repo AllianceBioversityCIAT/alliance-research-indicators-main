@@ -17,7 +17,7 @@ export interface AgrovocUpstreamResponse {
 
 export class AgrovocTermDto {
   @ApiProperty({
-    example: 'http://aims.fao.org/aos/agrovoc/c_7861',
+    example: 'https://aims.fao.org/aos/agrovoc/c_7861',
   })
   uri: string;
 

@@ -12,6 +12,7 @@ import {
   piDelegateScopeParam,
   ProjectDelegates
 } from '../interfaces/pi-delegates.interface';
+import { PfmQueue, PfmQueueQuery, PfmResultRow, PfmScope, PfmSummary, pfmQueryString } from '@platform/pages/pooled-funding-monitor/pfm.interfaces';
 import { GetViewComponents, Indicator, IndicatorTypes } from '../interfaces/api.interface';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 import {
@@ -57,6 +58,7 @@ import {
   ImpersonationUserRow
 } from '@shared/interfaces/impersonation.interface';
 import { environment } from '../../../environments/environment';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { PostError } from '../interfaces/post-error.interface';
 import { GetContractsByUser } from '@shared/interfaces/get-contracts-by-user.interface';
 import { GeneralReportItem } from '@shared/interfaces/get-general-report.interface';
@@ -840,10 +842,19 @@ export class ApiService {
   };
 
   // Bilateral routes are URI-versioned and the backend regex on :resultCode accepts
-  // only digits, so we strip any STAR- prefix the FE may pass in (route params can
-  // arrive in either form). See bilateral-module/ari-backend-context handoff §4.
+  // only digits, so we strip any known platform prefix the FE may pass in (route
+  // params arrive as STAR-123 or TIP-123). Platform travels in the interceptor's
+  // reportingPlatforms query, not in this path (D-7).
   private bilateralPath(resultCode: string, suffix = ''): string {
-    const numeric = resultCode.replace(/^STAR-/i, '');
+    let numeric = resultCode;
+    const upper = resultCode.toUpperCase();
+    for (const platform of Object.values(PLATFORM_CODES)) {
+      const prefix = `${platform}-`;
+      if (upper.startsWith(prefix)) {
+        numeric = resultCode.slice(prefix.length);
+        break;
+      }
+    }
     return `v1/results/${encodeURIComponent(numeric)}/pool-funding-alignment${suffix}`;
   }
 
@@ -1275,6 +1286,27 @@ export class ApiService {
   POST_feedback = (body: InteractionFeedbackPayload) => {
     const url = () => `interactions`;
     return this.TP.post(url(), body, { isAuth: environment.feedbackUrl });
+  };
+
+  // ─── Pooled Funding Monitor — @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor (T-07) ──
+  // Read-only. Empty / null query params are omitted from the URL.
+
+  /** GET /api/pooled-funding-monitor/summary?scope=mine|all */
+  GET_PfmSummary = (scope: PfmScope): Promise<MainResponse<PfmSummary>> => {
+    const url = () => `pooled-funding-monitor/summary${pfmQueryString({ scope })}`;
+    return this.TP.get(url(), {});
+  };
+
+  /** GET /api/pooled-funding-monitor/queue?scope&project&sp&status&type&chip */
+  GET_PfmQueue = (query: PfmQueueQuery): Promise<MainResponse<PfmQueue>> => {
+    const url = () => `pooled-funding-monitor/queue${pfmQueryString(query)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /** GET /api/pooled-funding-monitor/queue/projects/:projectCode/results (same query as /queue) */
+  GET_PfmProjectResults = (projectCode: string, query: PfmQueueQuery): Promise<MainResponse<PfmResultRow[]>> => {
+    const url = () => `pooled-funding-monitor/queue/projects/${encodeURIComponent(projectCode)}/results${pfmQueryString(query)}`;
+    return this.TP.get(url(), {});
   };
 
   // ─── PI Delegates — @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01) ──────────

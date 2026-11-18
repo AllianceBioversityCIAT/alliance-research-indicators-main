@@ -72,6 +72,45 @@ export class ResultPrmsSyncAggregateRepository {
     private readonly appConfig: AppConfig,
   ) {}
 
+  /**
+   * Staff for the user who pressed push. Same hop as the approval submitter:
+   * `sec_users.carnet` first, then one `alliance_user_staff` row by email
+   * (active first, lowest carnet). The request `User` has no carnet column.
+   */
+  async findActingStaffBySecUserId(
+    secUserId: number,
+  ): Promise<PrmsStaffSnapshot | null> {
+    const secondary = this.appConfig.ARI_SECONDARY_MYSQL_NAME;
+    const rows: Array<{
+      email?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+    }> = await this.dataSource.query(
+      `
+      SELECT
+        aus.email,
+        aus.first_name,
+        aus.last_name
+      FROM ${secondary}.sec_users su
+      LEFT JOIN alliance_user_staff aus
+        ON aus.carnet = COALESCE(
+          su.carnet,
+          (SELECT a.carnet
+             FROM alliance_user_staff a
+            WHERE a.email = su.email
+              AND su.email IS NOT NULL
+              AND su.email <> ''
+            ORDER BY a.is_active DESC, a.carnet ASC
+            LIMIT 1)
+        )
+      WHERE su.sec_user_id = ?
+      LIMIT 1
+      `,
+      [secUserId],
+    );
+    return asStaff(rows[0] ?? {});
+  }
+
   async loadByResultId(resultId: number): Promise<PrmsSyncAggregate | null> {
     const secondary = this.appConfig.ARI_SECONDARY_MYSQL_NAME;
     // homologation.md §4 created_by.email: hop r.created_by → sec_users, then
@@ -87,6 +126,7 @@ export class ResultPrmsSyncAggregateRepository {
       SELECT
         r.result_id,
         r.result_official_code,
+        r.platform_code,
         r.prms_result_code,
         r.indicator_id,
         r.title,
@@ -434,6 +474,11 @@ export class ResultPrmsSyncAggregateRepository {
     return {
       result_id: Number(header.result_id),
       result_official_code: header.result_official_code,
+      // Blank is absent: the builder still treats a missing platform as STAR.
+      platform_code:
+        typeof header.platform_code === 'string' && header.platform_code !== ''
+          ? header.platform_code
+          : null,
       // Same empty-string guard as the decimal sibling: mysql2 can hand the
       // integer back as `"9475"`, and `Number('')` is 0, which a re-push
       // would send as a real PRMS code.

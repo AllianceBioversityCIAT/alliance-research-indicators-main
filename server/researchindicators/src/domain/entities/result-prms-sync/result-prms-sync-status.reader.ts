@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { prmsExternalReferenceSql } from '../../tools/prms-normalizer/reference/prms-external-reference';
 import {
   PRMS_SYNC_HTTP_DESCRIPTIONS,
   PrmsSyncLastAttemptDto,
@@ -20,8 +21,15 @@ const LAST_ATTEMPT_SQL = `
         prms_type,
         created_at
       FROM result_prms_sync_log
-      WHERE external_reference = (
-              SELECT result_official_code FROM results WHERE result_id = ?
+      WHERE platform_code = (
+              SELECT COALESCE(platform_code, 'STAR') FROM results WHERE result_id = ?
+            )
+        AND external_reference = (
+              SELECT ${prmsExternalReferenceSql(
+                'platform_code',
+                'result_official_code',
+              )}
+              FROM results WHERE result_id = ?
             )
         AND result_year = (
               SELECT report_year_id FROM results WHERE result_id = ?
@@ -49,10 +57,11 @@ const RESULT_STATUS_SQL = `
  * `findHistoryByResultCodeAndYear` ordering and duplicate filtering belong
  * to the UI spec, not here.
  *
- * Keyed on the durable pair (`result_official_code`, `result_year`) rather
+ * Keyed on (`platform_code`, `result_official_code`, `result_year`) rather
  * than an internal id, resolved through `results` exactly as the sync-log
  * query above does: overwriting a version deletes the id permanently, and
- * `result_prms_sync_history` carries no `result_id` column at all.
+ * `result_prms_sync_history` carries no `result_id` column at all. A NULL
+ * platform on the result is STAR.
  */
 const LAST_DECISION_SQL = `
       SELECT
@@ -62,7 +71,10 @@ const LAST_DECISION_SQL = `
         prms_result_code,
         occurred_at
       FROM result_prms_sync_history
-      WHERE result_official_code = (
+      WHERE platform_code = (
+              SELECT COALESCE(platform_code, 'STAR') FROM results WHERE result_id = ?
+            )
+        AND result_official_code = (
               SELECT result_official_code FROM results WHERE result_id = ?
             )
         AND result_year = (
@@ -152,18 +164,20 @@ export class ResultPrmsSyncStatusReader {
       throw new NotFoundException(PRMS_SYNC_HTTP_DESCRIPTIONS.notFound);
     }
 
-    // Twice: the log keys on (official code, year) now, and each is resolved from
-    // the same `results` row the caller asked about.
+    // Three times: platform, reference and year are each resolved from the
+    // same `results` row the caller asked about.
     const attemptRows = await this.dataSource.query(LAST_ATTEMPT_SQL, [
+      resultId,
       resultId,
       resultId,
     ]);
     const lastAttempt = mapLastAttempt(
       attemptRows[0] as Record<string, unknown> | undefined,
     );
-    // Two placeholders: the official code and the year are each resolved
+    // Three placeholders: platform, official code and year are each resolved
     // through `results` by the same id, exactly as LAST_ATTEMPT_SQL does.
     const decisionRows = await this.dataSource.query(LAST_DECISION_SQL, [
+      resultId,
       resultId,
       resultId,
     ]);

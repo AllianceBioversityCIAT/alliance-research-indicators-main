@@ -8,6 +8,7 @@ import {
   TOC_CATALOG_CAPSHARING_GUIDANCE_FIXTURE,
   TOC_CATALOG_POLICY_FIXTURE
 } from 'src/app/testing/toc-catalog.fixture';
+import * as guidanceUtil from '../../utils/indicator-type-guidance.util';
 import { IndicatorSelectOption, SpTocAlignmentBlockComponent, SpTocBlockScienceProgram } from './sp-toc-alignment-block.component';
 
 const SP01: SpTocBlockScienceProgram = { official_code: 'SP01', name: 'Biodiversity for Food and Agriculture', color: '#173f6f' };
@@ -1355,5 +1356,192 @@ describe('SpTocAlignmentBlockComponent', () => {
       expect(callout).not.toBeNull();
       expect(callout.textContent?.trim()).toContain(component.CONTRIBUTION_CALLOUT);
     });
+  });
+});
+
+describe('SpTocAlignmentBlockComponent - defensive branches', () => {
+  let fixture: ComponentFixture<SpTocAlignmentBlockComponent>;
+  let component: SpTocAlignmentBlockComponent;
+
+  const catalogWith = (typeValue: string | null | undefined, description: string | null | undefined): TocCatalogSp =>
+    ({
+      sp_code: 'SP01',
+      levels: [
+        {
+          level: 'OUTPUT',
+          toc_results: [
+            {
+              toc_result_id: 1,
+              aow_code: 'AOW1',
+              title: 'HLO 1',
+              indicators: [{ indicator_id: 10, indicator_description: description, type_value: typeValue }]
+            }
+          ]
+        }
+      ]
+    }) as never;
+
+  function setup(inputs: { catalog?: TocCatalogSp | null; draft?: SpAlignmentDraft; resultType?: string | null } = {}): void {
+    fixture.componentRef.setInput('sp', SP01);
+    fixture.componentRef.setInput('catalog', inputs.catalog === undefined ? SP01_CAT : inputs.catalog);
+    fixture.componentRef.setInput('allowedLevels', ['OUTPUT']);
+    fixture.componentRef.setInput('draft', inputs.draft ?? emptyDraft());
+    fixture.componentRef.setInput('disabled', false);
+    fixture.componentRef.setInput('inlineErrors', null);
+    fixture.componentRef.setInput('catalogState', 'ready');
+    fixture.componentRef.setInput('resultType', inputs.resultType ?? null);
+  }
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [SpTocAlignmentBlockComponent],
+      providers: [provideNoopAnimations()]
+    }).compileComponents();
+    fixture = TestBed.createComponent(SpTocAlignmentBlockComponent);
+    component = fixture.componentInstance;
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('falls back to the generic HLO label when no level is chosen', () => {
+    setup({ draft: emptyDraft() });
+    expect(component.hloFieldLabel()).toBe('High Level Output');
+  });
+
+  it('yields no HLO options when the catalog is missing or lacks the chosen level', () => {
+    setup({ catalog: null, draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT' }) });
+    expect(component.hloOptions()).toEqual([]);
+    expect(component.showEmptyHlo()).toBe(true);
+
+    fixture.componentRef.setInput('catalog', SP01_POLICY_CAT);
+    fixture.componentRef.setInput('draft', emptyDraft({ aligns_with_toc: true, level: 'OUTPUT' }));
+    expect(component.hloOptions()).toEqual([]);
+  });
+
+  it('labels an indicator without a description with an em dash', () => {
+    setup({
+      catalog: catalogWith('custom', '   '),
+      draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 1 }),
+      resultType: 'capacity_sharing'
+    });
+    expect(component.classifiedIndicators()[0].label).toBe('—');
+
+    setup({
+      catalog: catalogWith('custom', undefined),
+      draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 1 }),
+      resultType: 'capacity_sharing'
+    });
+    expect(component.classifiedIndicators()[0].label).toBe('—');
+  });
+
+  it('gives no badge when the classified type has no registered badge label', () => {
+    const original = guidanceUtil.TYPE_BADGE_LABELS['custom'];
+    delete guidanceUtil.TYPE_BADGE_LABELS['custom'];
+    try {
+      setup({
+        catalog: catalogWith('custom', 'Wildcard'),
+        draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 1 }),
+        resultType: 'capacity_sharing'
+      });
+      expect(component.classifiedIndicators()[0]).toEqual(expect.objectContaining({ classification: 'wildcard', badge: null }));
+    } finally {
+      guidanceUtil.TYPE_BADGE_LABELS['custom'] = original;
+    }
+  });
+
+  it('gives no badge when a classified indicator carries no type value', () => {
+    jest.spyOn(guidanceUtil, 'classifyIndicator').mockReturnValue('wildcard');
+    setup({
+      catalog: catalogWith(undefined, 'No type'),
+      draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 1 }),
+      resultType: 'capacity_sharing'
+    });
+    expect(component.classifiedIndicators()[0].badge).toBeNull();
+  });
+
+  it('builds an empty recommended label and notice copy when the result type is unknown', () => {
+    setup({ resultType: null });
+    expect(component.recommendedGroupLabel()).toBe('Recommended for ');
+    expect(component.noTypeMatchNoticeMessage()).toMatch(/^No High Level Output in this Science Program has indicators typed for \. /);
+  });
+
+  it('cross-type warning copy tolerates a missing indicator and unmapped result type', () => {
+    setup({ resultType: 'capacity_sharing' });
+    Object.defineProperty(component, 'guidanceEnabled', { value: () => true });
+    Object.defineProperty(component, 'selectedIndicatorClassification', { value: () => 'other' });
+    expect(component.crossTypeWarningMessage()).toBe('This indicator is typed “”; this result is “Capacity Sharing for Development”. Confirm the contribution belongs here.');
+
+    fixture.componentRef.setInput('resultType', null);
+    expect(component.crossTypeWarningMessage()).toBe('This indicator is typed “”; this result is “”. Confirm the contribution belongs here.');
+  });
+
+  it('cross-type warning leaves the result label empty for a matrix type without a label', () => {
+    guidanceUtil.TOC_TYPE_MATRIX['zz_type'] = 'ZZ canonical';
+    try {
+      setup({
+        catalog: catalogWith('Innovation Use', 'Other typed'),
+        draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 1, indicator_id: 10 }),
+        resultType: 'zz_type'
+      });
+      expect(component.crossTypeWarningMessage()).toBe('This indicator is typed “Innovation Use”; this result is “”. Confirm the contribution belongs here.');
+    } finally {
+      delete guidanceUtil.TOC_TYPE_MATRIX['zz_type'];
+    }
+  });
+
+  it('treats a non-numeric id as unresolved', () => {
+    setup();
+    expect((component as any).normalizeNumericId('abc')).toBeNull();
+    expect((component as any).normalizeNumericId('42')).toBe(42);
+    expect((component as any).normalizeNumericId('')).toBeNull();
+  });
+
+  describe('select panel sizing', () => {
+    it('uses the viewport-capped default when the width is unmeasured or non-positive', () => {
+      setup();
+      expect(component.selectPanelStyle()).toEqual({ boxSizing: 'border-box', maxWidth: 'min(40rem, calc(100vw - 2rem))' });
+      (component as any).selectPanelWidthPx.set(0);
+      expect(component.selectPanelStyle()['maxWidth']).toBe('min(40rem, calc(100vw - 2rem))');
+    });
+
+    it('pins the panel to the measured width, capped to the viewport', () => {
+      setup();
+      (component as any).selectPanelWidthPx.set(300);
+      expect(component.selectPanelStyle()).toEqual({ boxSizing: 'border-box', width: '300px', maxWidth: '300px', minWidth: '300px' });
+
+      const cap = window.innerWidth - 32;
+      (component as any).selectPanelWidthPx.set(window.innerWidth + 500);
+      expect(component.selectPanelStyle()['width']).toBe(`${cap}px`);
+    });
+
+    it('ignores a zero-width trigger on panel show', () => {
+      setup();
+      const trigger = { getBoundingClientRect: () => ({ width: 0 }) } as HTMLElement;
+      component.onSelectPanelShow({ overlayViewChild: { alignOverlay: jest.fn() } } as unknown as Select, trigger);
+      expect((component as any).selectPanelWidthPx()).toBeNull();
+    });
+
+    it('records the trigger width and realigns the overlay on the next tick', fakeAsync(() => {
+      setup();
+      const alignOverlay = jest.fn();
+      const trigger = { getBoundingClientRect: () => ({ width: 240.4 }) } as HTMLElement;
+
+      component.onSelectPanelShow({ overlayViewChild: { alignOverlay } } as unknown as Select, trigger);
+      expect((component as any).selectPanelWidthPx()).toBe(240);
+      expect(alignOverlay).not.toHaveBeenCalled();
+
+      flush();
+      expect(alignOverlay).toHaveBeenCalledTimes(1);
+    }));
+
+    it('tolerates a select without an overlay view child', fakeAsync(() => {
+      setup();
+      const trigger = { getBoundingClientRect: () => ({ width: 100 }) } as HTMLElement;
+      expect(() => {
+        component.onSelectPanelShow({} as Select, trigger);
+        flush();
+      }).not.toThrow();
+      expect((component as any).selectPanelWidthPx()).toBe(100);
+    }));
   });
 });
