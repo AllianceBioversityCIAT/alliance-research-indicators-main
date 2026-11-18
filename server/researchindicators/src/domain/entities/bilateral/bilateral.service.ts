@@ -664,15 +664,23 @@ export class BilateralService {
     // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-10 / R-PRY-007
     // A non-eligible result that still carries a record (snapshot, synced, or
     // PRMS code) is shown read-only. `eligible` stays the raw contract fact.
+    // For STAR that record exception applies only outside the configured
+    // reporting year — the same comparison as `version_locked`.
     // @sdd-spec docs/specs/changes/tip-kp-project-pool-funding — T-02 / R-TIP-006, D-7
     // A non-eligible TIP result that already has an active alignment is shown
-    // read-only. `eligible` stays the raw contract fact. STAR keeps only the
-    // snapshot / synced / PRMS-code term.
+    // read-only in any year. `eligible` stays the raw contract fact.
+    const versionLocked = Number(context.report_year_id) !== year;
+    const carriesPoolFundingRecord =
+      this.toBoolean(context.is_snapshot) ||
+      isSyncedToPrms ||
+      context.prms_result_code != null;
+    const recordKeepsSectionVisible =
+      context.platform_code === ReportingPlatformEnum.STAR
+        ? versionLocked && carriesPoolFundingRecord
+        : carriesPoolFundingRecord;
     const displayOnly =
       !eligible &&
-      (this.toBoolean(context.is_snapshot) ||
-        isSyncedToPrms ||
-        context.prms_result_code != null ||
+      (recordKeepsSectionVisible ||
         (context.platform_code === ReportingPlatformEnum.TIP &&
           alignment != null));
     const visibleAlignment = eligible || displayOnly ? alignment : null;
@@ -708,7 +716,7 @@ export class BilateralService {
       // Same Number(...) comparison as the hlos-indicators read (D-V2-7);
       // `toc_alignments` follows the same eligibility visibility gate as
       // the rest of the alignment payload (mirrors `visibleAlignment`).
-      version_locked: Number(context.report_year_id) !== year,
+      version_locked: versionLocked,
       // Answered contribution (including an explicit false), a completed
       // PRMS sync, or a PRMS result code. Sync history alone does not count.
       has_pool_funding_data:

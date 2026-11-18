@@ -353,6 +353,111 @@ describe('BilateralService', () => {
 
       expect(service.loadingAlignment()).toBe(false);
     });
+
+    it('a stale getAlignment response does not overwrite the alignment of the result now on screen', async () => {
+      const alignmentA: AlignmentResponse = {
+        ...baseAlignment,
+        result_code: '111',
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP13', name: 'Genebank', role: 'PRIMARY' }]
+      };
+      const alignmentB: AlignmentResponse = {
+        ...baseAlignment,
+        result_code: '222',
+        has_contribution: null,
+        selected_science_programs: []
+      };
+      let resolveA: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      let resolveB: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingAlignment.mockImplementation((code: string) => {
+        return new Promise<MainResponse<AlignmentResponse>>(resolve => {
+          if (code === '111') resolveA = resolve;
+          else resolveB = resolve;
+        });
+      });
+
+      const pendingA = service.getAlignment('111');
+      const pendingB = service.getAlignment('222');
+
+      resolveB(ok(alignmentB));
+      await pendingB;
+      expect(service.currentAlignment()).toEqual(alignmentB);
+
+      resolveA(ok(alignmentA));
+      await pendingA;
+
+      expect(service.currentAlignment()).toEqual(alignmentB);
+      expect(await pendingA).toBeUndefined();
+    });
+
+    // STAR-698 — the page already holds SP13, then another result's GET returns
+    // an empty alignment. The singleton must drop 698 before that GET resolves.
+    it('replaces a held SP13 alignment when another result returns an empty one', async () => {
+      const held: AlignmentResponse = {
+        ...baseAlignment,
+        result_code: '698',
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP13', name: 'Genebank', role: 'PRIMARY' }]
+      };
+      const emptyB: AlignmentResponse = {
+        ...baseAlignment,
+        result_code: '222',
+        has_contribution: null,
+        selected_science_programs: []
+      };
+      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok(held));
+      await service.getAlignment('STAR-698');
+      expect(service.currentAlignment()).toEqual(held);
+
+      let resolveB: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingAlignment.mockImplementation(
+        () => new Promise<MainResponse<AlignmentResponse>>(resolve => {
+          resolveB = resolve;
+        })
+      );
+      const pendingB = service.getAlignment('222');
+
+      expect(service.currentAlignment()).toBeNull();
+
+      resolveB(ok(emptyB));
+      await pendingB;
+      expect(service.currentAlignment()).toEqual(emptyB);
+    });
+
+    // STAR-698 version switch — live and the 2026 snapshot share a result code.
+    // The snapshot still carries SP13; a late snapshot response must not restore it
+    // once the live (empty) response is the latest request.
+    it('keeps the latest response when two reads of the same result resolve out of order', async () => {
+      const snapshot: AlignmentResponse = {
+        ...baseAlignment,
+        result_code: '698',
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP13', name: 'Genebank', role: 'PRIMARY' }]
+      };
+      const live: AlignmentResponse = {
+        ...baseAlignment,
+        result_code: '698',
+        has_contribution: null,
+        selected_science_programs: []
+      };
+      const resolvers: Array<(value: MainResponse<AlignmentResponse>) => void> = [];
+      mockApi.GET_PoolFundingAlignment.mockImplementation(
+        () => new Promise<MainResponse<AlignmentResponse>>(resolve => {
+          resolvers.push(resolve);
+        })
+      );
+
+      const pendingSnapshot = service.getAlignment('698');
+      const pendingLive = service.getAlignment('698');
+
+      resolvers[1](ok(live));
+      await pendingLive;
+      expect(service.currentAlignment()).toEqual(live);
+
+      resolvers[0](ok(snapshot));
+      await pendingSnapshot;
+      expect(service.currentAlignment()).toEqual(live);
+    });
   });
 
   describe('getSciencePrograms (REQ-BIL-ASR-01)', () => {
@@ -436,6 +541,118 @@ describe('BilateralService', () => {
 
       expect(service.loadingSciencePrograms()).toBe(false);
     });
+
+    it('clears the previous result’s programs when another result starts loading and drops the late list', async () => {
+      const programA = { code: 'SP13', name: 'Genebank', icon_key: 'SP13', allocation: 1 };
+      const programsA: PoolFundingSciencePrograms = {
+        result_code: '111',
+        mapping_status: 'mapped',
+        clarisa_project: null,
+        science_programs: [programA]
+      };
+      mockApi.GET_PoolFundingSciencePrograms.mockResolvedValueOnce(ok(programsA));
+      await service.getSciencePrograms('111');
+      expect(service.sciencePrograms()).toEqual([programA]);
+      expect(service.mappingStatus()).toBe('mapped');
+
+      let resolveLateA: (value: MainResponse<PoolFundingSciencePrograms>) => void = () => undefined;
+      mockApi.GET_PoolFundingSciencePrograms.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveLateA = resolve;
+          })
+      );
+      const lateA = service.getSciencePrograms('111');
+
+      let resolveB: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingAlignment.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveB = resolve;
+          })
+      );
+      const pendingB = service.getAlignment('222');
+
+      expect(service.sciencePrograms()).toEqual([]);
+      expect(service.mappingStatus()).toBeNull();
+
+      resolveLateA(ok(programsA));
+      await lateA;
+      expect(service.sciencePrograms()).toEqual([]);
+      expect(service.mappingStatus()).toBeNull();
+
+      resolveB(
+        ok<AlignmentResponse>({
+          result_code: '222',
+          eligible: true,
+          has_pool_funding_alignment_eligible: true,
+          has_contribution: null,
+          selected_levers: [],
+          is_synced_to_prms: false,
+          is_read_only: false
+        })
+      );
+      await pendingB;
+      expect(service.sciencePrograms()).toEqual([]);
+      expect(service.mappingStatus()).toBeNull();
+    });
+
+    it('makes a fresh programs request when returning to A while A’s first list is still pending', async () => {
+      const programA = { code: 'SP13', name: 'Genebank', icon_key: 'SP13', allocation: 1 };
+      const programsA: PoolFundingSciencePrograms = {
+        result_code: '111',
+        mapping_status: 'mapped',
+        clarisa_project: null,
+        science_programs: [programA]
+      };
+      const resolvers: Array<(value: MainResponse<PoolFundingSciencePrograms>) => void> = [];
+      mockApi.GET_PoolFundingSciencePrograms.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolvers.push(resolve);
+          })
+      );
+
+      const firstA = service.getSciencePrograms('111');
+      expect(mockApi.GET_PoolFundingSciencePrograms).toHaveBeenCalledTimes(1);
+      expect(service.loadingSciencePrograms()).toBe(true);
+
+      mockApi.GET_PoolFundingAlignment.mockResolvedValue(
+        ok<AlignmentResponse>({
+          result_code: '222',
+          eligible: true,
+          has_pool_funding_alignment_eligible: true,
+          has_contribution: null,
+          selected_levers: [],
+          is_synced_to_prms: false,
+          is_read_only: false
+        })
+      );
+      await service.getAlignment('222');
+      expect(service.sciencePrograms()).toEqual([]);
+      expect(service.mappingStatus()).toBeNull();
+
+      const secondA = service.getSciencePrograms('111');
+      expect(secondA).not.toBe(firstA);
+      expect(mockApi.GET_PoolFundingSciencePrograms).toHaveBeenCalledTimes(2);
+      expect(service.loadingSciencePrograms()).toBe(true);
+
+      resolvers[1](ok(programsA));
+      await secondA;
+      expect(service.sciencePrograms()).toEqual([programA]);
+      expect(service.mappingStatus()).toBe('mapped');
+      expect(service.loadingSciencePrograms()).toBe(false);
+
+      resolvers[0](
+        ok<PoolFundingSciencePrograms>({
+          ...programsA,
+          science_programs: [{ code: 'SP01', name: 'Other', icon_key: 'SP01', allocation: 1 }]
+        })
+      );
+      await firstA;
+      expect(service.sciencePrograms()).toEqual([programA]);
+      expect(service.mappingStatus()).toBe('mapped');
+    });
   });
 
   describe('patchAlignment', () => {
@@ -450,6 +667,9 @@ describe('BilateralService', () => {
     };
 
     it('200 — returns ok:true and updates currentAlignment', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValue(ok(successAlignment));
+      await service.getAlignment('RES-001');
+
       let savingDuringCall = false;
       mockApi.PATCH_PoolFundingAlignment.mockImplementation(() => {
         savingDuringCall = service.savingAlignment();
@@ -462,6 +682,100 @@ describe('BilateralService', () => {
       expect(service.savingAlignment()).toBe(false);
       expect(result).toEqual({ ok: true, data: successAlignment });
       expect(service.currentAlignment()).toEqual(successAlignment);
+    });
+
+    it('does not let a slow save for A overwrite B once B is the result on screen', async () => {
+      const alignmentA: AlignmentResponse = {
+        ...successAlignment,
+        result_code: '111',
+        selected_science_programs: [{ code: 'SP13', name: 'Genebank', role: 'PRIMARY' }]
+      };
+      const alignmentB: AlignmentResponse = {
+        ...successAlignment,
+        result_code: '222',
+        has_contribution: null,
+        selected_science_programs: []
+      };
+      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok(alignmentA));
+      await service.getAlignment('111');
+
+      let resolvePatch: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.PATCH_PoolFundingAlignment.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolvePatch = resolve;
+          })
+      );
+      const pendingPatch = service.patchAlignment('111', { has_contribution: true });
+
+      let resolveB: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingAlignment.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveB = resolve;
+          })
+      );
+      const pendingB = service.getAlignment('222');
+      resolveB(ok(alignmentB));
+      await pendingB;
+      expect(service.currentAlignment()).toEqual(alignmentB);
+
+      resolvePatch(ok(alignmentA));
+      await pendingPatch;
+      expect(service.currentAlignment()).toEqual(alignmentB);
+    });
+
+    it('keeps a fresh save when an older GET of the same result resolves afterwards', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok(successAlignment));
+      await service.getAlignment('RES-001');
+
+      let resolveGet: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingAlignment.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveGet = resolve;
+          })
+      );
+      const pendingGet = service.getAlignment('RES-001');
+
+      const saved: AlignmentResponse = { ...successAlignment, has_contribution: false };
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(ok(saved));
+      await service.patchAlignment('RES-001', { has_contribution: false });
+      expect(service.currentAlignment()).toEqual(saved);
+
+      resolveGet(ok({ ...successAlignment, has_contribution: true }));
+      await pendingGet;
+      expect(service.currentAlignment()).toEqual(saved);
+      expect(await pendingGet).toBeUndefined();
+    });
+
+    it('clears loadingAlignment when a save supersedes an in-flight GET', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok(successAlignment));
+      await service.getAlignment('RES-001');
+
+      let resolveGet: (value: MainResponse<AlignmentResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingAlignment.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveGet = resolve;
+          })
+      );
+      const pendingGet = service.getAlignment('RES-001');
+      expect(service.loadingAlignment()).toBe(true);
+
+      const saved: AlignmentResponse = { ...successAlignment, has_contribution: false };
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(ok(saved));
+      const pendingPatch = service.patchAlignment('RES-001', { has_contribution: false });
+      expect(service.loadingAlignment()).toBe(false);
+
+      await pendingPatch;
+      expect(service.loadingAlignment()).toBe(false);
+      expect(service.currentAlignment()).toEqual(saved);
+
+      resolveGet(ok({ ...successAlignment, has_contribution: true }));
+      await pendingGet;
+      expect(service.loadingAlignment()).toBe(false);
+      expect(service.currentAlignment()).toEqual(saved);
     });
 
     it('400 with structured field-keyed errors — returns ok:false with fieldErrors', async () => {
@@ -817,6 +1131,49 @@ describe('BilateralService', () => {
       await expect(service.getTocCatalog('STAR-5238')).rejects.toThrow('network down');
 
       expect(service.loadingTocCatalog()).toBe(false);
+    });
+
+    it('a stale catalog response does not overwrite the catalog of the result now on screen', async () => {
+      let resolveA: (value: MainResponse<BilateralTocCatalogResponse>) => void = () => undefined;
+      let resolveB: (value: MainResponse<BilateralTocCatalogResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingHlosIndicators.mockImplementation((code: string) => {
+        return new Promise<MainResponse<BilateralTocCatalogResponse>>(resolve => {
+          if (code === '111') resolveA = resolve;
+          else resolveB = resolve;
+        });
+      });
+
+      const pendingA = service.getTocCatalog('111');
+      const pendingB = service.getTocCatalog('222');
+
+      resolveB(ok(TOC_CATALOG_TWO_SP_FIXTURE));
+      await pendingB;
+      expect(service.tocCatalog()).toEqual(TOC_CATALOG_TWO_SP_FIXTURE);
+
+      resolveA(ok(TOC_CATALOG_CAPSHARING_FIXTURE));
+      await pendingA;
+
+      expect(service.tocCatalog()).toEqual(TOC_CATALOG_TWO_SP_FIXTURE);
+    });
+
+    it('drops the previous result catalog when a different result starts loading', async () => {
+      mockApi.GET_PoolFundingHlosIndicators.mockResolvedValueOnce(ok(TOC_CATALOG_CAPSHARING_FIXTURE));
+      await service.getTocCatalog('111');
+      expect(service.tocCatalog()).toEqual(TOC_CATALOG_CAPSHARING_FIXTURE);
+
+      let resolveB: (value: MainResponse<BilateralTocCatalogResponse>) => void = () => undefined;
+      mockApi.GET_PoolFundingHlosIndicators.mockImplementation(
+        () => new Promise<MainResponse<BilateralTocCatalogResponse>>(resolve => {
+          resolveB = resolve;
+        })
+      );
+      const pendingB = service.getTocCatalog('222');
+
+      expect(service.tocCatalog()).toBeNull();
+
+      resolveB(ok(TOC_CATALOG_TWO_SP_FIXTURE));
+      await pendingB;
+      expect(service.tocCatalog()).toEqual(TOC_CATALOG_TWO_SP_FIXTURE);
     });
   });
 
