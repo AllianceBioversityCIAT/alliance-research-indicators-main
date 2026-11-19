@@ -385,4 +385,71 @@ describe('pfm-derivation', () => {
       ).toBe(4);
     });
   });
+
+  describe('DD-PFM-40: TIP knowledge products', () => {
+    const tip = (o: Partial<PfmRawRow> = {}): PfmRawRow =>
+      raw({
+        platform_code: 'TIP',
+        result_status_id: 20,
+        result_status_name: 'Completed in TIP',
+        approved_at: null,
+        ...o,
+      });
+
+    it('keeps the TIP status name and counts Completed in TIP as approved', () => {
+      const d = derivePfmRow(tip());
+      expect(d.starLabel).toBe('Completed in TIP');
+      expect(d.isExternal).toBe(true);
+      expect(d.isApproved).toBe(true);
+    });
+
+    it('is never an action in STAR, whatever its mapping', () => {
+      for (const o of [
+        {},
+        { mapping_complete: 0 },
+        { has_alignment: 0, has_contribution: null, mapping_complete: null },
+      ]) {
+        const d = derivePfmRow(tip(o));
+        expect(d.needsAttention).toBe(false);
+        for (const chip of [
+          PfmChipEnum.NEED_ATTENTION,
+          PfmChipEnum.MAPPING_INCOMPLETE,
+          PfmChipEnum.READY_TO_SYNC,
+          PfmChipEnum.AWAITING_PI,
+        ]) {
+          expect(matchesChip(d, chip)).toBe(false);
+        }
+        expect(matchesChip(d, PfmChipEnum.MANAGED_IN_TIP)).toBe(true);
+      }
+    });
+
+    it('keeps its real state: a mapped TIP row not in PRMS is still ready (pipeline)', () => {
+      expect(derivePfmRow(tip()).isReady).toBe(true);
+    });
+
+    it('leaves Managed in TIP once it is in PRMS or out of scope', () => {
+      const synced = derivePfmRow(tip({ is_synced_to_prms: 1 }));
+      expect(matchesChip(synced, PfmChipEnum.MANAGED_IN_TIP)).toBe(false);
+      expect(matchesChip(synced, PfmChipEnum.SYNCED)).toBe(true);
+      const noSp = derivePfmRow(tip({ has_contribution: 0 }));
+      expect(matchesChip(noSp, PfmChipEnum.MANAGED_IN_TIP)).toBe(false);
+      expect(matchesChip(noSp, PfmChipEnum.NO_SP_CONTRIBUTION)).toBe(true);
+    });
+
+    it('a STAR row (or one without platform) is unchanged and never Managed in TIP', () => {
+      for (const platform_code of ['STAR', undefined, null]) {
+        const d = derivePfmRow(raw({ platform_code, mapping_complete: 0 }));
+        expect(d.isExternal).toBe(false);
+        expect(d.needsAttention).toBe(true);
+        expect(matchesChip(d, PfmChipEnum.MANAGED_IN_TIP)).toBe(false);
+      }
+    });
+
+    it('status 20 on a STAR row is not treated as approved', () => {
+      const d = derivePfmRow(
+        raw({ result_status_id: 20, result_status_name: 'Completed in TIP' }),
+      );
+      expect(d.isApproved).toBe(false);
+    });
+  });
 });

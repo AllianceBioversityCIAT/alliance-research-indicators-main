@@ -189,6 +189,7 @@ describe('PooledFundingMonitorService', () => {
       expect(r).toEqual({
         result_code: 'STAR-1002',
         platform_code: 'STAR',
+        is_external: false,
         official_code: 1002,
         report_year: 2026,
         snapshot_years: [2025],
