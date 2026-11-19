@@ -2,7 +2,7 @@
 
 - **Module:** result-prms-sync (server) · version-selector + result-sidebar (client)
 - **Spec id:** 2026-11-prms-pending-review-lock
-- **Status:** in-progress
+- **Status:** done (5 of 5, 2026-11-19)
 - **Owner:** owner + delegated workers (all code goes to a worker; Claude briefs and reviews)
 - **Linked requirements:** ./requirements.md · **Linked design:** ./design.md · **Review:** ./judgment.md
 - **Branch:** `fix/prevent-prms-resubmission-during-active-review`
@@ -40,8 +40,8 @@ graph TD
 | S-27 a re-import does not reorder; **BUT must NOT** let an imported row outrank a real one | T-01 | fixture (imported rows with a higher `id` than the real push) + rule unit test |
 | S-7 (702 replay) refused with 409 | T-02 | service spec |
 | S-7 **BUT** no log row, attempt count unchanged, no Normalizer call | T-02 | service spec |
-| S-7 **AND IT MUST** apply to every role, `SYSTEM_ADMIN` included | T-02 | service spec (admin user) |
-| S-7 **AND IT MUST** apply to the TIP sync origin | T-02 | service spec (`origin: 'TIP_SYNC'`) |
+| S-10 **AND IT MUST** apply to every role, `SYSTEM_ADMIN` included | T-02 | service spec (admin user) |
+| S-10 **AND IT MUST** apply to the TIP sync origin | T-02 | service spec (`origin: 'TIP_SYNC'`) |
 | S-8 Approved refused | T-02 | sync-gate spec |
 | S-9 Rejected / never pushed passes | T-02 | sync-gate spec |
 | S-10 refusal order | T-02 | sync-gate spec (position between `not_already_synced` and `reporting_year`) |

@@ -722,6 +722,71 @@ describe('VersionSelectorComponent', () => {
       errorSpy.mockRestore();
     });
 
+    it('S-19: a hung status read times out after 10000 ms, logs, and still patches once', async () => {
+      jest.useFakeTimers();
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      (api.GET_PrmsPushStatus as jest.Mock).mockReturnValue(new Promise(() => undefined));
+
+      try {
+        await component.updateResult();
+        latestAlert().confirmCallback.event();
+        fixture.detectChanges();
+
+        await jest.advanceTimersByTimeAsync(9_999);
+        fixture.detectChanges();
+
+        expect(updateResultSpan().getAttribute('aria-busy')).toBe('true');
+        expect(api.PATCH_ReportingCycle).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(1);
+        fixture.detectChanges();
+
+        expect(errorSpy).toHaveBeenCalled();
+        expect(api.PATCH_ReportingCycle).toHaveBeenCalledTimes(1);
+        expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2026');
+        expect(updateResultSpan().getAttribute('aria-busy')).not.toBe('true');
+      } finally {
+        errorSpy.mockRestore();
+        jest.clearAllTimers();
+        jest.useRealTimers();
+      }
+    });
+
+    it('S-19: a status read that arrives after the timeout does not warn or patch again', async () => {
+      jest.useFakeTimers();
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      let resolveGet!: (value: unknown) => void;
+      (api.GET_PrmsPushStatus as jest.Mock).mockReturnValue(
+        new Promise(resolve => {
+          resolveGet = resolve;
+        })
+      );
+
+      try {
+        await component.updateResult();
+        latestAlert().confirmCallback.event();
+        fixture.detectChanges();
+
+        await jest.advanceTimersByTimeAsync(10_000);
+        fixture.detectChanges();
+
+        resolveGet({
+          successfulRequest: true,
+          data: { push_status: { year: 2026, status: 'pending_review', resubmittable: false } }
+        });
+        await jest.advanceTimersByTimeAsync(0);
+        fixture.detectChanges();
+
+        expect(api.PATCH_ReportingCycle).toHaveBeenCalledTimes(1);
+        expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2026');
+        expect(alerts().some(alert => alert.severity === 'warning')).toBe(false);
+      } finally {
+        errorSpy.mockRestore();
+        jest.clearAllTimers();
+        jest.useRealTimers();
+      }
+    });
+
     it('S-11: the status read uses the chosen year, not the URL version', async () => {
       const route = TestBed.inject(ActivatedRoute) as { snapshot: { queryParamMap: { get: (key: string) => string | null } } };
       route.snapshot.queryParamMap.get = (key: string) => (key === 'version' ? '2019' : null);

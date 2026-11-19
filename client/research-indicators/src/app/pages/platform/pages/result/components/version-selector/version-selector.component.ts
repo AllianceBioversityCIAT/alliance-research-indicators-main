@@ -16,6 +16,8 @@ import { environment } from '../../../../../../../environments/environment';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { RESULT_ENTRY_SOURCE_QUERY, isKnownResultEntrySource } from '@shared/constants/result-entry-source';
 
+const PRMS_STATUS_TIMEOUT_MS = 10_000;
+
 @Component({
   selector: 'app-version-selector',
   standalone: true,
@@ -265,8 +267,14 @@ export class VersionSelectorComponent implements OnDestroy {
   private async checkThenSubmit(year: string): Promise<void> {
     if (this.checkingPrms()) return;
     this.checkingPrms.set(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const response = await this.api.GET_PrmsPushStatus(this.cache.getCurrentNumericResultId(), year);
+      const response = await Promise.race([
+        this.api.GET_PrmsPushStatus(this.cache.getCurrentNumericResultId(), year),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('PRMS push status read timed out')), PRMS_STATUS_TIMEOUT_MS);
+        })
+      ]);
       if (!response.successfulRequest) {
         console.error('PRMS push status read failed', response);
         this.submitReportingCycle(year);
@@ -282,6 +290,7 @@ export class VersionSelectorComponent implements OnDestroy {
       console.error('PRMS push status read failed', error);
       this.submitReportingCycle(year);
     } finally {
+      clearTimeout(timer);
       this.checkingPrms.set(false);
     }
   }

@@ -83,7 +83,7 @@
 #### Running totals (Budget Tripwire)
 
 - Tasks: 1 of 5.
-- LOC: `git diff --stat` at commit (see the commit). Production is about 190 lines (rule + reader + module). Tests are about 520 lines (rule spec + reader spec + fixture). That is within budget for now, but the tests already consume most of the 550-line estimate.
+- LOC: `git diff --stat` at commit (see the commit). *Corrected at validation (2026-11-19, F-4): measured on `c3851a247`, production is 163 lines and tests 514, 677 in all; the estimates below and "662" under T-02 are superseded.* Production is about 190 lines (rule + reader + module). Tests are about 520 lines (rule spec + reader spec + fixture). That is within budget for now, but the tests already consume most of the 550-line estimate.
 - Review rounds: 1 of about 7.
 
 ### T-02 — Gate entry `prms_resubmittable` and the typed refusal → **PASS**
@@ -330,7 +330,7 @@ No owed item and no blocker, so no continuation is needed.
 ### T-05 — Sidebar: PRMS SYNC disabled while held → **PASS; owner HITL approved**
 
 - **Date:** 2026-11-19
-- **Status:** code PASS on attempt 1. The task stays open (not `[x]`) until the owner runs the HITL on Dev and approves visually. The client code for T-04 and T-05 is **uncommitted** until then.
+- **Status:** done. Code PASS on attempt 1; the owner approved the HITL on Dev (see *HITL on Dev* below). The client code for T-04 and T-05 is committed in `1d4e5e7d3`.
 - **Requirements covered by code:** R-PRL-005 (S-21…S-25), NFR-PRL-002 (tooltip on a disabled button, still to be confirmed at HITL), NFR-PRL-004 (client half).
 - **Skills / effort:** `angular-developer` and `ui-ux-pro-max`, as the task lists. Effort `high`.
 - **Brief:** lean tests.
@@ -415,3 +415,33 @@ The owner ran this branch's server and client natively against the shared Dev DB
 - **Steps 3 and 4 (picker year, keyboard), observed by the owner.** Asked separately, the owner confirmed: "sí probé los pasos 3 y 4". The HITL box is ticked on that statement.
 - **Step 5** was not run. It was optional, at the owner's choice.
 - **Copy:** the warning and tooltip wording chosen by the workers was accepted as shown.
+
+## Validation remediation (2026-11-19)
+
+`/akili-validate` returned **PASS with WARN** (see `validation-report.md`). The owner chose to fix F-1 in code and F-3 to F-6 in the documents.
+
+### F-1 — S-19 "or times out": bound the push-status read → **PASS**
+
+- **Worker:** Orca dispatch `ctx_b28c931f02ab` (rework follow-up `ctx_d2446ace7241`), Cursor · `grok-4.7-medium`.
+- **Files:** `version-selector.component.{ts,spec.ts}` only. `ApiService` and the sidebar are unchanged.
+- **Change:** `checkThenSubmit` races `GET_PrmsPushStatus` against `PRMS_STATUS_TIMEOUT_MS = 10_000`. Expiry takes the existing read-failure path (`console.error`, then `submitReportingCycle`). A late response is ignored by `Promise.race`. One `clearTimeout` sits in the existing `finally`.
+- **Red-first:** on the old code the hung-read test failed with `Expected number of calls: 1 / Received number of calls: 0`.
+- **Falsifiers**, each observed red and then reverted:
+  - Timeout removed: `errorSpy` was called 0 times.
+  - Late-response guard removed: the warning showed (`Expected: false / Received: true`).
+  - `PRMS_STATUS_TIMEOUT_MS = 0`: the 9 999 ms assertion failed (`Expected: "true" / Received: null`).
+- **Evidence re-run (non-author, Leader) → `VERIFIED`:** version-selector 66 of 66; lint exit 0; app tsc exit 0; spec tsc 0 errors in the file.
+- **Reviewer (fresh Claude `akili-reviewer`, checklist):** `STATUS: PASS` on attempt 1. Every ordering ends with `checkingPrms` false and at most one PATCH, and no test leaks fake timers.
+  - Two advisories, A2 (`Promise.race` shape) and A3 (assert at the 9 999 ms boundary), were then applied by the same worker.
+  - The rework is the reviewer's own proposed shape. It was accepted on the evidence re-run without a second review.
+- **Remaining advisory:** A5. After a timeout the user may click again, which starts a new GET. Each click still sends at most one PATCH, so S-20 holds.
+- **KZ-017:** jsdom with fake timers cannot prove a real network hang.
+
+### F-3 to F-6 — document fixes
+
+- S-10 relabelled in `tasks.md` §2 and `design.md` §7.
+- T-01 LOC corrected: 163 production lines and 514 test lines, measured on `c3851a247`.
+- T-05 status note updated.
+- Status fields set to approved/done.
+- `design.md` §5.3 now records the 10 s bound.
+- The correction sweep found no leftover old values.

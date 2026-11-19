@@ -10,7 +10,7 @@
 | Type | Change |
 | Deliverable | software |
 | Depth | Standard |
-| Status | draft |
+| Status | approved (implemented and validated 2026-11-19; see `validation-report.md`) |
 | Approval Mode | gated |
 | Owner | David Casañas / ARI |
 | Linked PRD section | [`docs/prd.md`](../../../prd.md) §3.5 (PRMS as downstream consumer) |

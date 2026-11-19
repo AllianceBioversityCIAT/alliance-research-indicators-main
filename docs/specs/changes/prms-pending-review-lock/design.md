@@ -2,7 +2,7 @@
 
 - **Module:** result-prms-sync (server) · version-selector + result-sidebar (client)
 - **Spec id:** 2026-11-prms-pending-review-lock
-- **Status:** draft — Judgment Day round 1 corrections applied (see `judgment.md`)
+- **Status:** approved — implemented 2026-11-19, with two execute-time amendments (§5.1.1, §4 POST); see `validation-report.md`
 - **Depth:** Standard · **Approval Mode:** gated
 - **Linked requirements:** ./requirements.md · **Linked proposal:** ./proposal.md · **Review:** ./judgment.md
 - **Linked TRD:** ../../../trd/trd.md (result-prms-sync, prms-webhook)
@@ -197,6 +197,7 @@ No data model changes. The design reads `result_prms_sync_history`, which **thre
 
      *Cancel* sends nothing (S-16). *Update anyway* calls `submitReportingCycle(year)` and never blocks (S-17).
    - **Read failure** (not `successfulRequest`, or a throw): `console.error`, then `submitReportingCycle(year)`. This fails open, and the server gate still protects (S-19, DD-6).
+   - **Timeout** (added at validation, 2026-11-19, F-1): the read is bounded at `PRMS_STATUS_TIMEOUT_MS = 10 000` ms through `Promise.race`. Expiry takes the read-failure path above. A response that arrives after the deadline is ignored: no warning and no second PATCH (S-19 "or times out").
    - `checkingPrms` clears in a `finally`.
 5. **Year source.** The year is the one the user chose, never the URL's `version` (S-11). The request still uses `useResultInterceptor`.
 6. **Accessibility (NFR-PRL-002).** The warning reuses the global alert, which already traps focus, closes on Esc, and shows its text before its actions. No new focusable surface is added.
@@ -235,7 +236,7 @@ No impact.
 - No new route and no new guard. GET and POST keep `@Roles(CONTRIBUTOR, CENTER_ADMIN, SYSTEM_ADMIN)` and `ResultOwnerGuard`.
   - Admins skip the owner check.
   - `setup()` runs in `SetUpInterceptor` for everyone (P-4).
-- The gate applies to **every** role, `SYSTEM_ADMIN` included (S-7). There is no override (owner decision).
+- The gate applies to **every** role, `SYSTEM_ADMIN` included, and to the TIP sync origin (S-10). There is no override (owner decision).
 - `push_status` reveals only what the caller already sees in the history modal.
 
 ## 8. Design decisions
