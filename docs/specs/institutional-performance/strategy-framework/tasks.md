@@ -253,7 +253,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `angular-developer`, `impeccable-bridge`
 
 ### T-12 — Framework page shell, API methods, types, error util, URL codec, export
-- **Status:** todo · **Size:** M · **Depends:** T-11
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-12; uncommitted until visual approval) · **Size:** M · **Depends:** T-11
 - **Requirements:** R-STF-007 (header: eyebrow, title from years, subtitle, selector; Editor/Table toggle; summary line; banner; states loading/empty on any portfolio/error), R-STF-008 (Export .xlsx one sheet per level; AC.3), R-STF-015 AC.2 (default portfolio from A0), R-STF-001 Details "not configured"
 - **Design:** §6.2, §6.4 export; §2.1 client rows (page shell, `framework-view.util`, `framework-url.codec`, `framework-error.util`, interfaces, `api.service`, `xlsx-export.util`); D-STF-9, D-STF-13, D-STF-23; P-14, P-28, P-36
 - **Scope:** page component with A0/A1e loading; `framework-view.util` (nesting, counts, flattened rows, export sheets); `framework-url.codec` (`?view=&level=`, frozen slugs); `frameworkErrorOf` (object, string, string array); additive `exportSheetsToXlsx`; `ApiService` methods for A0–A11; interfaces.

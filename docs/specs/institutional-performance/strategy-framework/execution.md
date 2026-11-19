@@ -297,3 +297,25 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Requirements covered:** R-STF-011 (AC.1–AC.3), NFR-STF-002 (seed transaction; batch proof in T-10).
 - **Running totals:** tasks 10/17 · server LOC ≈ 11,800 (9,600 + 2,184; re-based server ≈ 12,000 — **within, ~200 left before T-10**) · client LOC ≈ 400 · review rounds 16/≈26.
 - **Approval:** continue gate `auto-approved (owner standing direction)`.
+
+### T-12 — Framework page shell, API methods, types, error util, URL codec, export
+
+- **Status:** PASS (attempt 1) — 2026-11-19 · **not committed** (UI waits for the owner's visual approval)
+- **Dispatch:** fresh Grok `grok-4.7-high` via Cursor, run `run_674b6b131b1f`, task `task_97f3ff8b3ea2`, dispatch `ctx_22ba940807a3` (retained until PASS, then released). Effort high. Skills `angular-developer`, `ui-ux-pro-max` — same `impeccable-bridge` deviation as T-11. Exemplars: organizational-structure and control-lists pages, `ApiService` org-structure methods, `xlsx-export.util.ts`. Forward pointers copied: T-11 Reviewer (every 4xx except 401 rendered inline incl. 403/404; D-STF-26 as amended), D-STF-28 (`usageLabels` once on the view). Kaizen carried KZ-001, K-004/KZ-014, K-014, KZ-017.
+- **Implementer report:** new `framework.component.{ts,html,scss,spec.ts}` (192/126/22/271; replaces T-11's placeholder), `url/framework-url.codec(.spec).ts` (62/35), `utils/framework-error.util(.spec).ts` (45/48), `utils/framework-view.util(.spec).ts` (210/190), `shared/interfaces/strategy-framework.interface.ts` (197); `api.service.ts` A0–A11 (15 methods), `xlsx-export.util.ts` additive `writeExportSheets` + `exportSheetsToXlsx` (+spec). Slots left empty for T-13…T-15.
+  - Reds: baseline `grep -c exportSheetsToXlsx` = 0; page spec "No tests found, exiting with code 1". Falsifier 1 (title from `name`): received "Portfolio 2 – Monitoring framework" vs expected "Strategy 2026–2030 – Monitoring framework" — red; restored. Falsifier 2 (409 via `handleBadRequest`): "raises no result-title alert" Expected 0 calls, Received 1 (payload `errors.result_official_code` 1234) — red; restored.
+  - Verification: 9 suites / 249 tests (incl. consumers xlsx-export, data-table, organizational-structure, control-lists, actions.service); lint clean; `tsc -p tsconfig.spec.json` 942, none in new files; `npm run build` exit 0 (framework scss 521 B; `exceljs` lazy chunk).
+- **Leader re-run (non-author): VERIFIED** — same 9 suites / 249 tests; lint clean; **full client suite 396/396 suites, 9256/9256 tests** (no other worker active).
+- **Reviewer (`akili-reviewer`, opus): `STATUS: PASS`** — §2.1, §4 A0–A11 (paths literal, unversioned; interfaces match `framework-read.service.ts` and write DTOs), §6.2, §6.4, D-STF-9 (`exportRowsToXlsx` byte-identical), D-STF-13, D-STF-23, D-STF-26 as amended (403/404 inline via `it.each`), D-STF-28, P-14, P-28, P-36; export Disqualifier met (real `exceljs` workbook, sheet count + names, `1.2` before `1.10`).
+  - ADVISORY: RELIABILITY — `exportWorkbook()` has `try/finally` without `catch`: a failed lazy `exceljs` chunk load or `writeBuffer` error reaches the ErrorHandler with no inline message. READABILITY — §6.2 eyebrow "chip" renders as an uppercase `<p>` (HITL, T-17). RISK — the P-36 page test's `not.toHaveBeenCalled` holds trivially (component never injects `ActionsService`); the observed falsifier is what gives it meaning. RESILIENCE — portfolio is not written to the URL (conformant: §2.1 lists only `?view=&level=`).
+- **spawns:** implementer (Cursor/Grok) — not reported by host, ended complete; reviewer — not reported by host, ended complete.
+- **Requirements covered:** R-STF-007 (shell, states), R-STF-008 (export builder; AC.3), R-STF-015 AC.2, R-STF-001 Details "not configured".
+- **Running totals:** tasks 11/17 · server LOC ≈ 11,800 (re-based ≈ 12,000) · client LOC ≈ 2,000 · review rounds 17/≈26.
+
+## Session pause (2026-11-19, second)
+
+- **Done this session:** T-09 (committed `8c8c36e63`), T-11 and T-12 (PASS, **client changes uncommitted** — waiting for the owner's visual approval; tree holds T-11 + T-12 client files and `docs/ux-ui/design.md` §7.1 token row).
+- **Next:** T-10 (integration suites) — run it with **no other worker active** (performance + concurrency evidence). **Budget:** server ≈ 11,800 of the re-based ≈ 12,000; T-10 (8 integration suites) will very likely cross it → the tripwire stops for the owner at T-10's finalize unless the owner re-bases first (option raised: count the generated 1,127-line data file separately). Client T-13 (outline editor), T-14 (table view), T-16 (IOB page) are eligible after T-12; T-15 after T-13.
+- **Carry into T-10:** T-02 EXTRA check, T-06 update-vs-create concurrency, T-08 live Swagger count, T-09 Reviewer note on dedicated runner after `…001`/`…002` DDL in one batch.
+- **Environment:** scratch `127.0.0.1:3307/ari_scratch_test` now has `…003` applied (seeded Portfolio 2). Docker `research_indicators_server_test_mysql` must be running.
+- No Orca worker left open for this spec.
