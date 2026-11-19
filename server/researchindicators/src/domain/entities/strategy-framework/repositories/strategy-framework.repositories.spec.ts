@@ -73,5 +73,26 @@ describe('Strategy framework repositories', () => {
       await expect(repo.findById(9)).resolves.toBeNull();
       expect(query.mock.calls[0][1]).toEqual([9]);
     });
+
+    it('findAll selects the same columns and does not filter is_active or deleted_at', async () => {
+      const { repo, query } = makeRepo();
+      const row = {
+        id: 1,
+        name: 'P',
+        start_year: 2026,
+        end_year: 2030,
+        is_active: 0,
+      };
+      query.mockResolvedValue([row]);
+
+      await expect(repo.findAll()).resolves.toEqual([row]);
+
+      const [sql, params] = query.mock.calls[0];
+      expect(sql).toContain('SELECT id, name, start_year, end_year, is_active');
+      expect(sql).toContain('FROM portfolios');
+      expect(sql).not.toMatch(/\bWHERE\b/);
+      expect(sql).not.toContain('deleted_at');
+      expect(params).toBeUndefined();
+    });
   });
 });

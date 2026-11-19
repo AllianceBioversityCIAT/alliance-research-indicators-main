@@ -31,4 +31,16 @@ export class PortfolioLookupRepository extends Repository<Portfolio> {
     );
     return rows[0] ?? null;
   }
+
+  /**
+   * Every portfolio row, including inactive ones. No `deleted_at` column:
+   * the projection does not have it (T-03). The read service decides which
+   * rows are active for context (design 5.1).
+   */
+  async findAll(): Promise<PortfolioLookupRow[]> {
+    return this.query(
+      `SELECT id, name, start_year, end_year, is_active
+         FROM portfolios`,
+    );
+  }
 }

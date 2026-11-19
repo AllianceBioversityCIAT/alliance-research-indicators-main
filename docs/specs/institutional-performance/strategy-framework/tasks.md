@@ -164,13 +164,13 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ### T-07 — Read service, usage registry, context
-- **Status:** todo · **Size:** M · **Depends:** T-04
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-07) · **Size:** M · **Depends:** T-04
 - **Requirements:** R-STF-012 (Details; AC.1 incl. empty portfolio wording; AC.2 provider blocks and shows its count), R-STF-002 AC.1 (read derives levels), R-STF-015 AC.2 (default portfolio), R-STF-009 Details (default year), R-STF-007 (counts, `deletable`, `blockers`)
 - **Design:** §4 A0, A1, A1e, A2, A8; §5.1; §5.4 step 5; §5.6; D-STF-10, D-STF-13, D-STF-22; P-21
 - **Scope:** `framework-read.service.ts` (singleton, no `CurrentUserUtil`), `framework-usage.registry.ts` (dedup by `consumerName`; optional per-element and per-IOB counters); module exports both.
   - Backend route: stack NestJS; implement lead `nestjs-expert` support none — project conventions; api-contract lead `api-design-principles` support `nestjs-expert`; test-first lead `tdd` support `nestjs-expert`
 - **Tests:** A1 on a four-level fixture; A1 of a level-less portfolio → `levels: []`, `elements: []`; A1 of a portfolio with levels and no elements → stored levels, `elements: []`; A1e virtual levels when none exist; A1 never carries `usage`/`deletable`/`blockers`; default portfolio rule (contains-today, latest start, gap year, none); `defaultYear` in and out of range; registry dedup and both counters; a provider's count shows in A1e and blocks.
-- **Falsifier:** inject `PortfoliosService` instead of the lookup repository → the module-scope spec (`Reflect.getMetadata('scope:options', FrameworkReadService)` / instantiation outside a request) goes red; put editor fields into A1 → the "A1 has no editor fields" spec goes red.
+- **Falsifier:** inject `PortfoliosService` instead of the lookup repository → the constructor-dependency spec (`design:paramtypes`) and instantiation outside a request go red (*amended 2026-11-19: `scope:options` cannot go red for this hazard — Nest propagates request scope at runtime and never writes it to the class metadata*); put editor fields into A1 → the "A1 has no editor fields" spec goes red.
 - **Red run:** predicted — greenfield artifact (observed in T-07).
 - **Disqualifier:** a default-portfolio test that uses only Portfolio 1 and 2 cannot show the tie-break — the fixture includes an overlapping third portfolio and a gap year.
 - **Consumers:** future children 4–5 (none today).
