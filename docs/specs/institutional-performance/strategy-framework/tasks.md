@@ -98,7 +98,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`
 
 ### T-03 — Entities, repositories and module shell
-- **Status:** todo · **Size:** M · **Depends:** T-01, T-02
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-03) · **Size:** M · **Depends:** T-01, T-02
 - **Requirements:** R-STF-002, R-STF-003, R-STF-004, R-STF-009 (data mapping); R-STF-012 Details "injectable server service" (module exports)
 - **Design:** §2.1 server table (entities row incl. the `generatedType` mapping, repositories incl. `portfolio-lookup.repository.ts`), §2 *Why two services*; D-STF-1, D-STF-11; P-21, P-35
 - **Scope:**
