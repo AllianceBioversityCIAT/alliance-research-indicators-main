@@ -90,7 +90,7 @@ export class PooledFundingMonitorService {
     now: Date = new Date(),
   ): Promise<PfmSummary> {
     const startedAt = performance.now();
-    const repoScope = this.resolveScope(userId, scope);
+    const repoScope = await this.resolveScope(userId, scope);
     const [
       monitored,
       projectsTotal,
@@ -130,7 +130,7 @@ export class PooledFundingMonitorService {
   ): Promise<PfmQueueResponse> {
     const startedAt = performance.now();
     const scope = query.scope ?? PfmScopeEnum.MINE;
-    const repoScope = this.resolveScope(userId, scope);
+    const repoScope = await this.resolveScope(userId, scope);
     const [monitored, filterOptions] = await Promise.all([
       this.repository.findMonitoredResults(repoScope),
       this.repository.findFilterOptions(repoScope),
@@ -161,7 +161,7 @@ export class PooledFundingMonitorService {
   ): Promise<PfmResultRow[]> {
     const startedAt = performance.now();
     const scope = query.scope ?? PfmScopeEnum.MINE;
-    const repoScope = this.resolveScope(userId, scope);
+    const repoScope = await this.resolveScope(userId, scope);
     const rows = deriveMonitoredRows(
       await this.repository.findMonitoredResults(repoScope),
     );
@@ -222,18 +222,20 @@ export class PooledFundingMonitorService {
    * raw Error when it is missing; that must never surface on the HTTP path, and
    * must never fall through to the portfolio (R-PFM-002).
    */
-  private resolveScope(
+  private async resolveScope(
     userId: number,
     scope: PfmScopeEnum,
-  ): PfmRepositoryScope {
+  ): Promise<PfmRepositoryScope> {
     if (!Number.isInteger(userId)) {
       throw new ForbiddenException(
         'CGIAR Portfolio Contribution Monitor requires an authenticated user',
       );
     }
+    // Read once per request, so every number of one response uses the same year.
+    const reportYear = await this.repository.findReportYear();
     return scope === PfmScopeEnum.ALL
-      ? { scope: PfmScopeEnum.ALL }
-      : { scope: PfmScopeEnum.MINE, userId };
+      ? { scope: PfmScopeEnum.ALL, reportYear }
+      : { scope: PfmScopeEnum.MINE, userId, reportYear };
   }
 
   private toFilters(query: PfmQueueQueryDto): PfmQueueFilters {

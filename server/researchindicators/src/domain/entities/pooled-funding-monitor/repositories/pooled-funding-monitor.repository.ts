@@ -9,6 +9,8 @@ import {
   formatLastFirstName,
   formatPersonName,
 } from '../../../shared/utils/name-format.util';
+import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
 
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-02
 
@@ -18,8 +20,8 @@ import {
  * no caller can pass someone else's carnet or a free-text project list.
  */
 export type PfmRepositoryScope =
-  | { scope: PfmScopeEnum.ALL }
-  | { scope: PfmScopeEnum.MINE; userId: number };
+  | { scope: PfmScopeEnum.ALL; reportYear: number }
+  | { scope: PfmScopeEnum.MINE; userId: number; reportYear: number };
 
 export interface PfmSpRef {
   code: string;
@@ -110,12 +112,13 @@ export const PFM_PLATFORM_CODE = 'STAR';
 export const PFM_TIP_PLATFORM_CODE = 'TIP';
 export const PFM_KNOWLEDGE_PRODUCT_INDICATOR_ID = 3;
 /**
- * The monitor counts ONLY results of this report year (`results.report_year_id`
+ * The monitor counts ONLY results of one report year (`results.report_year_id`
  * holds the year value itself): queue, chips, KPIs, coverage, pipeline, monthly
- * series, filter options. Bound as a parameter in `monitoredWhere`.
+ * series, filter options. The year is the `app_config` value of this key, read
+ * on every request (no cache: an admin save shows on the next load), resolved
+ * ONCE per request into the scope and bound as a parameter in `monitoredWhere`.
  */
-// TODO(pfm): read the report year from a configuration variable (app_config) instead of this constant — owner, HITL 2026-10-09.
-export const PFM_REPORT_YEAR = 2026;
+export const PFM_REPORT_YEAR_CONFIG_KEY = AppConfigKey.OICR_REPORTING_YEAR;
 /** Status the approval date is read from (D-4). */
 const APPROVED_STATUS_ID = 6;
 
@@ -336,7 +339,33 @@ interface Fragment {
  */
 @Injectable()
 export class PooledFundingMonitorRepository {
+  private readonly logger = new LoggerUtil({
+    name: PooledFundingMonitorRepository.name,
+  });
+
   constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * The monitored report year: the active `OICR.REPORTING_YEAR` value. When it is
+   * missing or not a year, the current UTC calendar year, with a warning, so no
+   * year is ever written in code.
+   */
+  async findReportYear(now: Date = new Date()): Promise<number> {
+    const rows: { simple_value: string | null }[] = await this.dataSource.query(
+      'SELECT simple_value FROM app_config WHERE `key` = ? AND is_active = TRUE LIMIT 1',
+      [PFM_REPORT_YEAR_CONFIG_KEY],
+    );
+    const raw = rows?.[0]?.simple_value;
+    const trimmed = typeof raw === 'string' ? raw.trim() : '';
+    if (/^\d{4}$/.test(trimmed)) return Number(trimmed);
+    const fallback = now.getUTCFullYear();
+    this.logger._warn(
+      `Unusable app_config value for key "${PFM_REPORT_YEAR_CONFIG_KEY}" raw=${JSON.stringify(
+        raw ?? null,
+      )}. Falling back to the current year ${fallback}.`,
+    );
+    return fallback;
+  }
 
   /** R-PFM-003 + R-PFM-004: one row per monitored result in scope. */
   async findMonitoredResults(
@@ -435,7 +464,7 @@ export class PooledFundingMonitorRepository {
   /**
    * R-PFM-005 sub-line: every contributing project in the portfolio. Deliberately
    * NOT restricted by report year: it counts pool-funding PROJECTS (the "of N in
-   * portfolio" denominator), not results, so a project with no 2026 result is
+   * portfolio" denominator), not results, so a project with no result of the report year is
    * still part of the portfolio and shows as uncovered.
    */
   async countContributingProjects(): Promise<number> {
@@ -762,11 +791,15 @@ export class PooledFundingMonitorRepository {
    * so no AND can bind across it (KZ-017); the integration spec asserts it on rows.
    */
   private monitoredWhere(scope: PfmRepositoryScope): Fragment {
+    if (!Number.isInteger(scope.reportYear)) {
+      // Never count every year by accident: the year is always bound.
+      throw new Error('The monitor scope requires the report year');
+    }
     const params: unknown[] = [
       PFM_PLATFORM_CODE,
       PFM_TIP_PLATFORM_CODE,
       PFM_KNOWLEDGE_PRODUCT_INDICATOR_ID,
-      PFM_REPORT_YEAR,
+      scope.reportYear,
     ];
     const clauses = [
       // STAR, or a TIP Knowledge Product (DD-PFM-40). One parenthesised unit (KZ-017).
