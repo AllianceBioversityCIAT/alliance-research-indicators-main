@@ -348,4 +348,23 @@ describe('PfmResultRowComponent', () => {
       });
     });
   });
+
+  describe('TIP knowledge products (DD-PFM-40)', () => {
+    it('explains on the TIP platform tag that the row needs no action in STAR, for mouse, keyboard and screen readers', () => {
+      const { q, tipOf } = render({ platform_code: 'TIP', is_external: true, result_code: 'TIP-30027', official_code: 30027 });
+      const tag = q('pfm-row-code-platform');
+      expect(tag.textContent).toContain('TIP');
+      expect(tipOf(tag)).toContain('needs no action in STAR');
+      expect(tag.getAttribute('tabindex')).toBe('0');
+      expect(q('pfm-row-external-note')?.textContent).toContain('managed in TIP');
+    });
+
+    it('adds nothing to a STAR row', () => {
+      const { q, tipOf } = render();
+      const tag = q('pfm-row-code-platform');
+      expect(tipOf(tag)).toBeFalsy();
+      expect(tag.getAttribute('tabindex')).toBeNull();
+      expect(q('pfm-row-external-note')).toBeNull();
+    });
+  });
 });
