@@ -164,7 +164,10 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
     });
 
     const years = new ReportingYearResolver(dataSource);
-    statusReader = new ResultPrmsSyncStatusReader(dataSource);
+    statusReader = new ResultPrmsSyncStatusReader(
+      dataSource,
+      new PrmsPushStatusReader(dataSource),
+    );
     historyReader = new PrmsSyncHistoryReader(dataSource);
     logRepository = new ResultPrmsSyncLogRepository(
       dataSource,

@@ -201,7 +201,7 @@ graph TD
 
 ### T-03 — `GET …/prms-sync` gains `pushYear` and `push_status`
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-01 (runs after T-02, same package)
+- **Status:** done (2026-11-19, PASS attempt 1 — see `execution.md`) · **Size:** S · **Dependencies:** T-01 (runs after T-02, same package)
 - **Requirements:** R-PRL-003 (S-11, S-12, S-4 "no version" half)
 - **Design:** §4 GET, DD-4, DD-5, P-4, P-5
 - **Files:**
@@ -234,9 +234,9 @@ graph TD
 - **Review:** checklist. An additive field on an endpoint with no consumer.
 - **Skills:** `nestjs-expert`, `api-design-principles`
 - **Done:**
-  - [ ] specs green, with reds quoted
-  - [ ] build + eslint clean
-  - [ ] Swagger shows `pushYear` and `push_status`
+  - [x] specs green, with reds quoted
+  - [x] build + eslint clean
+  - [x] Swagger shows `pushYear` and `push_status`
 
 ### T-04 — Version selector: status check, warning, busy state
 

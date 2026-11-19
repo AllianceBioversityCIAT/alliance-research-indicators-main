@@ -1,15 +1,18 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   HttpException,
   HttpStatus,
   Post,
+  Query,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -56,6 +59,23 @@ const httpExceptionDescription = (error: HttpException): string => {
     }
   }
   return error.message;
+};
+
+const PUSH_YEAR_MESSAGE = 'pushYear must be an integer from 1901 to 2155';
+
+/** MySQL YEAR bounds. Absent or blank means "use the resolved row's year". */
+const parsePushYear = (raw: unknown): number | undefined => {
+  if (raw == null || raw === '') {
+    return undefined;
+  }
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) {
+    throw new BadRequestException(PUSH_YEAR_MESSAGE);
+  }
+  const year = Number(raw);
+  if (year < 1901 || year > 2155) {
+    throw new BadRequestException(PUSH_YEAR_MESSAGE);
+  }
+  return year;
 };
 
 /**
@@ -219,6 +239,7 @@ export class ResultPrmsSyncController {
     status: HttpStatus.NOT_FOUND,
     description: PRMS_SYNC_HTTP_DESCRIPTIONS.notFound,
   })
+  @ApiQuery({ name: 'pushYear', required: false })
   @Roles(
     SecRolesEnum.CONTRIBUTOR,
     SecRolesEnum.CENTER_ADMIN,
@@ -226,9 +247,13 @@ export class ResultPrmsSyncController {
   )
   @ResultOwner()
   @UseGuards(RolesGuard, ResultOwnerGuard)
-  async getStatus() {
+  async getStatus(@Query('pushYear') pushYear?: string) {
     try {
-      const data = await this.statusReader.getStatus(this.resultsUtil.resultId);
+      const year = parsePushYear(pushYear);
+      const data = await this.statusReader.getStatus(
+        this.resultsUtil.resultId,
+        year,
+      );
       return ResponseUtils.format({
         description: PRMS_SYNC_HTTP_DESCRIPTIONS.statusFound,
         status: HttpStatus.OK,

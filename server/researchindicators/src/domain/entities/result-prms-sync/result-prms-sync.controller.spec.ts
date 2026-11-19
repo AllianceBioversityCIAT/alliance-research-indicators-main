@@ -30,10 +30,12 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import {
   PRMS_SYNC_HTTP_DESCRIPTIONS,
+  PrmsPushStatusDto,
   PrmsSyncLastAttemptDto,
   PrmsSyncResponseDto,
   PrmsSyncStatusDto,
 } from './dto/prms-sync.dto';
+import { PrmsPushStatusReader } from './prms-push-status.reader';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
 import { PRMS_SYNC_HISTORY_FOUND } from './dto/prms-sync-history.dto';
@@ -198,6 +200,27 @@ describe('ResultPrmsSyncController', () => {
       expect(operation.summary).toBeDefined();
       expect(lastAttemptProps.join(',')).not.toMatch(/request_payload/);
       expect(statusProps.join(',')).not.toMatch(/request_payload/);
+      // Decorator metadata stands in for /swagger, which this spec does not render.
+      const params = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        ResultPrmsSyncController.prototype.getStatus,
+      ) as { name?: string; required?: boolean }[];
+      const pushProps: string[] =
+        Reflect.getMetadata(
+          DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+          PrmsPushStatusDto.prototype,
+        ) ?? [];
+
+      expect(params).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'pushYear', required: false }),
+          expect.objectContaining({ name: 'reportYear' }),
+        ]),
+      );
+      expect(statusProps).toEqual(expect.arrayContaining([':push_status']));
+      expect(pushProps).toEqual(
+        expect.arrayContaining([':year', ':status', ':resubmittable']),
+      );
     });
 
     it('documents GET history under the Result PRMS Sync tag', () => {
@@ -402,10 +425,90 @@ describe('ResultPrmsSyncController', () => {
 
       const response = await controller.getStatus();
 
-      expect(getStatus).toHaveBeenCalledWith(42);
+      expect(getStatus).toHaveBeenCalledWith(42, undefined);
       expect(response.status).toBe(HttpStatus.OK);
       expect(response.data).not.toHaveProperty('request_payload');
       expect(JSON.stringify(response.data)).not.toMatch(/request_payload/);
+    });
+
+    it('returns a 400 envelope when pushYear is abc', async () => {
+      const response = await controller.getStatus('abc');
+
+      expect(response.status).toBe(HttpStatus.BAD_REQUEST);
+      expect(response.description).toBe(
+        'pushYear must be an integer from 1901 to 2155',
+      );
+      expect(getStatus).not.toHaveBeenCalled();
+    });
+
+    it('returns a 400 envelope when pushYear is 1800', async () => {
+      const response = await controller.getStatus('1800');
+
+      expect(response.status).toBe(HttpStatus.BAD_REQUEST);
+      expect(response.description).toBe(
+        'pushYear must be an integer from 1901 to 2155',
+      );
+      expect(getStatus).not.toHaveBeenCalled();
+    });
+
+    it('returns 200 never_pushed when the year has no history (S-12)', async () => {
+      const query = jest.fn((sql: string) => {
+        if (/result_prms_sync_log|result_prms_sync_history/.test(sql)) {
+          return Promise.resolve([]);
+        }
+        if (/FROM results/i.test(sql)) {
+          return Promise.resolve([
+            {
+              is_synced_to_prms: 1,
+              prms_result_code: 9,
+              report_year_id: 2026,
+              platform_code: 'STAR',
+              result_official_code: 55,
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      });
+      const dataSource = { query };
+      const module = await Test.createTestingModule({
+        controllers: [ResultPrmsSyncController],
+        providers: [
+          { provide: ResultPrmsSyncService, useValue: { sync: jest.fn() } },
+          {
+            provide: ResultPrmsSyncStatusReader,
+            useValue: new ResultPrmsSyncStatusReader(
+              dataSource as never,
+              new PrmsPushStatusReader(dataSource as never),
+            ),
+          },
+          {
+            provide: PrmsSyncHistoryReader,
+            useValue: { getHistory: jest.fn() },
+          },
+          { provide: ResultsUtil, useValue: resultsUtil },
+          mockPortfolioUtilProvider,
+        ],
+      })
+        .overrideGuard(RolesGuard)
+        .useValue({ canActivate: () => true })
+        .overrideGuard(ResultOwnerGuard)
+        .useValue({ canActivate: () => true })
+        .compile();
+
+      const response = await module
+        .get(ResultPrmsSyncController)
+        .getStatus('2019');
+      const data = response.data as PrmsSyncStatusDto;
+
+      expect(response.status).toBe(HttpStatus.OK);
+      expect(data.push_status).toEqual({
+        year: 2019,
+        status: 'never_pushed',
+        resubmittable: true,
+      });
+      expect(data.is_synced_to_prms).toBe(true);
+      expect(data.prms_result_code).toBe(9);
+      expect(data.sync_state).toBe('synced');
     });
 
     it('surfaces 404 when the reader cannot find the result', async () => {

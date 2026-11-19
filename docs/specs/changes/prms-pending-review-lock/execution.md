@@ -191,3 +191,62 @@ No owed item and no blocker, so no continuation is needed.
 - **Owner decision (2026-11-19):** continue, with lean tests.
   - The test budget is raised, so the tripwire no longer stops the run for test LOC alone. A new overrun on production LOC or review rounds would still stop it.
   - From T-03 on, each Implementer brief says: cover each scenario the task lists once, and add no duplicate-shape cases beyond the task's list.
+
+### T-03 — `GET …/prms-sync` gains `pushYear` and `push_status` → **PASS**
+
+- **Date:** 2026-11-19
+- **Final status:** PASS, on attempt 1.
+- **Requirements covered:** R-PRL-003 (S-11, S-12), and the "no version" half of S-4.
+- **Skills / effort:** `nestjs-expert` and `api-design-principles`, as the task lists. Effort `medium`.
+- **Brief:** lean tests, per the owner's decision after T-02.
+- **Attempts:** 1.
+
+#### Attempt 1
+
+- **Worker:** Orca dispatch `ctx_66f8d269418f` (task `task_9be0f115c517`), Cursor · `grok-4.7-medium`.
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/result-prms-sync/result-prms-sync.controller.ts` and its spec
+  - `.../result-prms-sync/result-prms-sync-status.reader.ts` and its spec
+  - `.../result-prms-sync/dto/prms-sync.dto.ts`
+  - `server/researchindicators/test/prms-platform-identity.integration-spec.ts` (constructor only)
+- **Red-first runs on the code before the change:**
+  - S-11: `Expected: 2025 Received: undefined`.
+  - 400 for `abc` and for `1800`: `Expected: 400 Received: 200`.
+- **Implementer verification:**
+  - `npm test -- --silent result-prms-sync` → 11 suites, 228 tests passed.
+  - The seven unit specs from the `getStatus` consumer grep → 315 tests passed.
+  - eslint → exit 0.
+  - build → exit 0.
+- **Falsifier:** the code was changed to ignore `pushYear` (`year: reportYear ?? 0`). S-11 went red with `Expected: 2025 Received: 2026`. Reverted.
+- **Consumers:**
+  - The client grep found `api.service.ts:1114` (POST_PrmsSync), `api.service.ts:1119` (GET_PrmsSyncHistory) and `http-error.interceptor.ts:114`. None of them calls GET status, which confirms P-5.
+- **Evidence re-run (non-author, Leader inline) → `VERIFIED`:**
+  - unit: 11 suites, 228 tests passed;
+  - `npm run test:integration -- prms-platform-identity`: 8 of 8 passed;
+  - eslint: exit 0;
+  - build: exit 0.
+- **Reviewer verdict:** `STATUS: PASS` from a fresh Claude `akili-reviewer` in checklist mode. Summary:
+  - `pushYear` is parsed inside the existing `try`. It must be an integer from 1901 to 2155; otherwise the response is a 400 in the standard envelope.
+  - The year used is `pushYear ?? report_year_id`. The platform comes from the resolved row, with NULL treated as STAR.
+  - Guards and roles are unchanged. A failed history read still returns 500 through the existing catch.
+  - Both named checks hold: the `design.md#4` POST amendment did not regress, and the `design.md#5.1` item 1 amendment is consistent.
+  - Treating a blank `pushYear` as absent is acceptable under §4 GET.
+  - Issues: none.
+- **runtime events:** none.
+- **spawns:**
+  - Implementer: about 55 calls (the worker's own count), tokens not reported by the host. It ended complete.
+  - Reviewer: not reported by the host. It ended complete.
+
+#### ADVISORY (4R, from the final Reviewer verdict; never gates)
+
+1. **Reliability.** When `report_year_id` is NULL and `pushYear` is absent, the response carries `push_status.year: 0` with `never_pushed`. The gate behaves the same way. Whether `results.report_year_id` can be NULL in the live schema was not checked. If it can, the client would show year 0.
+2. **Readability.** There are now five module-local copies of `platformCodeOf`, and they differ slightly. They should be consolidated into one helper in a later cleanup.
+3. **Risk (KZ-017).** Swagger is checked through decorator metadata only. The 400 tests call the controller directly, which is enough because the 400 comes from the handler's own `ResponseUtils.format`. The Done item "Swagger shows `pushYear` and `push_status`" stays at metadata level until someone opens `/swagger` on a running app.
+
+#### Running totals (Budget Tripwire)
+
+- Tasks: 3 of 5.
+- T-03 alone: 99 production lines and 241 test lines.
+- Cumulative: about 363 production lines, against an estimate of about 300. That is about 21% over, which is within the normal margin for an estimate. About 1,303 test lines, with the test budget already raised by the owner.
+- Review rounds: 3 of about 7.
+- Production LOC is now just past its estimate. That is noted here; it does not stop the run. The remaining tasks are client-side and are small in production lines.
