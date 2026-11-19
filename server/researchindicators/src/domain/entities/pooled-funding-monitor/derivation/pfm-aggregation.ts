@@ -229,7 +229,8 @@ export const buildJourney = (
     sync: { ready: 0, synced: 0, rejected: 0 },
   };
   for (const { row, d } of rows) {
-    if (d.starLabel === PfmStarLabelEnum.APPROVED) {
+    // *Completed in TIP* is final in TIP, so a TIP row starts at step 3 (DD-PFM-40).
+    if (d.isApproved) {
       j.star.approved += 1;
     } else if (
       d.starLabel === PfmStarLabelEnum.SUBMITTED ||
@@ -487,6 +488,7 @@ export const PFM_CHIP_COUNT_KEYS = {
   [PfmChipEnum.NO_SP_CONTRIBUTION]: 'no_sp',
   [PfmChipEnum.PRMS_PENDING]: 'prms_pending',
   [PfmChipEnum.PRMS_APPROVED]: 'prms_approved',
+  [PfmChipEnum.MANAGED_IN_TIP]: 'managed_in_tip',
 } as const;
 
 export type PfmChipCounts = Record<
