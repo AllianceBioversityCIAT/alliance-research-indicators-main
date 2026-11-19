@@ -257,11 +257,11 @@ describe('PooledFundingMonitorRepository scope guard', () => {
       const calls = await allCalls();
       const [monitored] = calls[0];
       expect(monitored).toMatch(
-        /h\.platform_code = \(r\.platform_code COLLATE utf8mb4_unicode_520_ci\)/,
+        /h\.platform_code = \(CAST\(r\.platform_code AS CHAR CHARACTER SET utf8mb4\) COLLATE utf8mb4_unicode_520_ci\)/,
       );
       for (const [sql] of [calls[1], calls[2]]) {
         expect(sql).toMatch(
-          /l\.platform_code = \(r\.platform_code COLLATE utf8mb4_unicode_520_ci\)/,
+          /l\.platform_code = \(CAST\(r\.platform_code AS CHAR CHARACTER SET utf8mb4\) COLLATE utf8mb4_unicode_520_ci\)/,
         );
         // STAR keeps the bare code; any other platform is `<platform>-<code>` (prmsRef).
         expect(sql).toContain(
