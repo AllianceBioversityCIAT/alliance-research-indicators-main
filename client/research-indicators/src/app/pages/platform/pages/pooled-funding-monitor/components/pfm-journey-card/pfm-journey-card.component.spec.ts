@@ -191,10 +191,11 @@ describe('PfmJourneyCardComponent', () => {
 
     it.each([
       [1, ['journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip']],
-      [2, ['journey_not_answered', 'journey_contributes', 'journey_no_sp']],
-      [3, ['journey_mapping_incomplete', 'journey_mapping_complete']],
-      [4, ['journey_ready', 'journey_synced']]
-    ])('stage %i cards open their own queue view', (stage, chips) => {
+      // A card whose concept is a quick view opens that quick view, not a look-alike.
+      [2, ['mapping_incomplete', 'journey_contributes', 'journey_no_sp']],
+      [3, ['mapping_incomplete', 'journey_mapping_complete']],
+      [4, ['ready_to_sync', 'synced']]
+    ])('stage %i cards open their queue view', (stage, chips) => {
       const { fixture, el } = render(stage as number, 'all', WITH_TIP);
       const opened: PfmChip[] = [];
       fixture.componentInstance.openQueue.subscribe(c => opened.push(c));
