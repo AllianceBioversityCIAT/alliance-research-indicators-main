@@ -13,6 +13,9 @@ import { UpdateDataUtil } from '../../../../../../shared/utils/update-data.util'
 import { ContractRolesEnum } from '../../../../../result-contracts/enum/contract-roles.enum';
 import { LeverRolesEnum } from '../../../../../lever-roles/enum/lever-roles.enum';
 import { PortfolioIdEnum } from '../../../enum/portfolio-id.enum';
+import { ResultPoolFundingAlignmentRepository } from '../../../../../bilateral/repositories/result-pool-funding-alignment.repository';
+import { CurrentUserUtil } from '../../../../../../shared/utils/current-user.util';
+import { ReportingPlatformEnum } from '../../../../enum/reporting-platform.enum';
 
 describe('ResultAlignmentOperationsService', () => {
   let service: ResultAlignmentOperationsService;
@@ -49,10 +52,17 @@ describe('ResultAlignmentOperationsService', () => {
   let updateDataUtil: jest.Mocked<
     Pick<UpdateDataUtil, 'updateLastUpdatedDate'>
   >;
+  let poolFundingAlignmentRepository: jest.Mocked<
+    Pick<ResultPoolFundingAlignmentRepository, 'clearLivePoolFunding'>
+  >;
+  let currentUser: { user_id: number | null | undefined };
   let dataSource: { transaction: jest.Mock };
 
   const resultId = 7;
-  const manager = { id: 'entity-manager' };
+  const manager = {
+    id: 'entity-manager',
+    query: jest.fn().mockResolvedValue([]),
+  };
 
   beforeEach(async () => {
     resultContractsService = { create: jest.fn(), find: jest.fn() };
@@ -74,6 +84,10 @@ describe('ResultAlignmentOperationsService', () => {
     resultImpactOutcomesService = { create: jest.fn() };
     resultSdgTargetsService = { replaceForResult: jest.fn() };
     updateDataUtil = { updateLastUpdatedDate: jest.fn() };
+    poolFundingAlignmentRepository = { clearLivePoolFunding: jest.fn() };
+    currentUser = { user_id: 15 };
+    manager.query.mockReset();
+    manager.query.mockResolvedValue([]);
     dataSource = {
       transaction: jest.fn(async (callback) => callback(manager)),
     };
@@ -106,6 +120,11 @@ describe('ResultAlignmentOperationsService', () => {
           useValue: resultSdgTargetsService,
         },
         { provide: UpdateDataUtil, useValue: updateDataUtil },
+        {
+          provide: ResultPoolFundingAlignmentRepository,
+          useValue: poolFundingAlignmentRepository,
+        },
+        { provide: CurrentUserUtil, useValue: currentUser },
       ],
     }).compile();
 
@@ -239,6 +258,276 @@ describe('ResultAlignmentOperationsService', () => {
 
       expect(dataSource.transaction).toHaveBeenCalled();
       expect(result).toEqual(expected);
+    });
+  });
+
+  describe('save — STAR primary contract clears pool funding', () => {
+    const stubFind = () => {
+      resultLeversService.create.mockResolvedValue([]);
+      resultLeversService.comparerClientToServer.mockResolvedValue([]);
+      resultContractsService.find.mockResolvedValue([]);
+      resultLeversService.find.mockResolvedValue([]);
+      resultLeverSdgTargetsService.findByMultiplesResultLeverIds.mockResolvedValue(
+        [],
+      );
+      resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds.mockResolvedValue(
+        [],
+      );
+      resultSdgsService.find.mockResolvedValue([]);
+    };
+
+    const mockReads = (
+      previousContractIds: string | string[] | null,
+      platformCode: string | null,
+      isSnapshot: unknown = 0,
+      query: jest.Mock = manager.query,
+    ) => {
+      const ids =
+        previousContractIds == null
+          ? []
+          : Array.isArray(previousContractIds)
+            ? previousContractIds
+            : [previousContractIds];
+      query.mockImplementation(async (sql: string, params: unknown[]) => {
+        expect(params[0]).toBe(resultId);
+        if (String(sql).includes('FROM result_contracts')) {
+          expect(String(sql)).not.toContain('LIMIT');
+          expect(params[1]).toBe(ContractRolesEnum.ALIGNMENT);
+          return ids.map((contract_id) => ({ contract_id }));
+        }
+        if (String(sql).includes('FROM results')) {
+          expect(String(sql)).toContain('platform_code');
+          expect(String(sql)).toContain('is_snapshot');
+          return platformCode == null
+            ? []
+            : [{ platform_code: platformCode, is_snapshot: isSnapshot }];
+        }
+        throw new Error(`unexpected sql: ${sql}`);
+      });
+    };
+
+    const alignment = (contracts: unknown[]) =>
+      ({
+        contracts,
+        primary_levers: [],
+        contributor_levers: [],
+        result_sdgs: [],
+      }) as any;
+
+    beforeEach(() => {
+      stubFind();
+    });
+
+    it('clears when the primary changes from one contributor contract to another', async () => {
+      mockReads('A100', ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([
+          { contract_id: 'A100', is_primary: false },
+          { contract_id: 'B200', is_primary: true },
+        ]),
+        manager as any,
+      );
+
+      expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
+        resultContractsService.create.mock.invocationCallOrder[0],
+      );
+      expect(
+        resultContractsService.create.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        poolFundingAlignmentRepository.clearLivePoolFunding.mock
+          .invocationCallOrder[0],
+      );
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).toHaveBeenCalledWith(manager, resultId, 15);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('clears when the primary changes to a contract that does not contribute', async () => {
+      mockReads('A100', ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'C300', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).toHaveBeenCalledWith(manager, resultId, 15);
+    });
+
+    it('clears when the primary contract is removed', async () => {
+      mockReads('A100', ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'A100', is_primary: false }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).toHaveBeenCalledWith(manager, resultId, 15);
+    });
+
+    it('does not clear when the primary contract stays the same', async () => {
+      mockReads('A100', ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'A100', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not clear when there was no previous primary', async () => {
+      mockReads(null, ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'A100', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not clear a non-STAR result when the primary changes', async () => {
+      mockReads('A100', ReportingPlatformEnum.TIP);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'B200', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('passes null when no acting user is available and still uses the passed manager', async () => {
+      currentUser.user_id = undefined;
+      mockReads('A100', ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'B200', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).toHaveBeenCalledWith(manager, resultId, null);
+    });
+
+    it('does not clear a STAR snapshot when the primary changes', async () => {
+      mockReads('A100', ReportingPlatformEnum.STAR, 1);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'B200', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).not.toHaveBeenCalled();
+    });
+
+    it.each([0, '0', false])(
+      'clears a live STAR row when is_snapshot is %s and the primary changes',
+      async (isSnapshot) => {
+        mockReads('A100', ReportingPlatformEnum.STAR, isSnapshot);
+
+        await service.save(
+          resultId,
+          alignment([{ contract_id: 'B200', is_primary: true }]),
+          manager as any,
+        );
+
+        expect(
+          poolFundingAlignmentRepository.clearLivePoolFunding,
+        ).toHaveBeenCalledWith(manager, resultId, 15);
+      },
+    );
+
+    it.each([1, '1'])(
+      'treats incoming is_primary %s as the primary and does not clear when that contract is already active',
+      async (isPrimary) => {
+        mockReads('A100', ReportingPlatformEnum.STAR);
+
+        await service.save(
+          resultId,
+          alignment([{ contract_id: 'A100', is_primary: isPrimary }]),
+          manager as any,
+        );
+
+        expect(
+          poolFundingAlignmentRepository.clearLivePoolFunding,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not clear when a numeric incoming contract id matches the stored string', async () => {
+      mockReads('123', ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 123, is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not clear when the incoming primary is any of several active primaries', async () => {
+      mockReads(['A100', 'B200'], ReportingPlatformEnum.STAR);
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'B200', is_primary: true }]),
+        manager as any,
+      );
+
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('reads and clears on the manager opened by dataSource.transaction', async () => {
+      const transactionManager = { query: jest.fn() };
+      mockReads(
+        'A100',
+        ReportingPlatformEnum.STAR,
+        0,
+        transactionManager.query,
+      );
+      dataSource.transaction.mockImplementation(async (callback) =>
+        callback(transactionManager),
+      );
+
+      await service.save(
+        resultId,
+        alignment([{ contract_id: 'B200', is_primary: true }]),
+      );
+
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(manager.query).not.toHaveBeenCalled();
+      expect(
+        poolFundingAlignmentRepository.clearLivePoolFunding,
+      ).toHaveBeenCalledWith(transactionManager, resultId, 15);
     });
   });
 

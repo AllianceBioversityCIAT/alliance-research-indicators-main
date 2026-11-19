@@ -217,6 +217,20 @@ export class ResultSidebarComponent {
     return this.allOptionsWithGreenChecks().some(o => o.path === 'pool-funding-alignment' && !o.hide);
   });
 
+  /**
+   * Pool Funding block hidden, but the result is already linked to a PRMS
+   * result: show only `PRMS code #<code>`. The sync button, the sync card and
+   * the sidebar item stay hidden with the block. OICR (indicator_id === 5)
+   * never has the block, and a disabled section flag hides the line too.
+   */
+  readonly showPrmsCodeOnly = computed(
+    () =>
+      !this.hasPoolFundingOption() &&
+      this.prmsResultCode() != null &&
+      this.poolFundingFlags.sectionEnabled() &&
+      this.cache.currentMetadata()?.indicator_id !== 5
+  );
+
   onPrmsHistoryVisible(open: boolean): void {
     this.prmsHistoryOpen.set(open);
     if (!open) {
