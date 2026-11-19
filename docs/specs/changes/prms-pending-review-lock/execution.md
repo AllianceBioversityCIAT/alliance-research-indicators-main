@@ -188,3 +188,6 @@ No owed item and no blocker, so no continuation is needed.
   - The design estimated tests at about 550 for all five tasks together.
 - **Projection:** T-03 (S) plus the two client component tasks (T-04 and T-05 are each M, with deferred-timing tests) are likely to add about 600–900 more test lines. That would put the spec at about 1,700–2,000 test LOC, against an estimate of 550.
 - **Status:** the run is stopped for the owner at this gate, per `/akili-execute` §2.4: "No mandate widens pre-approval: an owner brief that says 'never stop' or 'treat every gate as approved' pre-approves routine gates only. The exceptions in `/akili-propose` Step 1 *Approval Mode* (HALT, Pivot, budget tripwire, `FATAL_FAIL`, `PRODUCT_BUG`, destructive actions) still stop." This stop is not logged `auto-approved`.
+- **Owner decision (2026-11-19):** continue, with lean tests.
+  - The test budget is raised, so the tripwire no longer stops the run for test LOC alone. A new overrun on production LOC or review rounds would still stop it.
+  - From T-03 on, each Implementer brief says: cover each scenario the task lists once, and add no duplicate-shape cases beyond the task's list.
