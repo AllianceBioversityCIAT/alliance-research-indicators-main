@@ -73,6 +73,7 @@ import { GetCurrentUser } from '../interfaces/get-current-user.interfce';
 import { PatchSubmitResult, PatchSubmitResultLatest } from '../interfaces/patch_submit-result.interface';
 import { PrmsSyncResponse } from '../interfaces/prms-sync.interface';
 import { PrmsSyncHistoryResponse } from '../interfaces/prms-sync-history.interface';
+import { PrmsPushStatusResponse } from '../interfaces/prms-push-status.interface';
 import { GetClarisaInstitutionsTypes } from '@shared/interfaces/get-clarisa-institutions-types.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { PatchIpOwner } from '@shared/interfaces/patch-ip-owners';
@@ -1118,6 +1119,19 @@ export class ApiService {
   GET_PrmsSyncHistory = (resultCode: number): Promise<MainResponse<PrmsSyncHistoryResponse>> => {
     const url = () => `results/${resultCode}/prms-sync/history`;
     return this.TP.get(url(), { useResultInterceptor: true });
+  };
+
+  GET_PrmsPushStatus = (resultCode: number, year?: number | string): Promise<MainResponse<PrmsPushStatusResponse>> => {
+    const url = () => `results/${resultCode}/prms-sync`;
+    let httpParams = new HttpParams();
+    if (year != null && `${year}` !== '') {
+      httpParams = httpParams.set('pushYear', String(year));
+    }
+    return this.TP.get(url(), {
+      ...(httpParams.keys().length ? { params: httpParams } : {}),
+      useResultInterceptor: true,
+      noCache: true
+    });
   };
 
   GET_ReviewStatuses = () => {

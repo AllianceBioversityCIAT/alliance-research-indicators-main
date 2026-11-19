@@ -8,6 +8,7 @@ import { CacheService } from '@shared/services/cache/cache.service';
 import { GetMetadataService } from '@shared/services/get-metadata.service';
 import { GetYearsByCodeService } from '@shared/services/control-list/get-years-by-code.service';
 import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
+import { PrmsPushStatusValue } from '@shared/interfaces/prms-push-status.interface';
 import { DividerModule } from 'primeng/divider';
 import { TooltipModule } from 'primeng/tooltip';
 import { filter, Subscription } from 'rxjs';
@@ -34,6 +35,7 @@ export class VersionSelectorComponent implements OnDestroy {
   liveVersion = signal<TransformResultCodeResponse | null>(null);
   approvedVersions = signal<TransformResultCodeResponse[]>([]);
   updating = signal(false);
+  checkingPrms = signal(false);
 
   prmsUrl: string = environment.prmsUrl;
   tipUrl: string = environment.tipUrl;
@@ -199,7 +201,7 @@ export class VersionSelectorComponent implements OnDestroy {
 
   // @akili-spec docs/specs/changes/update-result-year-prompt
   async updateResult() {
-    if (this.updating()) return;
+    if (this.updating() || this.checkingPrms()) return;
     this.updating.set(true);
     try {
       await this.yearsService.main();
@@ -233,7 +235,7 @@ export class VersionSelectorComponent implements OnDestroy {
       infoCard: { badge: `${year} VERSION`, caption },
       cancelCallback: { label: 'No, choose another year' },
       cancelSwapsTo: this.pickerAlert([year]),
-      confirmCallback: { label: `Yes, update ${year}`, event: () => this.submitReportingCycle(String(year)) },
+      confirmCallback: { label: `Yes, update ${year}`, event: () => void this.checkThenSubmit(String(year)) },
       buttonColor: 'var(--ac-light-blue-400)'
     });
   }
@@ -250,7 +252,7 @@ export class VersionSelectorComponent implements OnDestroy {
       selectorExcludeValues: exclude,
       confirmCallback: {
         label: 'Confirm',
-        event: (data?: { comment?: string; selected?: string }) => this.submitReportingCycle(data?.selected ?? '')
+        event: (data?: { comment?: string; selected?: string }) => void this.checkThenSubmit(data?.selected ?? '')
       },
       buttonColor: '#035BA9'
     };
@@ -258,6 +260,43 @@ export class VersionSelectorComponent implements OnDestroy {
 
   private showPicker(exclude: number[]) {
     this.actions.showGlobalAlert(this.pickerAlert(exclude));
+  }
+
+  private async checkThenSubmit(year: string): Promise<void> {
+    if (this.checkingPrms()) return;
+    this.checkingPrms.set(true);
+    try {
+      const response = await this.api.GET_PrmsPushStatus(this.cache.getCurrentNumericResultId(), year);
+      if (!response.successfulRequest) {
+        console.error('PRMS push status read failed', response);
+        this.submitReportingCycle(year);
+        return;
+      }
+      const pushStatus = response.data?.push_status;
+      if (pushStatus?.resubmittable === false) {
+        this.showPrmsHoldWarning(year, pushStatus.status);
+        return;
+      }
+      this.submitReportingCycle(year);
+    } catch (error) {
+      console.error('PRMS push status read failed', error);
+      this.submitReportingCycle(year);
+    } finally {
+      this.checkingPrms.set(false);
+    }
+  }
+
+  private showPrmsHoldWarning(year: string, status: PrmsPushStatusValue) {
+    const approved = status === 'approved';
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: approved ? 'Already approved in PRMS' : 'PRMS review in progress',
+      detail: approved
+        ? `PRMS already approved the ${year} version of this result and will not accept the updated one.`
+        : `The ${year} version of this result was sent to PRMS and is pending review. PRMS will not receive the changes, nor accept a new push, until it rejects the current one.`,
+      cancelCallback: { label: 'Cancel' },
+      confirmCallback: { label: 'Update anyway', event: () => this.submitReportingCycle(year) }
+    });
   }
 
   private submitReportingCycle(year: string) {

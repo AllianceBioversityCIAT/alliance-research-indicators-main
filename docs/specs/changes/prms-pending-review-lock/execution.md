@@ -255,3 +255,163 @@ No owed item and no blocker, so no continuation is needed.
 - **Owner decision (2026-11-19, after T-03):** continue to T-04 and T-05.
   - The production budget is raised as well.
   - Client code is not committed until the owner has seen it working on Dev (T-05 HITL).
+
+### T-04 — Version selector: status check, warning, busy state → **PASS; owner HITL approved**
+
+- **Date:** 2026-11-19
+- **Final status:** PASS, on attempt 1. The code is left **uncommitted** until the owner sees it working, together with T-05 (task Done item, and the owner's standing rule).
+- **Requirements covered:** R-PRL-004 (S-11, S-13…S-20), NFR-PRL-001, NFR-PRL-002 (busy state, reuse of the alert), and NFR-PRL-004 (the client half: it consumes `push_status` only).
+- **Skills / effort:** `angular-developer`, `ui-ux-pro-max` and `tdd`, as the task lists. Effort `high`, because this is the live update path and the S-20 race needs deferred timing.
+- **Brief:** lean tests.
+- **Attempts:** 1.
+
+#### Attempt 1
+
+- **Worker:** Orca dispatch `ctx_31ade71448d6` (task `task_c7d02c797d72`), Cursor · `grok-4.7-high`.
+- **Files changed:**
+  - new `client/research-indicators/src/app/shared/interfaces/prms-push-status.interface.ts`
+  - `client/research-indicators/src/app/shared/services/api.service.ts` and its spec
+  - `client/research-indicators/src/app/pages/platform/pages/result/components/version-selector/version-selector.component.{ts,html}` and its spec
+- **Red-first runs on the code before the change:**
+  - S-13: expected `getCalls 1, patchCalls 0, severity warning, summary "PRMS review in progress"`; received `getCalls 0, patchCalls 1, severity success, summary "RESULT UPDATED"`.
+  - S-20: expected `ariaBusy "true", getCalls 1, patchCalls 0`; received `ariaBusy null, getCalls 0, patchCalls 1`.
+- **Implementer verification:**
+  - `npm test -- --silent version-selector api.service` → 351 passed, but the command exits 1 on the global coverage threshold. That is expected for a targeted run (client guide, K-020). With `--coverage=false` it exits 0 with 351 passed.
+  - lint → exit 0.
+  - `tsc -p tsconfig.app.json` → 0 errors.
+  - `tsc -p tsconfig.spec.json` → the known baseline of 946 lines. None are in the touched version-selector or interface files. The hits in `api.service.spec.ts` (lines 70–71, 2286, 2301) were already there.
+- **Falsifiers.** Each was applied after the green run and reverted:
+  - **(a)** The `checkingPrms` guard was removed. S-20 went red with `Expected: 1 / Received: 2` GET calls.
+  - **(b)** The URL `version` was sent instead of the chosen year. S-14 went red with `Expected: 1, "2025" / Received: 1, "2026"`.
+- **Consumers:**
+  - `submitReportingCycle`, `showPrompt`, `pickerAlert` and `updateResult` appear only in the version-selector.
+  - `GET_PrmsPushStatus` appears in the API service, the version selector and their specs.
+- **Evidence re-run (non-author, Leader inline) → `VERIFIED`:**
+  - 3 suites and 351 tests passed (`--coverage=false`);
+  - lint: exit 0;
+  - app tsc: exit 0;
+  - spec tsc: no errors in `version-selector` or `prms-push-status` files.
+- **Reviewer verdict:** `STATUS: PASS` from a fresh Claude `akili-reviewer` in checklist mode. Summary:
+  - Both confirms take one path, `checkThenSubmit`, which uses the chosen year (never `version`).
+  - The `checkingPrms` guard is cleared in `finally`.
+  - S-20 runs with genuinely deferred timing.
+  - The warning severity, titles and actions match S-13 and S-15. The fail-open path works.
+  - The API call goes through ApiService with `noCache` and `useResultInterceptor`.
+  - The busy-state ARIA uses token classes, and the task adds no new hex value.
+  - NFR-PRL-004 holds: no `event_source`/`decision` reads. The fixtures arrange the transition (KZ-015).
+  - Both named checks hold, because the client depends on nothing the amendments changed.
+  - Issues: none.
+- **runtime events:** none.
+- **spawns:**
+  - Implementer: about 70 calls (the worker's own count), tokens not reported by the host. It ended complete.
+  - Reviewer: not reported by the host. It ended complete.
+
+#### ADVISORY (4R, from the final Reviewer verdict; never gates)
+
+1. **Hex color.** `#409acd` already existed on the *Update result* span and was only moved into the new ternary. It is not new, but it sits in an edited line. It could be swapped for the matching `--ac-*` token in a follow-up.
+2. **Accessibility (reachable, pre-existing).** The *Update result* `<span>` has no `tabindex` or `role="button"`, so keyboard users cannot focus it, and its `aria-disabled`/`aria-busy` never reach assistive technology. This predates the task. It is raised for the owner at the HITL keyboard step (T-05 HITL step 4). Advisory Never Becomes A Task applies: the owner decides.
+3. **Reliability.** The fail-open branch for `successfulRequest: false` has no test; S-19 covers only the thrown rejection. This is acceptable under the lean-test decision.
+4. **Resilience.** An empty year would send a GET with no `pushYear`. It is not reachable, because the picker has `selectorRequired: true`.
+5. **What jsdom cannot see:** the muted look, the spinner, the focus trap and Esc. These belong to the HITL check.
+
+#### Decisions made
+
+- **Warning body copy.** The Implementer composed it from the requirements wording, because design §5.3 quotes only the titles.
+  - Pending: "The {year} version of this result was sent to PRMS and is pending review. PRMS will not receive the changes, nor accept a new push, until it rejects the current one."
+  - Approved: "PRMS already approved the {year} version of this result and will not accept the updated one."
+
+  It follows S-13 and S-15 closely. The owner sees it at the HITL.
+
+#### Running totals (Budget Tripwire)
+
+- Tasks: 4 of 5. Production and test budgets were raised by the owner.
+- Review rounds: 4 of about 7.
+
+### T-05 — Sidebar: PRMS SYNC disabled while held → **PASS; owner HITL approved**
+
+- **Date:** 2026-11-19
+- **Status:** code PASS on attempt 1. The task stays open (not `[x]`) until the owner runs the HITL on Dev and approves visually. The client code for T-04 and T-05 is **uncommitted** until then.
+- **Requirements covered by code:** R-PRL-005 (S-21…S-25), NFR-PRL-002 (tooltip on a disabled button, still to be confirmed at HITL), NFR-PRL-004 (client half).
+- **Skills / effort:** `angular-developer` and `ui-ux-pro-max`, as the task lists. Effort `high`.
+- **Brief:** lean tests.
+- **Attempts:** 1.
+
+#### Attempt 1
+
+- **Worker:** Orca dispatch `ctx_3d34e2ed9cc6` (task `task_48c46263928b`), Cursor · `grok-4.7-high`.
+- **Files changed:** `client/research-indicators/src/app/shared/components/result-sidebar/result-sidebar.component.{ts,html}` and its spec.
+- **Red-first runs on the code before the change:**
+  - S-21: `Expected true Received false`. The button was still enabled.
+  - S-25: received the generic copy `"This result was not synchronized.<br>Please try again. If the problem continues, contact support."` instead of the escaped description.
+- **Implementer verification:**
+  - `npm test -- --silent --coverage=false result-sidebar` → 187 passed.
+  - lint → passed.
+  - app tsc → 0 errors.
+  - spec tsc → the error set for `result-sidebar.component.spec.ts` is the same as at HEAD (20 errors already there, none new).
+- **Falsifiers.** Each was applied after the green run and reverted:
+  - **(a)** The held branch was moved before `canSyncPrms()`. The not-approved case went red with `Received: PRMS is reviewing this version...`.
+  - **(b)** The reset on version change was dropped. The stale-value test kept the 2024 `pending_review`.
+- **Consumers:** `result-sidebar.component.{ts,html,spec.ts}`, plus a comment in `alliance-alignment.component.ts:504`. The only spec is the sidebar spec, which was re-run.
+- **Evidence re-run (non-author, Leader inline) → `VERIFIED`:**
+  - sidebar: 187 passed;
+  - lint: exit 0;
+  - app tsc: exit 0.
+- **Full client suite**, run because the sidebar renders on many screens (KZ-003):
+  - Runs 1 and 2, with the changes: 379 of 380 suites passed. `truncated-text-tooltip.directive.spec.ts` reported `Test suite failed to run`, with 0 failed tests.
+  - Run 3, with the changes: 380 of 380 suites, 8935 tests passed.
+  - Clean tree (client changes stashed): 380 of 380.
+  - That suite passes on its own both with and without the changes.
+
+  This is the documented flaky-runner signature: a failed suite with zero failed tests. It is not attributed to this task.
+- **Reviewer verdict:** `STATUS: PASS` from a fresh Claude `akili-reviewer` in checklist mode. Summary:
+  - The tooltip order matches §5.4 item 4 exactly.
+  - The button is disabled, and `onPrmsSync` returns early, while loading or held.
+  - The fetch has its own generation counter and resets to `null` before it waits.
+  - A failed read leaves the button as it is today.
+  - The status is re-fetched after a success and after the `prms_resubmittable` 409 only.
+  - The 409 is matched on `gate_entry_id` alone, so other gate refusals that carry an id keep today's copy (named check on the `design.md#4` amendment). The description is escaped, and a test proves it.
+  - No new `event_source`/`decision` reads (NFR-PRL-004).
+  - Precedence is tested on the not-approved case, and the tests change the version after the first render (KZ-015).
+  - Issues: none.
+- **runtime events:** none.
+- **spawns:**
+  - Implementer: the worker reports staying under 60 calls (no exact count); tokens not reported by the host. It ended complete.
+  - Reviewer: not reported by the host. It ended complete.
+
+#### ADVISORY (4R, from the final Reviewer verdict; never gates)
+
+1. **Accessibility (NFR-PRL-002).** The held reason is a tooltip on a native `disabled` button. Such a button cannot take keyboard focus, and some browsers fire no hover events on it. The existing "already synced" and "will become available" tooltips share the same pattern, so this is not new to T-05. The owner should try Tab as well as hover at HITL step 1.
+2. **Readability.** Hex literals that were already there (`#035BA9`, `#E8EBED`, `#8D9299`) sit on the edited `[ngClass]` lines.
+3. **Readability.** `isPrmsResubmittableGate` also falls back to a top-level `data.gate_entry_id`. That is harmless, and a short comment or dropping it would make it clearer.
+4. **Reliability (tests only).** The shared `beforeEach` gained `await fixture.whenStable()` and `createUrlTree`/`serializeUrl` on the router mock. This affects all 187 sidebar tests, which still pass. It is broader than T-05 needs.
+5. **Readability (tests only).** S-22 and S-24 use a version year that differs from `push_status.year`. This is cosmetic.
+
+#### Decisions made
+
+- **Tooltip copy**, taken from S-21 and S-22:
+  - Pending: "PRMS is reviewing this version and it can be sent again only if PRMS rejects it."
+  - Approved: "PRMS already approved this version."
+- `gate_entry_id` is read from `errorDetail.data`, falling back to `data`.
+
+#### Running totals (Budget Tripwire)
+
+- Tasks: 5 of 5 with code PASS; T-05 HITL is pending.
+- The T-04 and T-05 client code adds 166 production lines and 439 test lines. Both budgets were raised by the owner.
+- Review rounds: 5 of about 7.
+
+#### HITL on Dev (owner, 2026-11-19) → **APPROVED**
+
+The owner ran this branch's server and client natively against the shared Dev DB, on result **698**.
+
+- **Step 1, observed (screenshot).** PRMS SYNC is disabled in the sidebar.
+- **Step 2, observed (screenshot).** *Update result* → *Yes, update 2026* shows the warning *PRMS REVIEW IN PROGRESS*: "The 2026 version of this result was sent to PRMS and is pending review. PRMS will not receive the changes, nor accept a new push, until it rejects the current one." The actions are *Cancel* and *Update anyway*.
+- **An apparent defect, triaged as data, not code.** The sidebar card showed **REJECTED** for "PRMS sync #2" while the warning said pending. The owner wrote: "el resultado que probe esta rejected ... pero sale el mensaje". A read-only check on Dev showed the following:
+  - `result_prms_sync_history` rows 339, 344 and 345, and `result_prms_sync_log` rows 44, 52 and 53.
+  - Push #2 (log 53, `ACCEPTED`, HTTP 200, 19:42Z) came **after** the PRMS reject (history 344, 19:09Z). So PRMS really holds 698/2026 as pending, and the warning was correct.
+  - The card was wrong because STAR push rows 339, 342 and 345 stored `occurred_at` 5 hours behind `created_at`, and the card orders by `COALESCE(decided_at, occurred_at)` (`prms-sync-history.reader.ts:107`).
+  - The owner confirmed the cause: "ese fue un problema que tuve por que mi local tenia zona horaria diferente". They corrected the Dev data themselves and re-tested.
+  - The rule in this spec orders by `id` and is not affected by timestamps.
+- **Owner verdict after the re-test:** "si quedo al pelo".
+- **Steps 3 and 4 (picker year, keyboard) were not reported one by one.** The owner's approval covers them, but they are not quoted as observed (KZ-002), so the HITL box stays unticked.
+- **Step 5** was not run. It was optional, at the owner's choice.
+- **Copy:** the warning and tooltip wording chosen by the workers was accepted as shown.

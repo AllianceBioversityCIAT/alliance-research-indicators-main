@@ -240,7 +240,7 @@ graph TD
 
 ### T-04 — Version selector: status check, warning, busy state
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-03 (API contract). It can be edited while T-02 runs.
+- **Status:** done 2026-11-19 (attempt 1; owner approved at the T-05 HITL) — see `execution.md` · **Size:** M · **Dependencies:** T-03 (API contract). It can be edited while T-02 runs.
 - **Requirements:** R-PRL-004 (S-13…S-20), NFR-PRL-001, NFR-PRL-002
 - **Design:** §5.3, DD-6, P-8, P-13
 - **Files:**
@@ -284,13 +284,13 @@ graph TD
 - **Review:** full. It is on the live path of every update.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
 - **Done:**
-  - [ ] specs green, with reds and falsifiers quoted
-  - [ ] lint + type-check clean
-  - [ ] **no commit before the owner sees it working** (HITL with T-05)
+  - [x] specs green, with reds and falsifiers quoted
+  - [x] lint + type-check clean
+  - [x] **no commit before the owner sees it working** (HITL with T-05)
 
 ### T-05 — Sidebar: PRMS SYNC disabled while held, plus the live Dev check
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-02, T-03 (T-04 for the shared API method)
+- **Status:** done 2026-11-19 (attempt 1; owner approved; HITL steps 3–4 not quoted individually) — see `execution.md` · **Size:** M · **Dependencies:** T-02, T-03 (T-04 for the shared API method)
 - **Requirements:** R-PRL-005 (S-21…S-25), NFR-PRL-002, NFR-PRL-004 (client half)
 - **Design:** §5.4, DD-7 (client half)
 - **Files:** `client/.../shared/components/result-sidebar/result-sidebar.component.{ts,html}` (+ spec)
@@ -333,10 +333,10 @@ graph TD
 - **Review:** full, plus the HITL. This is the user-facing lock.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Done:**
-  - [ ] specs green, with reds and falsifiers quoted
-  - [ ] lint + type-check clean
-  - [ ] HITL steps 1–4 observed and quoted (step 5 only if the owner chooses)
-  - [ ] the owner approves visually → only then commit the client tasks
+  - [x] specs green, with reds and falsifiers quoted
+  - [x] lint + type-check clean
+  - [ ] HITL steps 1–4 observed and quoted (step 5 only if the owner chooses) — steps 1–2 quoted; 3–4 covered by the owner's approval but not quoted (KZ-002)
+  - [x] the owner approves visually → only then commit the client tasks
 
 ## 4. Review intensity
 

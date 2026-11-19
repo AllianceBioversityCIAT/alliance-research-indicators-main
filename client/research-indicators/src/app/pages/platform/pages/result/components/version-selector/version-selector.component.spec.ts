@@ -15,6 +15,10 @@ import { GetYearsByCodeService } from '@shared/services/control-list/get-years-b
 class MockApiService {
   GET_Versions = jest.fn().mockReturnValue(Promise.resolve({ data: { live: [], versions: [] } }));
   PATCH_ReportingCycle = jest.fn().mockReturnValue(Promise.resolve({ successfulRequest: true }));
+  GET_PrmsPushStatus = jest.fn().mockResolvedValue({
+    successfulRequest: true,
+    data: { push_status: { year: 2026, status: 'never_pushed', resubmittable: true } }
+  });
 }
 class MockCacheService {
   currentResultId = jest.fn().mockReturnValue(1);
@@ -529,6 +533,205 @@ describe('VersionSelectorComponent', () => {
       swap.confirmCallback.event({ selected: '2025' });
       await new Promise(r => setTimeout(r, 0));
       expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2025');
+    });
+
+    const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+    const alerts = () => (actions.showGlobalAlert as jest.Mock).mock.calls.map(call => call[0]);
+    const latestAlert = () => alerts().at(-1);
+    const updateResultSpan = (): HTMLElement => {
+      const span = Array.from(fixture.nativeElement.querySelectorAll('span')).find(el =>
+        (el as HTMLElement).textContent?.includes('Update result')
+      ) as HTMLElement | undefined;
+      if (!span) throw new Error('Update result span is not in the document');
+      return span;
+    };
+
+    it('S-13: direct path pending review warns with the pending title and does not patch', async () => {
+      (api.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'pending_review', resubmittable: false } }
+      });
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      const warning = latestAlert();
+      expect({
+        getCalls: (api.GET_PrmsPushStatus as jest.Mock).mock.calls.length,
+        patchCalls: (api.PATCH_ReportingCycle as jest.Mock).mock.calls.length,
+        severity: warning?.severity,
+        summary: warning?.summary
+      }).toEqual({
+        getCalls: 1,
+        patchCalls: 0,
+        severity: 'warning',
+        summary: 'PRMS review in progress'
+      });
+      expect(warning.detail).toBe(
+        'The 2026 version of this result was sent to PRMS and is pending review. PRMS will not receive the changes, nor accept a new push, until it rejects the current one.'
+      );
+      expect(warning.cancelCallback.label).toBe('Cancel');
+      expect(warning.confirmCallback.label).toBe('Update anyway');
+    });
+
+    it('S-20: a deferred status read ignores a second confirm and a click on Update result', async () => {
+      let resolveGet!: (value: unknown) => void;
+      (api.GET_PrmsPushStatus as jest.Mock).mockReturnValue(
+        new Promise(resolve => {
+          resolveGet = resolve;
+        })
+      );
+
+      await component.updateResult();
+      const confirm = latestAlert().confirmCallback.event as () => void;
+      confirm();
+      fixture.detectChanges();
+
+      expect({
+        getCalls: (api.GET_PrmsPushStatus as jest.Mock).mock.calls.length,
+        patchCalls: (api.PATCH_ReportingCycle as jest.Mock).mock.calls.length,
+        ariaBusy: updateResultSpan().getAttribute('aria-busy')
+      }).toEqual({
+        getCalls: 1,
+        patchCalls: 0,
+        ariaBusy: 'true'
+      });
+
+      confirm();
+      updateResultSpan().click();
+      fixture.detectChanges();
+
+      expect((api.GET_PrmsPushStatus as jest.Mock).mock.calls.length).toBe(1);
+      expect(api.PATCH_ReportingCycle).not.toHaveBeenCalled();
+
+      resolveGet({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'pending_review', resubmittable: false } }
+      });
+      await flush();
+      fixture.detectChanges();
+
+      expect(api.GET_PrmsPushStatus).toHaveBeenCalledTimes(1);
+      expect((api.PATCH_ReportingCycle as jest.Mock).mock.calls.length).toBeLessThanOrEqual(1);
+    });
+
+    it('S-14: picker confirm for a held 2025 warns for 2025, not the URL version', async () => {
+      const route = TestBed.inject(ActivatedRoute) as { snapshot: { queryParamMap: { get: (key: string) => string | null } } };
+      route.snapshot.queryParamMap.get = (key: string) => (key === 'version' ? '2026' : null);
+      (api.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2025, status: 'pending_review', resubmittable: false } }
+      });
+
+      await component.updateResult();
+      latestAlert().cancelSwapsTo.confirmCallback.event({ selected: '2025' });
+      await flush();
+
+      const warning = latestAlert();
+      expect(warning.summary).toBe('PRMS review in progress');
+      expect(warning.detail).toBe(
+        'The 2025 version of this result was sent to PRMS and is pending review. PRMS will not receive the changes, nor accept a new push, until it rejects the current one.'
+      );
+      expect(api.GET_PrmsPushStatus).toHaveBeenCalledTimes(1);
+      expect(api.GET_PrmsPushStatus).toHaveBeenCalledWith(1, '2025');
+      expect(api.PATCH_ReportingCycle).not.toHaveBeenCalled();
+    });
+
+    it('S-15: an approved year warns with the approved title', async () => {
+      (api.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'approved', resubmittable: false } }
+      });
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      const warning = latestAlert();
+      expect(warning.severity).toBe('warning');
+      expect(warning.summary).toBe('Already approved in PRMS');
+      expect(warning.detail).toBe('PRMS already approved the 2026 version of this result and will not accept the updated one.');
+      expect(api.PATCH_ReportingCycle).not.toHaveBeenCalled();
+    });
+
+    it('S-16: Cancel on the warning sends no update', async () => {
+      (api.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'pending_review', resubmittable: false } }
+      });
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      const warning = latestAlert();
+      expect(warning.cancelCallback.label).toBe('Cancel');
+      warning.cancelCallback.event?.();
+      await flush();
+
+      expect(api.PATCH_ReportingCycle).not.toHaveBeenCalled();
+    });
+
+    it('S-17: Update anyway patches the chosen year once', async () => {
+      (api.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'pending_review', resubmittable: false } }
+      });
+      (api.PATCH_ReportingCycle as jest.Mock).mockResolvedValue({ successfulRequest: true });
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledTimes(1);
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2026');
+      expect(latestAlert().summary).toBe('RESULT UPDATED');
+    });
+
+    it('S-18: a resubmittable year patches with no warning', async () => {
+      (api.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'rejected', resubmittable: true } }
+      });
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      expect(alerts().some(alert => alert.severity === 'warning')).toBe(false);
+      expect(api.GET_PrmsPushStatus).toHaveBeenCalledTimes(1);
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledTimes(1);
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2026');
+    });
+
+    it('S-19: a rejected status read logs and still patches', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      (api.GET_PrmsPushStatus as jest.Mock).mockRejectedValue(new Error('status read timed out'));
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalled();
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledTimes(1);
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2026');
+      expect(alerts().some(alert => alert.severity === 'warning')).toBe(false);
+      errorSpy.mockRestore();
+    });
+
+    it('S-11: the status read uses the chosen year, not the URL version', async () => {
+      const route = TestBed.inject(ActivatedRoute) as { snapshot: { queryParamMap: { get: (key: string) => string | null } } };
+      route.snapshot.queryParamMap.get = (key: string) => (key === 'version' ? '2019' : null);
+
+      await component.updateResult();
+      latestAlert().confirmCallback.event();
+      await flush();
+
+      expect(api.GET_PrmsPushStatus).toHaveBeenCalledTimes(1);
+      expect(api.GET_PrmsPushStatus).toHaveBeenCalledWith(1, '2026');
     });
 
     it('v9: a second click while the refresh is in flight is ignored', async () => {

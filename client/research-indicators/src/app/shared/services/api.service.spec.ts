@@ -722,6 +722,20 @@ describe('ApiService', () => {
       expect(calledUrl).toBe('results/123/prms-sync/history');
     });
 
+    it('should call GET_PrmsPushStatus with pushYear, noCache and useResultInterceptor', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.GET_PrmsPushStatus(123, 2026);
+
+      expect(mockToPromiseService.get).toHaveBeenCalledTimes(1);
+      const [calledUrl, config] = (mockToPromiseService.get as jest.Mock).mock.calls[0] as [string, { params: HttpParams; noCache?: boolean; useResultInterceptor?: boolean }];
+      expect(calledUrl).toBe('results/123/prms-sync');
+      expect(calledUrl).not.toContain('v1/');
+      expect(config.useResultInterceptor).toBe(true);
+      expect(config.noCache).toBe(true);
+      expect(config.params.get('pushYear')).toBe('2026');
+    });
+
     it('should call PATCH_Feedback', () => {
       const body = { test: 'data' } as any;
       (mockToPromiseService.patch as jest.Mock).mockResolvedValue({ data: {} });
