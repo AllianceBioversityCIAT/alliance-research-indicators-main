@@ -264,9 +264,12 @@ export class ResultsCenterService {
   resultsTablePaginatorRows = signal(10);
   resultsTableTotalRecords = signal(0);
   private lastSuccessfulResultsFetchKey: string | null = null;
-  // Every main() call takes a ticket; only the newest one may write the table. On reload the
-  // table's first lazy load fires before the URL/session filters are seeded, and when that
-  // unfiltered response landed last it replaced the filtered one while the chips stayed active.
+  /**
+   * Bumped by every `main()` call. A response is applied only when its call is still the
+   * latest one: `main()` runs from the page load, the table's lazy load, the search box and
+   * the tab switch, so an older, unfiltered request that resolves last must not overwrite
+   * the list of the filters the chips and the search box already show.
+   */
   private resultsRequestSeq = 0;
   resultsTableSortField = signal<string>('result_official_code');
   resultsTableSortOrder = signal<-1 | 1>(-1);
@@ -500,7 +503,8 @@ export class ResultsCenterService {
   }
 
   async main() {
-    const requestId = ++this.resultsRequestSeq;
+    const requestSeq = ++this.resultsRequestSeq;
+    const isLatestRequest = () => requestSeq === this.resultsRequestSeq;
     this.loading.set(true);
     const primaryContractIdAtRequest = this.primaryContractId();
     const activeTabIdAtRequest = this.myResultsFilterItem()?.id;
@@ -587,19 +591,19 @@ export class ResultsCenterService {
         } as Result & { primaryLeverSort: string; _creatorFullName: string };
       });
 
-      if (requestId !== this.resultsRequestSeq) {
+      if (!isLatestRequest()) {
         return;
       }
 
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
-      if (stillSameContext) {
+      if (stillSameContext && isLatestRequest()) {
         this.resultsTableTotalRecords.set(total);
         this.list.set(enhancedResults);
         this.lastSuccessfulResultsFetchKey = fetchKey;
       }
     } catch (error) {
       console.error('Error loading results:', error);
-      if (requestId !== this.resultsRequestSeq) {
+      if (!isLatestRequest()) {
         return;
       }
       this.lastSuccessfulResultsFetchKey = null;
@@ -609,9 +613,8 @@ export class ResultsCenterService {
         this.list.set([]);
       }
     } finally {
-      if (requestId === this.resultsRequestSeq) {
-        this.loading.set(false);
-      }
+      // A superseded call leaves the spinner to the call that replaced it.
+      if (isLatestRequest()) this.loading.set(false);
     }
   }
   handleResultsTableLazyLoad(event: TableLazyLoadEvent): void {

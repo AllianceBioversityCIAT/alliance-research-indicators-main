@@ -1,4 +1,5 @@
 import { Component, computed, effect, ElementRef, inject, signal, ViewChild, WritableSignal } from '@angular/core';
+import { catalogStatus } from '@shared/utils/catalog-relation.util';
 import { GetContractsService } from '@services/control-list/get-contracts.service';
 import { GetLeversService } from '@services/control-list/get-levers.service';
 import { GetStrategicObjectivesService } from '@services/control-list/get-strategic-objectives.service';
@@ -298,7 +299,9 @@ export default class AllianceAlignmentComponent {
         {
           id: outcomeId,
           lever_strategic_outcome_id: outcomeId,
-          strategic_outcome
+          strategic_outcome,
+          // The GET's lever_strategic_outcome relation is not filtered by is_active.
+          ...catalogStatus(saved?.lever_strategic_outcome as { is_active?: unknown } | undefined)
         }
       ];
     });

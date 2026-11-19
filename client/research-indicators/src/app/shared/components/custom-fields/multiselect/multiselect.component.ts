@@ -217,6 +217,15 @@ export class MultiselectComponent implements OnInit, OnChanges {
       disabled: this.optionsDisabled().some((option: any) => this.sameOptionValue(option, item))
     }));
   });
+  /**
+   * Selected rows normally wait for the option list (it supplies their labels). Rows whose
+   * control-list entry is inactive carry their own labels from the result GET, so when they
+   * are all that is selected an empty list (a fully deactivated catalog) must not hide them.
+   */
+  readonly selectedRowsSelfLabelled = computed(() => {
+    const selected = this.selectedOptions();
+    return selected.length > 0 && selected.every((row: any) => row?.is_catalog_inactive === true);
+  });
   firstLoad = signal(true);
 
   onChange = effect(
