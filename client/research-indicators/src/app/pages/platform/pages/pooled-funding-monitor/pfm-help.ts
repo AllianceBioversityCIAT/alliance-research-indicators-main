@@ -14,6 +14,7 @@ export const PFM_HELP = {
   managedInTip:
     'Knowledge products reported in TIP that are not in PRMS yet. They are managed in TIP, so there is nothing to do in STAR.',
   fromTip: 'Reported in TIP. Shown here for visibility only: it is managed in TIP and needs no action in STAR.',
+  completedInTip: 'Knowledge products reported and approved in TIP, no action in STAR',
 
   // Terms
   outOfScope:

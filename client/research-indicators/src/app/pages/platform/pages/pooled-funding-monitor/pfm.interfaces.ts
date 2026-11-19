@@ -9,7 +9,10 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved', 'managed_in_tip'] as const;
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved', 'managed_in_tip',
+  // One view per journey card: the queue lists exactly what the card counts (server DD-PFM-42).
+  'journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip', 'journey_not_answered', 'journey_contributes',
+  'journey_no_sp', 'journey_mapping_incomplete', 'journey_mapping_complete', 'journey_ready', 'journey_synced'] as const;
 export type PfmChip = (typeof PFM_CHIPS)[number];
 
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
@@ -65,9 +68,12 @@ export interface PfmSyncedType {
 /** Coverage tab, "the journey of a result": five stages, each a subset of the one before. */
 export interface PfmJourney {
   projects: { total: number; with_results: number; without_results: number };
-  /** Draft includes Returned; Submitted includes Under review. */
-  star: { draft: number; submitted: number; approved: number };
-  /** Approved results only. */
+  /**
+   * Draft includes Returned; Submitted includes Under review. `approved` is STAR only;
+   * `completed_in_tip` are the TIP knowledge products (final in TIP). Optional: older servers omit it.
+   */
+  star: { draft: number; submitted: number; approved: number; completed_in_tip?: number };
+  /** Approved (or Completed in TIP) results only. */
   answer: { not_answered: number; contributes: number; no_sp: number };
   /** Approved results that contribute. */
   mapping: { incomplete: number; complete: number };

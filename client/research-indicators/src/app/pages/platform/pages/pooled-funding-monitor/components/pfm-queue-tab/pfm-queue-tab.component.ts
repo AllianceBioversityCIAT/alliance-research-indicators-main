@@ -32,7 +32,19 @@ const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
   rejected: 'Rejected by PRMS',
   no_sp_contribution: 'No SP contribution',
   prms_pending: 'Pending review in PRMS',
-  prms_approved: 'Approved by PRMS'
+  prms_approved: 'Approved by PRMS',
+  // Opened from the journey cards of the coverage tab.
+  journey_draft: 'Draft',
+  journey_submitted: 'Submitted',
+  journey_approved: 'Approved in STAR',
+  journey_completed_in_tip: 'Completed in TIP',
+  journey_not_answered: 'Mapping not answered',
+  journey_contributes: 'Contributes to CGIAR',
+  journey_no_sp: 'No Science Program contribution',
+  journey_mapping_incomplete: 'Mapping incomplete',
+  journey_mapping_complete: 'Mapping complete',
+  journey_ready: 'Ready to sync',
+  journey_synced: 'Synced to PRMS'
 };
 
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
