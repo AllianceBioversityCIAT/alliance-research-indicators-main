@@ -416,6 +416,7 @@ Agresso staff: read only, through `alliance_user_staff`, filled by the existing 
 | Tasks | **17** — the `tasks.md` decomposition (T-01…T-17): the write service split into elements (T-05) and objectives (T-06), plus the Dev/HITL pass (T-17) |
 | LOC | **≈ 9,000** (server ≈ 4,800 incl. tests, migration specs and the data file; client ≈ 4,200 incl. tests). Re-based on the sibling, whose first slice measured 4,427 LOC against a 2,500 tripwire (org design §14). **Intermediate tripwire:** after T-05 (element writes), compare server actuals to 2,000 LOC and re-estimate before continuing |
 | LOC — re-based 2026-11-19 | **≈ 12,000** (server ≈ 7,000, client ≈ 5,000). At T-04 the server measured 2,199 LOC (`git diff --numstat e75276055 HEAD -- server`; 1,069 production / 1,130 tests), above the 2,000 intermediate tripwire one task early. Owner decision: accept and re-base; review-round cap unchanged. Next check: after T-08, server vs 5,000 |
+| LOC — re-based again 2026-11-19 (after T-05) | **≈ 18,000** (server ≈ 12,000, client ≈ 6,000). After T-05 the server measured 6,549 (`git diff --numstat e75276055 -- server`; 3,049 production / 3,500 tests). Owner decision: accept the real size; review-round cap unchanged. Next check: after T-10 (server close) |
 | Review rounds | **≈ 26** (one per task plus margin for the seed, the role migration, the sidebar and the outline editor) |
 
 Depth stays **Full**: the estimate matches it.

@@ -187,3 +187,4 @@ Not run by the Leader: Dev is shared and the owner runs these checks (standing r
 - Re-based budget (design §14, 2026-11-19): server ≈ 7,000; **next check "after T-08: server vs 5,000"**. Measured after T-05: **6,549** — +1,549 over that check, three tasks early; server remaining: T-06 (IOB writes), T-08 (controller), T-09 (seed + data file), T-10 (8 integration suites).
 - Cause: tests 53 %; T-05 alone +2,400 (service 940 + spec 1,121).
 - **Stopped for the owner's decision** (tripwire is never auto-approved).
+- **Owner decision (2026-11-19):** *Re-basar a ~18k y seguir* — server ≈ 12,000, whole spec ≈ 18,000, review-round cap unchanged; next check after T-10. Applied to `design.md` §14 (new row; earlier rows kept as history).
