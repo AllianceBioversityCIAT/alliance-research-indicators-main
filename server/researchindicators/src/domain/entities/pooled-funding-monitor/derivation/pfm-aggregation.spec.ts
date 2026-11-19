@@ -403,7 +403,6 @@ describe('pfm-aggregation', () => {
         no_sp_contribution: 'no_sp',
         prms_pending: 'prms_pending',
         prms_approved: 'prms_approved',
-        managed_in_tip: 'managed_in_tip',
       });
     });
 
@@ -420,7 +419,6 @@ describe('pfm-aggregation', () => {
         no_sp: 2, // r6, r12
         prms_pending: 1, // r7
         prms_approved: 2, // r4, r11
-        managed_in_tip: 0,
       });
       // Synced = Pending review + Approved + Rejected: in PRMS, whatever its review status.
       expect(
@@ -428,12 +426,9 @@ describe('pfm-aggregation', () => {
           q.chip_counts.prms_approved +
           q.chip_counts.prms_rejected,
       ).toBe(q.chip_counts.synced);
-      // Need attention + Managed in TIP + Synced + No SP contribution partition every result.
+      // Need attention + Synced + No SP contribution partition every result.
       expect(
-        q.chip_counts.attention +
-          q.chip_counts.managed_in_tip +
-          q.chip_counts.synced +
-          q.chip_counts.no_sp,
+        q.chip_counts.attention + q.chip_counts.synced + q.chip_counts.no_sp,
       ).toBe(q.chip_counts.all);
       // P-C (2 need attention) before P-B (1: its rejected result is done, owner 2026-10-22).
       expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-C', 'P-B', 'P-D']);
@@ -490,7 +485,6 @@ describe('pfm-aggregation', () => {
         no_sp: 0,
         prms_pending: 0,
         prms_approved: 0,
-        managed_in_tip: 0,
       });
       expect(q.totals).toEqual({
         results: 1,
@@ -516,7 +510,6 @@ describe('pfm-aggregation', () => {
         no_sp: 0,
         prms_pending: 0,
         prms_approved: 1, // r4
-        managed_in_tip: 0,
       });
       expect(q.groups).toHaveLength(1);
       expect(q.groups[0].result_count).toBe(3);
@@ -713,29 +706,25 @@ describe('DD-PFM-40: TIP knowledge products in the aggregates', () => {
   };
   const rows = deriveMonitoredRows([
     mk(1, 'P-A'), // STAR, mapped, not sent -> attention (ready)
-    mk(2, 'P-A', { ...TIP }), // TIP mapped, not sent -> managed in TIP
-    mk(3, 'P-A', { ...TIP, ...NO_ALIGN }), // TIP not answered -> managed in TIP
+    mk(2, 'P-A', { ...TIP }), // TIP mapped, not sent -> attention (ready)
+    mk(3, 'P-A', { ...TIP, ...NO_ALIGN }), // TIP not answered -> attention (mapping)
     mk(4, 'P-B', { ...TIP, ...SYNCED }), // TIP in PRMS -> synced
     mk(5, 'P-B', { ...TIP, has_contribution: false }), // TIP no SP -> no_sp
   ]);
 
-  it('keeps the four-way chip partition exact and leaves TIP out of every action count', () => {
+  it('DD-PFM-43: TIP mapping counts like STAR in every quick view; never Pending approval', () => {
     const q = buildPfmQueue(rows, {});
     expect(q.chip_counts.all).toBe(5);
-    expect(q.chip_counts.attention).toBe(1);
-    expect(q.chip_counts.ready).toBe(1);
-    expect(q.chip_counts.mapping).toBe(0);
+    expect(q.chip_counts.attention).toBe(3); // STAR 1 + TIP 2 + TIP 3
+    expect(q.chip_counts.ready).toBe(2); // STAR 1 + TIP 2
+    expect(q.chip_counts.mapping).toBe(1); // TIP 3
     expect(q.chip_counts.awaiting_pi).toBe(0);
-    expect(q.chip_counts.managed_in_tip).toBe(2);
     expect(q.chip_counts.synced).toBe(1);
     expect(q.chip_counts.no_sp).toBe(1);
     expect(
-      q.chip_counts.attention +
-        q.chip_counts.managed_in_tip +
-        q.chip_counts.synced +
-        q.chip_counts.no_sp,
+      q.chip_counts.attention + q.chip_counts.synced + q.chip_counts.no_sp,
     ).toBe(q.chip_counts.all);
-    expect(q.groups.find((g) => g.code === 'P-A')?.attention).toBe(1);
+    expect(q.groups.find((g) => g.code === 'P-A')?.attention).toBe(3);
   });
 
   it('runs TIP rows through the journey from step 3: Completed in TIP is approved', () => {

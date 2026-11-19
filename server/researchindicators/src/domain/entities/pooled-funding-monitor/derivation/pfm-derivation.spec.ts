@@ -403,23 +403,30 @@ describe('pfm-derivation', () => {
       expect(d.isApproved).toBe(true);
     });
 
-    it('is never an action in STAR, whatever its mapping', () => {
-      for (const o of [
-        {},
-        { mapping_complete: 0 },
-        { has_alignment: 0, has_contribution: null, mapping_complete: null },
-      ]) {
-        const d = derivePfmRow(tip(o));
-        expect(d.needsAttention).toBe(false);
-        for (const chip of [
-          PfmChipEnum.NEED_ATTENTION,
-          PfmChipEnum.MAPPING_INCOMPLETE,
-          PfmChipEnum.READY_TO_SYNC,
-          PfmChipEnum.AWAITING_PI,
-        ]) {
-          expect(matchesChip(d, chip)).toBe(false);
-        }
-        expect(matchesChip(d, PfmChipEnum.MANAGED_IN_TIP)).toBe(true);
+    it('DD-PFM-43: its mapping counts like a STAR one, never as Pending approval', () => {
+      const pending = derivePfmRow(tip({ mapping_complete: 0 }));
+      expect(pending.needsAttention).toBe(true);
+      expect(matchesChip(pending, PfmChipEnum.NEED_ATTENTION)).toBe(true);
+      expect(matchesChip(pending, PfmChipEnum.MAPPING_INCOMPLETE)).toBe(true);
+      expect(matchesChip(pending, PfmChipEnum.READY_TO_SYNC)).toBe(false);
+
+      const notAnswered = derivePfmRow(
+        tip({
+          has_alignment: 0,
+          has_contribution: null,
+          mapping_complete: null,
+        }),
+      );
+      expect(matchesChip(notAnswered, PfmChipEnum.MAPPING_INCOMPLETE)).toBe(
+        true,
+      );
+
+      const mapped = derivePfmRow(tip());
+      expect(matchesChip(mapped, PfmChipEnum.READY_TO_SYNC)).toBe(true);
+      expect(matchesChip(mapped, PfmChipEnum.NEED_ATTENTION)).toBe(true);
+
+      for (const d of [pending, notAnswered, mapped]) {
+        expect(matchesChip(d, PfmChipEnum.AWAITING_PI)).toBe(false);
       }
     });
 
@@ -427,21 +434,20 @@ describe('pfm-derivation', () => {
       expect(derivePfmRow(tip()).isReady).toBe(true);
     });
 
-    it('leaves Managed in TIP once it is in PRMS or out of scope', () => {
+    it('is done once it is in PRMS or out of scope, like a STAR row', () => {
       const synced = derivePfmRow(tip({ is_synced_to_prms: 1 }));
-      expect(matchesChip(synced, PfmChipEnum.MANAGED_IN_TIP)).toBe(false);
+      expect(synced.needsAttention).toBe(false);
       expect(matchesChip(synced, PfmChipEnum.SYNCED)).toBe(true);
       const noSp = derivePfmRow(tip({ has_contribution: 0 }));
-      expect(matchesChip(noSp, PfmChipEnum.MANAGED_IN_TIP)).toBe(false);
+      expect(noSp.needsAttention).toBe(false);
       expect(matchesChip(noSp, PfmChipEnum.NO_SP_CONTRIBUTION)).toBe(true);
     });
 
-    it('a STAR row (or one without platform) is unchanged and never Managed in TIP', () => {
+    it('a STAR row (or one without platform) is not external', () => {
       for (const platform_code of ['STAR', undefined, null]) {
         const d = derivePfmRow(raw({ platform_code, mapping_complete: 0 }));
         expect(d.isExternal).toBe(false);
         expect(d.needsAttention).toBe(true);
-        expect(matchesChip(d, PfmChipEnum.MANAGED_IN_TIP)).toBe(false);
       }
     });
 
