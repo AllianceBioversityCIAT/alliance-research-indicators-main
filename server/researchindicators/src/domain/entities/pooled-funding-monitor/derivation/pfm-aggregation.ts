@@ -471,7 +471,6 @@ export const PFM_CHIP_COUNT_KEYS = {
   [PfmChipEnum.NO_SP_CONTRIBUTION]: 'no_sp',
   [PfmChipEnum.PRMS_PENDING]: 'prms_pending',
   [PfmChipEnum.PRMS_APPROVED]: 'prms_approved',
-  [PfmChipEnum.MANAGED_IN_TIP]: 'managed_in_tip',
 } as const;
 
 /** Chips with a count in `chip_counts` (every chip but the journey views). */

@@ -122,11 +122,6 @@ export class PfmChipCountsDto {
   prms_pending: number;
   @ApiProperty({ description: 'In PRMS, approved.' })
   prms_approved: number;
-  @ApiProperty({
-    description:
-      'TIP knowledge products in PRMS scope, not in PRMS yet: no action in STAR (DD-PFM-40).',
-  })
-  managed_in_tip: number;
 }
 
 export class PfmProjectProgressDto {
@@ -286,7 +281,7 @@ export class PfmResultRowDto {
   @ApiProperty({ example: 'STAR' }) platform_code: string;
   @ApiProperty({
     description:
-      'Managed in another platform (TIP): shown for visibility, no action in STAR (DD-PFM-40).',
+      'Reported in another platform (TIP); its mapping counts like a STAR one (DD-PFM-43).',
   })
   is_external: boolean;
   @ApiProperty({ example: 1234 }) official_code: number;

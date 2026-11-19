@@ -39,7 +39,7 @@ export type PfmQueueResponse = PfmQueueAggregate & {
 export interface PfmResultRow {
   result_code: string;
   platform_code: string;
-  /** Managed in TIP: visible, no action in STAR (DD-PFM-40). */
+  /** Reported in TIP (DD-PFM-40); its mapping counts like a STAR one (DD-PFM-43). */
   is_external: boolean;
   official_code: number;
   report_year: number;
