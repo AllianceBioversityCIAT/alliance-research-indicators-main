@@ -43,6 +43,15 @@ export class PrmsSyncResponseDto implements PrmsSyncResponseData {
 
   @ApiProperty({ type: String, nullable: true })
   failure_reason: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+    description:
+      'Gate entry that refused before a log row. Null when the 409 is not a gate entry (claim collision, or already synced inside the lock).',
+  })
+  gate_entry_id?: string | null;
 }
 
 export class PrmsSyncLastAttemptDto {

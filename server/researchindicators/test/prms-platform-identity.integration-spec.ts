@@ -13,6 +13,7 @@ import {
   PoolFundingMappingDiffService,
 } from '../src/domain/entities/prms-webhook/pool-funding-mapping-diff.service';
 import { PrmsSyncHistoryReader } from '../src/domain/entities/result-prms-sync/prms-sync-history.reader';
+import { PrmsPushStatusReader } from '../src/domain/entities/result-prms-sync/prms-push-status.reader';
 import { ResultPrmsSyncLogRepository } from '../src/domain/entities/result-prms-sync/repositories/result-prms-sync-log.repository';
 import { ResultPrmsSyncStatusReader } from '../src/domain/entities/result-prms-sync/result-prms-sync-status.reader';
 import { ReportingPlatformEnum } from '../src/domain/entities/results/enum/reporting-platform.enum';
@@ -165,7 +166,11 @@ describe('T-07 — PRMS platform identity on the TEST schema', () => {
     const years = new ReportingYearResolver(dataSource);
     statusReader = new ResultPrmsSyncStatusReader(dataSource);
     historyReader = new PrmsSyncHistoryReader(dataSource);
-    logRepository = new ResultPrmsSyncLogRepository(dataSource, years);
+    logRepository = new ResultPrmsSyncLogRepository(
+      dataSource,
+      years,
+      new PrmsPushStatusReader(dataSource),
+    );
     correlator = new DeliveryCorrelatorService(
       dataSource,
       new PoolFundingMappingDiffService(dataSource),
@@ -591,6 +596,7 @@ async function settleAccepted(
   const repository = new ResultPrmsSyncLogRepository(
     dataSource,
     new ReportingYearResolver(dataSource),
+    new PrmsPushStatusReader(dataSource),
   );
   const status = await repository.settleIfInFlight({
     attemptId: insertIdOf(header),

@@ -116,6 +116,7 @@ No data model changes. The design reads `result_prms_sync_history`, which **thre
 
 - When the resolved row's key is not resubmittable, the response is 409 with the description from §5.2.
 - `data` is `noRowRefusalData(description, entryId)`. The service throws gate refusals as `PrmsSyncNoRowRefusalException` carrying `gate.entryId` (today `throwHttp` drops it, and five different refusals share 409). The controller copies it into `gate_entry_id`. Refusals that are not gate entries (claim collision, already synced inside the lock) leave it `null`.
+- *Amended 2026-11-19 (T-02, execute-time):* every no-row gate refusal now throws `PrmsSyncNoRowRefusalException`, not only the 409s, so each carries its own `gate_entry_id`. The 404 `result_exists` refusal keeps its status and text. The 503 `feature_enabled` refusal keeps its status and text, and also gains `noRowRefusalData` in `data`, which it did not have before. This is additive. TIP still counts these refusals as `notSent`.
 - Nothing is written to `result_prms_sync_log`, and the Normalizer is not called (S-7).
 
 ## 5. Workflows & business rules

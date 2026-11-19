@@ -8,6 +8,7 @@ import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { isFeatureFlagEnabled } from '../../../shared/utils/feature-flag.util';
 import { SyncGateSnapshot } from '../eligibility/sync-gate';
+import { PrmsPushStatusReader } from '../prms-push-status.reader';
 import { PRMS_IN_FLIGHT_LIVE_WINDOW_MS } from '../result-prms-sync.constants';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
@@ -121,6 +122,7 @@ export class ResultPrmsSyncLogRepository {
   constructor(
     private readonly dataSource: DataSource,
     private readonly reportingYearResolver: ReportingYearResolver,
+    private readonly pushStatusReader: PrmsPushStatusReader,
   ) {}
 
   /**
@@ -201,6 +203,19 @@ export class ResultPrmsSyncLogRepository {
       return missing;
     }
 
+    const platformCode = platformCodeOf(row);
+    const reportYear =
+      row.report_year_id == null ? null : Number(row.report_year_id);
+    // Fail closed (DD-9): a history-read error is not caught.
+    const prmsPushStatus = await this.pushStatusReader.read({
+      platformCode,
+      resultOfficialCode:
+        row.result_official_code == null
+          ? ''
+          : String(row.result_official_code),
+      year: reportYear ?? 0,
+    });
+
     return {
       exists: true,
       result_id: Number(row.result_id),
@@ -225,10 +240,10 @@ export class ResultPrmsSyncLogRepository {
         row.policy_type_id == null ? null : Number(row.policy_type_id),
       ),
       prms_sync_button_enabled: prmsSyncButtonEnabled,
-      report_year:
-        row.report_year_id == null ? null : Number(row.report_year_id),
+      report_year: reportYear,
       reporting_year: reportingYear,
-      platform_code: platformCodeOf(row),
+      platform_code: platformCode,
+      prms_push_status: prmsPushStatus,
     };
   }
 

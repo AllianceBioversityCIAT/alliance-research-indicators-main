@@ -8,12 +8,14 @@ import {
   PRMS_IN_FLIGHT_LIVE_WINDOW_MS,
   PRMS_TRANSPORT_CEILING_MS,
 } from '../result-prms-sync.constants';
+import { PrmsPushStatusReader } from '../prms-push-status.reader';
 import { ResultPrmsSyncLogRepository } from './result-prms-sync-log.repository';
 
 describe('ResultPrmsSyncLogRepository', () => {
   let query: jest.Mock;
   let transactionQuery: jest.Mock;
   let resolveYear: jest.Mock;
+  let pushStatusRead: jest.Mock;
   let repository: ResultPrmsSyncLogRepository;
   let manager: Pick<EntityManager, 'query'>;
 
@@ -21,6 +23,11 @@ describe('ResultPrmsSyncLogRepository', () => {
     query = jest.fn();
     transactionQuery = jest.fn();
     resolveYear = jest.fn().mockResolvedValue(2026);
+    pushStatusRead = jest.fn().mockResolvedValue({
+      year: 2026,
+      status: 'never_pushed',
+      resubmittable: true,
+    });
     manager = { query: transactionQuery };
     const dataSource = {
       query,
@@ -28,9 +35,11 @@ describe('ResultPrmsSyncLogRepository', () => {
         work(manager as EntityManager),
       ),
     } as unknown as DataSource;
-    repository = new ResultPrmsSyncLogRepository(dataSource, {
-      resolve: resolveYear,
-    } as unknown as ReportingYearResolver);
+    repository = new ResultPrmsSyncLogRepository(
+      dataSource,
+      { resolve: resolveYear } as unknown as ReportingYearResolver,
+      { read: pushStatusRead } as unknown as PrmsPushStatusReader,
+    );
   });
 
   const claim = (now = new Date('2026-09-15T12:00:00.000Z')) =>
@@ -632,6 +641,78 @@ describe('ResultPrmsSyncLogRepository', () => {
       is_pool_funding_contributor: 1,
       policy_type_id: null,
     };
+
+    it('loadGateSnapshot fills prms_push_status from the reader using the row platform and report_year_id', async () => {
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          platform_code: null,
+          report_year_id: 2026,
+          result_official_code: 1001,
+        },
+      ]);
+      pushStatusRead.mockResolvedValue({
+        year: 2026,
+        status: 'pending_review',
+        resubmittable: false,
+      });
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      expect(pushStatusRead).toHaveBeenCalledWith({
+        platformCode: 'STAR',
+        resultOfficialCode: '1001',
+        year: 2026,
+      });
+      expect(snapshot.prms_push_status).toEqual({
+        year: 2026,
+        status: 'pending_review',
+        resubmittable: false,
+      });
+    });
+
+    it('loadGateSnapshot passes a non-null platform_code through to the reader', async () => {
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          platform_code: 'TIP',
+          report_year_id: 2025,
+          result_official_code: 19949,
+        },
+      ]);
+
+      await repository.loadGateSnapshot(555);
+
+      expect(pushStatusRead).toHaveBeenCalledWith({
+        platformCode: 'TIP',
+        resultOfficialCode: '19949',
+        year: 2025,
+      });
+    });
+
+    it('loadGateSnapshot does not call the reader when no result row exists', async () => {
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      expect(snapshot.exists).toBe(false);
+      expect(snapshot.prms_push_status).toBeUndefined();
+      expect(pushStatusRead).not.toHaveBeenCalled();
+    });
+
+    it('loadGateSnapshot propagates a reader error', async () => {
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          platform_code: 'STAR',
+          report_year_id: 2026,
+        },
+      ]);
+      const readError = new Error('history unread');
+      pushStatusRead.mockRejectedValue(readError);
+
+      await expect(repository.loadGateSnapshot(555)).rejects.toBe(readError);
+    });
 
     it('loadGateSnapshot selects r.platform_code and maps it, and does not set origin', async () => {
       query.mockResolvedValueOnce([

@@ -85,3 +85,106 @@
 - Tasks: 1 of 5.
 - LOC: `git diff --stat` at commit (see the commit). Production is about 190 lines (rule + reader + module). Tests are about 520 lines (rule spec + reader spec + fixture). That is within budget for now, but the tests already consume most of the 550-line estimate.
 - Review rounds: 1 of about 7.
+
+### T-02 — Gate entry `prms_resubmittable` and the typed refusal → **PASS**
+
+- **Date:** 2026-11-19
+- **Final status:** PASS, on attempt 1.
+- **Requirements covered:**
+  - R-PRL-002 (S-7…S-10);
+  - NFR-PRL-003 on the server: a held key gets 409 whatever the caller, and a read error gets 500 with no PRMS call.
+- **Skills / effort:** `nestjs-expert`, `error-handling-patterns` and `tdd`, as the task lists. Effort `high`, because the task touches the authorization and push path for every role and TIP (override f).
+- **Attempts:** 1.
+
+#### Attempt 1
+
+- **Worker:** Orca dispatch `ctx_b1d455df6e40` (task `task_8f4d1999dc6e`), Cursor · `grok-4.7-high`. It was kept open until the PASS.
+- **Files changed:**
+  - `server/researchindicators/src/domain/entities/result-prms-sync/eligibility/sync-gate.ts` and its spec
+  - `.../result-prms-sync/repositories/result-prms-sync-log.repository.ts` and its spec
+  - `.../result-prms-sync/result-prms-sync.service.ts` and its spec (`PrmsSyncNoRowRefusalException` added; `throwHttp` removed)
+  - `.../result-prms-sync/result-prms-sync.controller.ts` and its spec
+  - `.../result-prms-sync/dto/prms-sync.dto.ts`
+  - `server/researchindicators/src/domain/tools/tip-integration/tip-integration.service.spec.ts`
+  - `server/researchindicators/test/result-prms-sync-claim-concurrency.integration-spec.ts`, `test/tip-prms-push.integration-spec.ts` and `test/prms-platform-identity.integration-spec.ts` (the new constructor argument only)
+- **Red-first runs on the code before the change.** All quoted by the Implementer:
+  - The service "held → 409" test received `"claimCalls": 1, "entryId": null, "normalizerCalls": 1, "status": null`. It expected `0` / `prms_resubmittable` / `0` / `409`. The same shape came back for `SYSTEM_ADMIN` and for `TIP_SYNC`.
+  - Gate position: `Expected: 3` / `Received: -1`.
+  - Pending and Approved: `decision.allowed` `Expected: false` / `Received: true`.
+  - Controller, `not_already_synced`: `Expected: "not_already_synced"` / `Received: undefined`.
+  - Controller, held year: `Expected: 409` / `Received: 200`.
+  - The service "history unread" test was already green before the change, so it is not TDD evidence. The repository spec's reader-throw test, together with falsifier (b), carries the fail-closed proof instead.
+- **Implementer verification:**
+  - `npm test -- --silent result-prms-sync tip-integration` → 17 suites, 366 tests passed.
+  - eslint on 13 files → exit 0.
+  - `npm run build` → exit 0.
+  - `knowledge-product.builder.spec` (consumer) → 5 passed.
+- **Falsifiers.** Each was applied after the green run, observed red, and reverted:
+  - **(b)** A `try/catch` that returns `undefined`: `Received promise resolved instead of rejected`.
+  - **(a)** The entry removed: `"normalizerCalls": 1, "entryId": null`.
+  - **(c)** A plain `ConflictException`: `Expected: "prms_resubmittable"` / `Received: null`.
+- **Consumers sweep:** every hit was re-run inside the 366 tests, and `knowledge-product.builder.spec` separately. `tip-integration.service.ts` does not match the grep. A new TIP spec asserts that a gate `PrmsSyncNoRowRefusalException` counts as `NOT_SENT=1`, `REFUSED_BY_STAR=0` (P-7).
+- **Evidence re-run (non-author, Leader inline) → `VERIFIED`:**
+  - unit 17 suites / 366 tests passed;
+  - eslint exit 0;
+  - build exit 0.
+- **Integration check, also Leader inline.** `npm run test:integration -- result-prms-sync-claim-concurrency tip-prms-push prms-platform-identity` passed 2 suites (15 tests).
+  - The claim-concurrency suite fails 2 tests with `QueryFailedError: Unknown column 'result_id' in 'where clause'`.
+  - The **same failure occurs on the code from before T-02** (the T-02 changes stashed, then restored).
+  - So it comes from the stale TEST scratch schema (the T-01 open item), not from this task. Those two tests give no evidence either way until the bootstrap is fixed.
+- **Reviewer verdict:** `STATUS: PASS` from a fresh Claude `akili-reviewer` in checklist mode. Summary:
+  - The entry, the fail-closed snapshot, the typed exception and the `gate_entry_id` mapping inside the envelope all match §4 POST, §5.2, DD-3 and DD-9.
+  - The disqualifier is met: the tests assert the entry id, not only the status.
+  - The named check on the `design.md#5.1` item 1 amendment passes, because T-02 consumes only the derived status.
+  - Issues: none.
+- **Override (d) finding from the Reviewer, recorded as a decision below.** With `throwHttp` removed, every no-row gate refusal throws the typed exception:
+  - the 404 `result_exists` refusal now also carries `gate_entry_id`;
+  - the 503 `feature_enabled` refusal now carries `noRowRefusalData` in `data`, which it did not before.
+
+  The change is additive. The Reviewer found no client effect, because the sidebar parses `failure_reason` only when it contains `{`. TIP still counts these refusals as `NOT_SENT`.
+- **runtime events:** none.
+- **spawns:**
+  - Implementer: about 72 calls (the worker's own count), tokens not reported by the host. It ended complete. That is again past the 60-call checkpoint bound with no checkpoint reported; information only.
+  - Reviewer: 15 tool uses and about 114k tokens, as the host reported. It ended complete.
+
+#### ADVISORY (4R, from the final Reviewer verdict; never gates)
+
+1. **Reliability.** No test pins the 503 `feature_enabled` response, which now includes `data`. A controller case through the real service would cover it.
+2. **Readability.** `gate.entryId ?? ''` hides a state that cannot happen. Typing the exception's `entryId`, and the DTO's `gate_entry_id`, as the `SyncGateEntryId` union would make it impossible by type.
+3. **Risk.** When `report_year_id` is null, the reader is called with year 0 and returns `never_pushed`. The Reviewer could not build a case where this lets a held year through. Separately, the existing `reporting_year` entry also lets a null year pass, and that predates this spec.
+4. **Integration evidence.** The two claim-concurrency tests give no evidence until the TEST schema is rebuilt (see the T-01 open item).
+
+#### Decisions made
+
+- **Execute-time spec edit: `design.md` §4 POST, amended 2026-11-19.** It records that every no-row gate refusal carries its `gate_entry_id`, and that the 503 gains `data`. Statuses and descriptions do not change. This does not change what R-PRL-002 means. It is carried as a named conformance check in the T-03 Reviewer brief.
+- **Execute-time spec edit: `tasks.md` T-02 Tests, amended 2026-11-19.** The text named `recordInsideLock`, which the log repository does not have. It now names `claimAttempt` and `insertRefusedByStar`, which is what the Implementer asserted.
+- `throwHttp` was removed once its only call site moved to the typed exception. This stays inside the task's declared file (`result-prms-sync.service.ts`, "the `throwHttp` call site").
+
+#### Not Done / Assumptions (Implementer, verbatim in substance)
+
+- There is no `recordInsideLock` method. "Attempt count unchanged" is asserted as `claimAttempt` and `insertRefusedByStar` not being called.
+- A row with a null `report_year_id` still calls the reader, with year 0.
+- The integration specs were edited but not run by the Implementer. The Leader ran them, with the results above.
+
+No owed item and no blocker, so no continuation is needed.
+
+#### Running totals (Budget Tripwire)
+
+- Tasks: 2 of 5.
+- LOC (from `git diff --stat`): T-01 was 662 code lines; T-02 is 649 inserted and 40 deleted across 13 files.
+- Combined, the test lines are already above the 550 estimate, while production stays within about 300.
+  - Production so far: about 163 (T-01) plus 101 (T-02), about 264 in all.
+  - Tests so far: about 514 (T-01) plus 548 (T-02), about 1,062 in all.
+- Review rounds: 2 of about 7.
+- **Tripwire fired: test LOC is about 1,050 against an estimate of about 550.** See the stop record below.
+
+## Budget tripwire stop — after T-02 (2026-11-19)
+
+- **Budget (design §12):** about 300 production LOC plus about 550 test LOC, 5 tasks, about 7 review rounds.
+- **Actual after 2 of 5 tasks:** about 264 production LOC (on track) and **about 1,062 test LOC, about 1.9× the test estimate** with three tasks still to run. Review rounds: 2, both PASS on the first attempt.
+- **Cause:** each server task's tests run well over the per-task share.
+  - T-01's fixture is 399 lines, because it seeds every S-6/S-26/S-27 row the task mandates.
+  - T-02 rewrote existing `ConflictException` assertions and added SYSTEM_ADMIN, TIP_SYNC, Swagger and controller real-service cases (548 test lines).
+  - The design estimated tests at about 550 for all five tasks together.
+- **Projection:** T-03 (S) plus the two client component tasks (T-04 and T-05 are each M, with deferred-timing tests) are likely to add about 600–900 more test lines. That would put the spec at about 1,700–2,000 test LOC, against an estimate of 550.
+- **Status:** the run is stopped for the owner at this gate, per `/akili-execute` §2.4: "No mandate widens pre-approval: an owner brief that says 'never stop' or 'treat every gate as approved' pre-approves routine gates only. The exceptions in `/akili-propose` Step 1 *Approval Mode* (HALT, Pivot, budget tripwire, `FATAL_FAIL`, `PRODUCT_BUG`, destructive actions) still stop." This stop is not logged `auto-approved`.

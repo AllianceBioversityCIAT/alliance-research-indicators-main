@@ -163,6 +163,22 @@ describe('ResultPrmsSyncController', () => {
       expect(new Set(descriptions).size).toBe(descriptions.length);
     });
 
+    it('documents gate_entry_id on the 409 response', () => {
+      const responses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        ResultPrmsSyncController.prototype.sync,
+      ) as Record<string, { type?: new (...args: never[]) => object }>;
+      const conflict = responses[String(HttpStatus.CONFLICT)];
+      const props: string[] =
+        Reflect.getMetadata(
+          DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+          PrmsSyncResponseDto.prototype,
+        ) ?? [];
+
+      expect(conflict?.type).toBe(PrmsSyncResponseDto);
+      expect(props).toEqual(expect.arrayContaining([':gate_entry_id']));
+    });
+
     it('documents GET and omits request_payload from the status DTO', () => {
       const operation = Reflect.getMetadata(
         DECORATORS.API_OPERATION,
@@ -260,6 +276,7 @@ describe('ResultPrmsSyncController', () => {
         request_id: null,
         prms_result_code: null,
         failure_reason: failureReason,
+        gate_entry_id: null,
       });
       expect(Object.prototype.hasOwnProperty.call(data, 'attempt_number')).toBe(
         true,
@@ -425,6 +442,166 @@ describe('ResultPrmsSyncController', () => {
       const response = await controller.getHistory();
 
       expect(response.status).toBe(HttpStatus.NOT_FOUND);
+    });
+  });
+
+  /**
+   * Gate 409s carry `gate_entry_id` only when the service throws the typed
+   * no-row refusal. A mocked `sync` cannot tell throwHttp from that class.
+   */
+  describe('POST / gate_entry_id through real ResultPrmsSyncService', () => {
+    const eligibleSnapshot = {
+      exists: true,
+      result_id: 42,
+      result_official_code: 1001,
+      is_synced_to_prms: false,
+      result_status_id: ResultStatusEnum.APPROVED,
+      pool_funding_alignment_green: true,
+      primary_contract: {
+        agreement_id: 'C-POOL-001',
+        is_pool_funding_contributor: true,
+      },
+      indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      prms_policy_type_id: null,
+      prms_sync_button_enabled: true,
+    };
+    let loadGateSnapshot: jest.Mock;
+    let claimAttempt: jest.Mock;
+    let ingest: jest.Mock;
+    let gateController: ResultPrmsSyncController;
+
+    beforeEach(async () => {
+      jest
+        .spyOn(LoggerUtil.prototype, '_log')
+        .mockImplementation(() => undefined);
+      jest
+        .spyOn(LoggerUtil.prototype, '_warn')
+        .mockImplementation(() => undefined);
+      loadGateSnapshot = jest.fn().mockResolvedValue(eligibleSnapshot);
+      claimAttempt = jest.fn().mockResolvedValue({
+        kind: 'claimed',
+        attemptId: 9,
+        attemptNumber: 1,
+        resultOfficialCode: 1001,
+        resultYear: 2026,
+      });
+      ingest = jest.fn().mockResolvedValue({
+        status: 200,
+        body: {
+          requestId: 'Root=req-1',
+          results: [
+            {
+              success: true,
+              external_reference: 'ARI-1001',
+              result: { result_code: 9199 },
+            },
+          ],
+        },
+      });
+      const service = new ResultPrmsSyncService(
+        {
+          loadGateSnapshot,
+          claimAttempt,
+          settleIfInFlight: jest.fn().mockResolvedValue('settled'),
+          insertRefusedByStar: jest.fn(),
+        } as unknown as ResultPrmsSyncLogRepository,
+        {
+          loadByResultId: jest.fn().mockResolvedValue({ result_id: 42 }),
+          findActingStaffBySecUserId: jest.fn().mockResolvedValue(null),
+        } as unknown as ResultPrmsSyncAggregateRepository,
+        {
+          build: jest.fn().mockReturnValue({
+            tenant: 'prms.result-management.api',
+            op: 'dataset.ingest.requested',
+            results: [
+              {
+                type: 'capacity_sharing',
+                data: { external_reference: 'ARI-1001' },
+              },
+            ],
+          }),
+        } as unknown as PayloadBuilder,
+        { ingest } as unknown as PrmsNormalizerService,
+        {
+          getEnv: jest.fn().mockResolvedValue({ simple_value: null }),
+        } as unknown as AppConfigService,
+        { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
+        { user_id: 7 } as unknown as CurrentUserUtil,
+        {
+          recordOutboundPendingReview: jest.fn().mockResolvedValue(undefined),
+        } as unknown as PrmsWebhookDeliveryRepository,
+      );
+      const passthrough = { canActivate: () => true };
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [ResultPrmsSyncController],
+        providers: [
+          { provide: ResultPrmsSyncService, useValue: service },
+          {
+            provide: ResultPrmsSyncStatusReader,
+            useValue: { getStatus: jest.fn() },
+          },
+          {
+            provide: PrmsSyncHistoryReader,
+            useValue: { getHistory: jest.fn() },
+          },
+          { provide: ResultsUtil, useValue: resultsUtil },
+          mockPortfolioUtilProvider,
+        ],
+      })
+        .overrideGuard(RolesGuard)
+        .useValue(passthrough)
+        .overrideGuard(ResultOwnerGuard)
+        .useValue(passthrough)
+        .compile();
+      gateController = module.get(ResultPrmsSyncController);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('returns gate_entry_id prms_resubmittable on a held-year 409', async () => {
+      loadGateSnapshot.mockResolvedValue({
+        ...eligibleSnapshot,
+        prms_push_status: {
+          year: 2026,
+          status: 'pending_review',
+          resubmittable: false,
+        },
+      });
+
+      const response = await gateController.sync();
+      const data = response.data as { gate_entry_id?: string | null };
+
+      expect(response.status).toBe(HttpStatus.CONFLICT);
+      expect(data.gate_entry_id).toBe('prms_resubmittable');
+    });
+
+    it('returns gate_entry_id not_already_synced on that entry 409', async () => {
+      loadGateSnapshot.mockResolvedValue({
+        ...eligibleSnapshot,
+        is_synced_to_prms: true,
+      });
+
+      const response = await gateController.sync();
+      const data = response.data as { gate_entry_id?: string | null };
+
+      expect(response.status).toBe(HttpStatus.CONFLICT);
+      expect(data.gate_entry_id).toBe('not_already_synced');
+    });
+
+    it('returns gate_entry_id null when the 409 is a claim collision', async () => {
+      claimAttempt.mockResolvedValue({
+        kind: 'collision',
+        attemptNumber: 1,
+        resultOfficialCode: 1001,
+      });
+
+      const response = await gateController.sync();
+      const data = response.data as { gate_entry_id?: string | null };
+
+      expect(response.status).toBe(HttpStatus.CONFLICT);
+      expect(data.gate_entry_id).toBeNull();
     });
   });
 

@@ -139,7 +139,7 @@ graph TD
 
 ### T-02 — Gate entry `prms_resubmittable` and the typed refusal
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done (2026-11-19, PASS attempt 1 — see `execution.md`) · **Size:** M · **Dependencies:** T-01
 - **Requirements:** R-PRL-002 (S-7…S-10), NFR-PRL-003
 - **Design:** §4 POST, §5.2, DD-3, DD-7 (server half), DD-9, P-7, P-10
 - **Files:**
@@ -168,7 +168,7 @@ graph TD
     - `not_already_synced` still wins over the new entry.
   - **service spec:**
     - a held key → 409;
-    - the log repository's `recordInsideLock` is **not called**, the Normalizer is **not called**, and the attempt count is unchanged;
+    - the log repository's `claimAttempt` and `insertRefusedByStar` are **not called** (*amended 2026-11-19: the log repository has no `recordInsideLock`*), the Normalizer is **not called**, and the attempt count is unchanged;
     - the same result for a `SYSTEM_ADMIN` user and for `origin: 'TIP_SYNC'`;
     - a reader throw → the error propagates and the Normalizer is not called.
   - **controller spec:**
@@ -194,10 +194,10 @@ graph TD
 - **Review:** full. It changes a refusal on the push path for every role and TIP.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 - **Done:**
-  - [ ] specs green, including the TIP spec
-  - [ ] falsifiers (a)–(c) observed red and quoted
-  - [ ] build + eslint clean
-  - [ ] Swagger: the 409 response documents `gate_entry_id`
+  - [x] specs green, including the TIP spec
+  - [x] falsifiers (a)–(c) observed red and quoted
+  - [x] build + eslint clean
+  - [x] Swagger: the 409 response documents `gate_entry_id`
 
 ### T-03 — `GET …/prms-sync` gains `pushYear` and `push_status`
 

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { AppConfigService } from '../app-config/app-config.service';
 import { DegreesEnum } from '../degrees/enum/degrees.enum';
 import { DeliveryModalityEnum } from '../delivery-modalities/enum/delivery-modalities.enum';
@@ -41,6 +42,7 @@ import {
 import {
   redactPrmsPayload,
   ResultPrmsSyncService,
+  PrmsSyncNoRowRefusalException,
   PrmsSyncPersistedRefusalException,
 } from './result-prms-sync.service';
 
@@ -214,8 +216,14 @@ describe('ResultPrmsSyncService', () => {
     } catch (error) {
       secondError = error;
     }
-    expect(secondError).toBeInstanceOf(ConflictException);
-    expect((secondError as ConflictException).message).toBe(
+    expect(secondError).toBeInstanceOf(PrmsSyncNoRowRefusalException);
+    expect((secondError as PrmsSyncNoRowRefusalException).getStatus()).toBe(
+      409,
+    );
+    expect((secondError as PrmsSyncNoRowRefusalException).entryId).toBe(
+      'not_already_synced',
+    );
+    expect((secondError as PrmsSyncNoRowRefusalException).message).toBe(
       PRMS_SYNC_ALREADY_SYNCED,
     );
     expect((secondError as ConflictException).message).not.toBe(
@@ -300,9 +308,131 @@ describe('ResultPrmsSyncService', () => {
     expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
     expect(normalizer.ingest).not.toHaveBeenCalled();
     expect(logRepository.claimAttempt).not.toHaveBeenCalled();
-    expect(refusal).toBeInstanceOf(ConflictException);
-    expect((refusal as ConflictException).message).toContain('2025');
-    expect((refusal as ConflictException).message).toContain('2026');
+    expect(refusal).toBeInstanceOf(PrmsSyncNoRowRefusalException);
+    expect((refusal as PrmsSyncNoRowRefusalException).getStatus()).toBe(409);
+    expect((refusal as PrmsSyncNoRowRefusalException).entryId).toBe(
+      'reporting_year',
+    );
+    expect((refusal as PrmsSyncNoRowRefusalException).message).toContain(
+      '2025',
+    );
+    expect((refusal as PrmsSyncNoRowRefusalException).message).toContain(
+      '2026',
+    );
+  });
+
+  const PENDING_RESUBMIT =
+    'This result cannot be resubmitted to PRMS: its PRMS status is Pending Review. Only results rejected in PRMS can be resubmitted.';
+
+  const heldFacts = () => ({
+    ...eligibleFacts(),
+    prms_push_status: {
+      year: 2026,
+      status: 'pending_review' as const,
+      resubmittable: false,
+    },
+  });
+
+  const refusalOf = async (run: Promise<unknown>) => {
+    try {
+      await run;
+      return undefined;
+    } catch (error) {
+      return error as {
+        getStatus?: () => number;
+        entryId?: string;
+        message?: string;
+      };
+    }
+  };
+
+  const heldRefusalShape = async (run: Promise<unknown>) => {
+    const refusal = await refusalOf(run);
+    return {
+      status: refusal?.getStatus?.() ?? null,
+      entryId: refusal?.entryId ?? null,
+      message: refusal?.message ?? null,
+      normalizerCalls: normalizer.ingest.mock.calls.length,
+      claimCalls: logRepository.claimAttempt.mock.calls.length,
+      refusedRowCalls: logRepository.insertRefusedByStar.mock.calls.length,
+    };
+  };
+
+  const serviceFor = (currentUser: unknown) =>
+    new ResultPrmsSyncService(
+      logRepository as unknown as ResultPrmsSyncLogRepository,
+      aggregateRepository as unknown as ResultPrmsSyncAggregateRepository,
+      payloadBuilder as unknown as PayloadBuilder,
+      normalizer as unknown as PrmsNormalizerService,
+      appConfigService as unknown as AppConfigService,
+      { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
+      currentUser as unknown as CurrentUserUtil,
+      outboundHistoryRepository as unknown as PrmsWebhookDeliveryRepository,
+    );
+
+  it('refuses a held PRMS year with 409 prms_resubmittable and does not record or send', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(heldFacts());
+
+    await expect(heldRefusalShape(service.sync(42))).resolves.toEqual({
+      status: 409,
+      entryId: 'prms_resubmittable',
+      message: PENDING_RESUBMIT,
+      normalizerCalls: 0,
+      claimCalls: 0,
+      refusedRowCalls: 0,
+    });
+  });
+
+  it('refuses a held year for a SYSTEM_ADMIN user with the same 409 entry', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(heldFacts());
+    const admin = serviceFor({
+      user_id: 1,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      user: { sec_user_id: 1, roles: [SecRolesEnum.SYSTEM_ADMIN] },
+    });
+
+    await expect(heldRefusalShape(admin.sync(42))).resolves.toEqual({
+      status: 409,
+      entryId: 'prms_resubmittable',
+      message: PENDING_RESUBMIT,
+      normalizerCalls: 0,
+      claimCalls: 0,
+      refusedRowCalls: 0,
+    });
+  });
+
+  it('refuses a held year for origin TIP_SYNC with the same 409 entry', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(heldFacts());
+
+    await expect(
+      heldRefusalShape(
+        service.sync(42, {
+          origin: 'TIP_SYNC',
+          tocMapping: { science_program_id: 'SP01' },
+          author: {
+            email: 'tip@cgiar.org',
+            first_name: 'Tip',
+            last_name: 'Author',
+          },
+        }),
+      ),
+    ).resolves.toEqual({
+      status: 409,
+      entryId: 'prms_resubmittable',
+      message: PENDING_RESUBMIT,
+      normalizerCalls: 0,
+      claimCalls: 0,
+      refusedRowCalls: 0,
+    });
+  });
+
+  it('propagates a gate-snapshot read error and does not call the Normalizer', async () => {
+    const readError = new Error('history unread');
+    logRepository.loadGateSnapshot.mockRejectedValue(readError);
+
+    await expect(service.sync(42)).rejects.toBe(readError);
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.claimAttempt).not.toHaveBeenCalled();
   });
 
   it('already-synced 2025 is refused as not_already_synced, ahead of reporting_year', async () => {
@@ -340,8 +470,13 @@ describe('ResultPrmsSyncService', () => {
       refusal = error;
     }
 
-    expect(refusal).toBeInstanceOf(ConflictException);
-    expect((refusal as ConflictException).message).toContain('2027');
+    expect(refusal).toBeInstanceOf(PrmsSyncNoRowRefusalException);
+    expect((refusal as PrmsSyncNoRowRefusalException).entryId).toBe(
+      'reporting_year',
+    );
+    expect((refusal as PrmsSyncNoRowRefusalException).message).toContain(
+      '2027',
+    );
     expect(normalizer.ingest).not.toHaveBeenCalled();
     expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
   });

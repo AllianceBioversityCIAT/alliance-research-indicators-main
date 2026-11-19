@@ -34,6 +34,7 @@ import {
 import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
 import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
 import {
+  PrmsSyncNoRowRefusalException,
   PrmsSyncPersistedRefusalException,
   PrmsSyncResponseData,
   ResultPrmsSyncService,
@@ -58,17 +59,23 @@ const httpExceptionDescription = (error: HttpException): string => {
 };
 
 /**
- * Gate entries 1–2 write no log row (design.md §4 / JD-8). The envelope still
- * carries the full data contract so `attempt_number` is explicit `null`, never
- * absent and never `0`. `http_status` inside data is null: no PRMS call ran.
+ * No-row gate refusals (`persistsRow: false`). The envelope still carries the
+ * full data contract so `attempt_number` is explicit `null`, never absent and
+ * never `0`. `gate_entry_id` names the gate entry; claim collision and
+ * already-synced inside the lock leave it null. `http_status` inside data is
+ * null: no PRMS call ran.
  */
-const noRowRefusalData = (failureReason: string): PrmsSyncResponseData => ({
+const noRowRefusalData = (
+  failureReason: string,
+  entryId?: string | null,
+): PrmsSyncResponseData => ({
   outcome: PrmsSyncOutcome.REFUSED_BY_STAR,
   attempt_number: null,
   http_status: null,
   request_id: null,
   prms_result_code: null,
   failure_reason: failureReason,
+  gate_entry_id: entryId ?? null,
 });
 
 const isNoRowRefusalStatus = (status: number): boolean =>
@@ -134,6 +141,7 @@ export class ResultPrmsSyncController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
+    type: PrmsSyncResponseDto,
     description: PRMS_SYNC_HTTP_DESCRIPTIONS.conflict,
   })
   @ApiResponse({
@@ -172,6 +180,14 @@ export class ResultPrmsSyncController {
           description: httpExceptionDescription(error),
           status: error.getStatus(),
           data: error.responseData,
+        });
+      }
+      if (error instanceof PrmsSyncNoRowRefusalException) {
+        const description = httpExceptionDescription(error);
+        return ResponseUtils.format({
+          description,
+          status: error.getStatus(),
+          data: noRowRefusalData(description, error.entryId),
         });
       }
       if (error instanceof HttpException) {

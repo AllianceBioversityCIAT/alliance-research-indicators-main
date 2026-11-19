@@ -154,6 +154,97 @@ describe('evaluateSyncGate', () => {
     expect(transport.ingest).not.toHaveBeenCalled();
   });
 
+  // R-PRL-002 / design §5.2. Descriptions are the scenario literals.
+  const PENDING_RESUBMIT =
+    'This result cannot be resubmitted to PRMS: its PRMS status is Pending Review. Only results rejected in PRMS can be resubmitted.';
+  const APPROVED_RESUBMIT =
+    'This result cannot be resubmitted to PRMS: its PRMS status is Approved. Only results rejected in PRMS can be resubmitted.';
+
+  const withPushStatus = (
+    status: 'pending_review' | 'approved' | 'rejected' | 'never_pushed',
+    resubmittable: boolean,
+    overrides: Partial<SyncGateSnapshot> = {},
+  ) => ({
+    ...eligible(overrides),
+    prms_push_status: { year: 2026, status, resubmittable },
+  });
+
+  it('places prms_resubmittable immediately after not_already_synced and before reporting_year', () => {
+    const ids = SYNC_GATE_ENTRIES.map((entry) => entry.id) as string[];
+
+    expect(ids.indexOf('prms_resubmittable')).toBe(
+      ids.indexOf('not_already_synced') + 1,
+    );
+    expect(ids.indexOf('reporting_year')).toBe(
+      ids.indexOf('prms_resubmittable') + 1,
+    );
+  });
+
+  it('refuses Pending Review with 409, the Pending description, and persistsRow false', () => {
+    const decision = attemptSend(
+      withPushStatus('pending_review', false),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('prms_resubmittable');
+    expect(decision.httpStatus).toBe(HttpStatus.CONFLICT);
+    expect(decision.persistsRow).toBe(false);
+    expect(decision.description).toBe(PENDING_RESUBMIT);
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('refuses Approved in PRMS with 409 and the Approved description', () => {
+    const decision = attemptSend(withPushStatus('approved', false), transport);
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('prms_resubmittable');
+    expect(decision.httpStatus).toBe(HttpStatus.CONFLICT);
+    expect(decision.persistsRow).toBe(false);
+    expect(decision.description).toBe(APPROVED_RESUBMIT);
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('lets a rejected year and a never-pushed year pass the new entry', () => {
+    const rejected = attemptSend(withPushStatus('rejected', true), transport);
+    const neverPushed = attemptSend(
+      withPushStatus('never_pushed', true),
+      transport,
+    );
+
+    expect(rejected.allowed).toBe(true);
+    expect(rejected.entryId).toBe(null);
+    expect(neverPushed.allowed).toBe(true);
+    expect(neverPushed.entryId).toBe(null);
+    expect(transport.ingest).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes when prms_push_status is absent', () => {
+    const snapshot = eligible();
+
+    const decision = attemptSend(snapshot, transport);
+
+    expect(
+      (snapshot as { prms_push_status?: unknown }).prms_push_status,
+    ).toBeUndefined();
+    expect(decision.allowed).toBe(true);
+    expect(decision.entryId).toBe(null);
+    expect(transport.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets not_already_synced win over a held prms_push_status', () => {
+    const decision = attemptSend(
+      withPushStatus('pending_review', false, { is_synced_to_prms: true }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('not_already_synced');
+    expect(decision.httpStatus).toBe(HttpStatus.CONFLICT);
+    expect(decision.persistsRow).toBe(false);
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
   it('refuses an Approved result whose Pool Funding Alignment is not green-checked', () => {
     const decision = attemptSend(
       eligible({ pool_funding_alignment_green: false }),
