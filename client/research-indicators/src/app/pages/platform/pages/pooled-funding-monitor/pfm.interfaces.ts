@@ -9,7 +9,7 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved', 'managed_in_tip',
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved',
   // One view per journey card: the queue lists exactly what the card counts (server DD-PFM-42).
   'journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip', 'journey_not_answered', 'journey_contributes',
   'journey_no_sp', 'journey_mapping_incomplete', 'journey_mapping_complete', 'journey_ready', 'journey_synced'] as const;
@@ -191,8 +191,6 @@ export interface PfmChipCounts {
   /** In PRMS, pending review / approved (Synced = both). Optional: older servers omit them. */
   prms_pending?: number;
   prms_approved?: number;
-  /** TIP knowledge products in PRMS scope, not in PRMS yet: no action in STAR. Optional: older servers omit it. */
-  managed_in_tip?: number;
 }
 
 export interface PfmGroupCounts {
@@ -243,7 +241,7 @@ export interface PfmResultRow {
   /** Platform + official code, e.g. 'STAR-1234'. */
   result_code: string;
   platform_code: string;
-  /** Managed in another platform (TIP): shown for visibility, no action in STAR. Optional: older servers omit it. */
+  /** Reported in another platform (TIP). Optional: older servers omit it. */
   is_external?: boolean;
   official_code: number;
   report_year: number;

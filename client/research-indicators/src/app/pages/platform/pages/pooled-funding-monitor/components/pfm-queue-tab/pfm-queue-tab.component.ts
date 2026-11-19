@@ -16,15 +16,13 @@ const ALL = '__all__';
 /** `dot` = the state colour of that view (same palette as the badges and charts); none for All.
  * Order (owner): All, Need attention, then the work in the order it happens. The coverage tab's
  * progress bar and "What to do next" cards open these same quick views. */
-const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null; hideWhenZero?: boolean }[] = [
+const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
   { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
   { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill },
   { key: 'awaiting_pi', label: 'Pending approval', count: 'awaiting_pi', help: PFM_HELP.pendingApproval, dot: PFM_STATE.waiting.fill },
   { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: statusColor({ mapping: 'Pending' }) },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
-  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill },
-  // Not a state of STAR work, so no state colour; hidden while the view has none (most PIs).
-  { key: 'managed_in_tip', label: 'Managed in TIP', count: 'managed_in_tip', help: PFM_HELP.managedInTip, dot: null, hideWhenZero: true }
+  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
 ];
 
 /** Views reachable from the coverage tab that are not shown as quick views. */
@@ -73,10 +71,6 @@ export class PfmQueueTabComponent {
   /** The held queue belongs to a previous query while a refetch runs or has failed: show none of its numbers (NFR-PFM-006). */
   readonly stale = computed(() => this.store.queueState().loading || this.store.queueState().error);
   readonly activeChip = computed<PfmChip>(() => this.store.chip() ?? 'all');
-  /** Quick views to render: a `hideWhenZero` view shows only when it has results or is selected. */
-  readonly visibleChips = computed(() =>
-    this.chips.filter(c => !c.hideWhenZero || this.activeChip() === c.key || (this.queue()?.chip_counts?.[c.count] ?? 0) > 0)
-  );
   readonly projectOptions = computed(() => [
     { label: 'All projects', value: ALL },
     ...(this.queue()?.filter_options.projects ?? []).map(p => ({ label: `${p.code} — ${p.name}`, value: p.code }))
