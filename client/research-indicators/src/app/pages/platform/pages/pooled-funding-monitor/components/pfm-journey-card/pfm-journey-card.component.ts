@@ -7,7 +7,11 @@ import { PfmChip, PfmJourney, PfmScope } from '../../pfm.interfaces';
 /** How a part of a stage is labelled: still needs work, done for good, or moves to the next stage. */
 type PartKind = 'act' | 'done' | 'next' | 'synced';
 
-/** Where a card leads: the queue view of exactly its results, or the projects table (stage 1). */
+/**
+ * Where a card leads: the quick view of the same concept when there is one (Mapping pending,
+ * Ready to sync, Synced with PRMS; owner 2026-11-19), otherwise the queue view of exactly its
+ * results, or the projects table (stage 1).
+ */
 type PartTarget = PfmChip | 'projects_with' | 'projects_without';
 
 interface StagePart {
@@ -207,7 +211,7 @@ export class PfmJourneyCardComponent {
             value: j.answer.not_answered,
             color: PFM_STATE.progress.fill,
             kind: 'act',
-            target: 'journey_not_answered'
+            target: 'mapping_incomplete'
           },
           {
             label: 'Yes · contributes',
@@ -247,7 +251,7 @@ export class PfmJourneyCardComponent {
             value: j.mapping.incomplete,
             color: PFM_STATE.progress.fill,
             kind: 'act',
-            target: 'journey_mapping_incomplete'
+            target: 'mapping_incomplete'
           },
           {
             label: 'Mapping complete',
@@ -279,7 +283,7 @@ export class PfmJourneyCardComponent {
             value: j.sync.ready,
             color: PFM_STATE.ready.fill,
             kind: 'act',
-            target: 'journey_ready'
+            target: 'ready_to_sync'
           },
           {
             label: 'Synced',
@@ -287,7 +291,7 @@ export class PfmJourneyCardComponent {
             value: j.sync.synced,
             color: PFM_STATE.done.fill,
             kind: 'synced',
-            target: 'journey_synced'
+            target: 'synced'
           }
         ],
         action: {
