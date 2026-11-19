@@ -78,14 +78,14 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`
 
 ### T-02 — Framework and objective table migrations
-- **Status:** todo · **Size:** M · **Depends:** none
+- **Status:** done (2026-11-19, PASS attempt 3 — `execution.md` § T-02) · **Size:** M · **Depends:** none
 - **Requirements:** R-STF-002 (levels as data; one indicator level), R-STF-003 (one table; parent at depth − 1), R-STF-004 (responsibles keyed by staff ID; unique per element), R-STF-005 (code uniqueness per portfolio; IOB per portfolio + year), R-STF-009 / R-STF-010 (IOB tables), §7 constraints
 - **Design:** §3.1, §3.3 `…001`, `…002`; D-STF-2, D-STF-3, D-STF-15, D-STF-21; P-10, P-30, P-32, P-35
 - **Scope:**
   - `1795000000001-createFrameworkTables.ts`: `framework_levels` (incl. `short_label`, generated `indicator_portfolio_key` STORED + unique), `framework_elements` (self FK RESTRICT, `uq_framework_elements_portfolio_code`), `framework_element_responsibles` (CASCADE to element, staff FK with `readStaffCarnetColumnClause`).
   - `1795000000002-createInstitutionalObjectives.ts`: `institutional_objectives`, `institutional_objective_elements` (CASCADE to IOB, RESTRICT to element).
   - All `utf8mb4_0900_ai_ci` (the connection collation, P-37); `down` drops in reverse order.
-  - Migration specs in `db/migration-specs/` including the `information_schema.COLUMNS.EXTRA = 'STORED GENERATED'` check for `indicator_portfolio_key`.
+  - Migration specs in `db/migration-specs/` asserting the generated-column DDL text; the `information_schema.COLUMNS.EXTRA = 'STORED GENERATED'` check for `indicator_portfolio_key` is a real-DB property — observed in this task's scratch run and **committed in T-10's schema integration suite** (amended 2026-11-19: a unit spec cannot reach MySQL, server guide §9).
   - First step: re-run P-1's grep with `framework_element|framework_level|FrameworkElement|FrameworkLevel` (expect 0) and read `SELECT VERSION()` locally (P-30).
   - Backend route: stack NestJS; implement lead `nestjs-expert` support none — project conventions; test-suite lead the spec's scenarios support `nestjs-expert`
 - **Tests:** migration specs; local run up/down/up; two inserts of `is_indicator_level = 1` for one portfolio → 1062; a responsible with an unknown carnet → 1452; deleting an element that has a child → 1451.
@@ -217,6 +217,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Requirements:** R-STF-002 AC.1 (fourth level via fixture appears with no code change), R-STF-003 AC.1/AC.2, R-STF-006 AC.1/AC.2 (RESTRICT backstop), R-STF-010 AC.1/AC.2 (injected failure, concurrent calls), R-STF-011 AC.1–AC.3, R-STF-013 AC.1, NFR-STF-001, NFR-STF-002
 - **Design:** §10 Integration row; P-26, P-27, P-32
 - **Scope:** `test/strategy-framework-{schema,crud,levels,carry-forward,seed,role,module-wiring,performance}.integration-spec.ts`.
+  - **Schema suite includes** `information_schema.COLUMNS.EXTRA = 'STORED GENERATED'` for `framework_levels.indicator_portfolio_key` (moved here from T-02's migration specs, 2026-11-19), observed red once (K-004).
   - **Batch atomicity (P-26):** on a fresh local schema, run the four pending migrations together with an injected seed failure; first with the seed on the shared runner (expect leftover rows — the observed red), then with D-STF-24 (expect zero).
   - Concurrency: two simultaneous first creates on an empty portfolio → one level set; two carry forwards → one `409`, no `500`.
   - Performance: A1, A1e, A4 — p95 over 3 runs of 20 calls; inconclusive if runs differ by > 30 %.
