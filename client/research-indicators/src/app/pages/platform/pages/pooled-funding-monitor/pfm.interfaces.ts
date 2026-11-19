@@ -142,6 +142,8 @@ export interface PfmSummary {
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthly[];
   synced_this_year: number;
+  /** OICR.REPORTING_YEAR, the year the page counts. Optional: older servers omit it. */
+  report_year?: number | null;
   /** Results already in PRMS by result type, most first. Optional: older servers omit it. */
   synced_by_type?: PfmSyncedType[];
   /** Coverage tab stages. Optional: older servers omit it. */
@@ -285,6 +287,8 @@ export interface PfmFilters {
   project: string | null;
   sp: string | null;
   type: number | null;
+  /** 'YYYY-MM': results synced to PRMS that UTC month (opened from a Sync activity bar). */
+  synced_month?: string | null;
 }
 
 /** Query accepted by /queue and /queue/projects/:projectCode/results. */
@@ -293,6 +297,7 @@ export interface PfmQueueQuery {
   project?: string | null;
   sp?: string | null;
   type?: number | null;
+  synced_month?: string | null;
   chip?: PfmChip | null;
 }
 
