@@ -1,10 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { PFM_STATE } from '@shared/constants/pfm-status-colors';
+import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
+import { PFM_HELP } from '../../pfm-help';
 import { PfmChip, PfmJourney, PfmScope } from '../../pfm.interfaces';
 
 /** How a part of a stage is labelled: still needs work, done for good, or moves to the next stage. */
 type PartKind = 'act' | 'done' | 'next' | 'synced';
+
+/** Where a card leads: the queue view of exactly its results, or the projects table (stage 1). */
+type PartTarget = PfmChip | 'projects_with' | 'projects_without';
 
 interface StagePart {
   label: string;
@@ -12,6 +17,7 @@ interface StagePart {
   value: number;
   color: string;
   kind: PartKind;
+  target: PartTarget;
 }
 
 interface StageAction {
@@ -61,15 +67,24 @@ export class PfmJourneyCardComponent {
   openQueue = output<PfmChip>();
   /** Stage 1 CTA: show the projects without results in the table below. */
   showProjectsWithoutResults = output<void>();
+  /** Stage 1 card: show the projects that have results in the table below. */
+  showProjectsWithResults = output<void>();
 
   readonly partTag = PART_TAG;
 
   private readonly who = computed(() => (this.scope() === 'all' ? 'all PIs and delegates' : 'you or your delegates'));
 
+  /** Knowledge products reported and completed in TIP (DD-PFM-40). 0 from an older server. */
+  private readonly completedInTip = computed(() => this.journey().star.completed_in_tip ?? 0);
+
+  /** Every result reported, in STAR or in TIP. */
   reported = computed(() => {
     const s = this.journey().star;
-    return s.draft + s.submitted + s.approved;
+    return s.draft + s.submitted + s.approved + this.completedInTip();
   });
+
+  /** Results that reach stage 3: approved in STAR or completed in TIP. */
+  private readonly approvedOrCompleted = computed(() => this.journey().star.approved + this.completedInTip());
 
   headline = computed(() => {
     const j = this.journey();
@@ -96,6 +111,8 @@ export class PfmJourneyCardComponent {
     const reported = this.reported();
     const contributes = j.answer.contributes;
     const mapped = j.mapping.complete;
+    const tip = this.completedInTip();
+    const approved = this.approvedOrCompleted();
     return [
       {
         title: 'Create results per project',
@@ -103,8 +120,22 @@ export class PfmJourneyCardComponent {
         caption: 'Bilateral projects',
         story: `${fmt(j.projects.with_results)} of ${fmt(j.projects.total)} bilateral projects (${pct(j.projects.with_results, j.projects.total)}) have created results in STAR. Every project mapped to the CGIAR portfolio is expected to report at least one result.`,
         parts: [
-          { label: 'Projects with results', note: 'At least one result created in STAR', value: j.projects.with_results, color: PFM_STATE.complete.fill, kind: 'next' },
-          { label: 'Projects without results', note: 'No results created yet', value: j.projects.without_results, color: PFM_STATE.alert.fill, kind: 'act' }
+          {
+            label: 'Projects with results',
+            note: 'At least one result created in STAR',
+            value: j.projects.with_results,
+            color: PFM_STATE.complete.fill,
+            kind: 'next',
+            target: 'projects_with'
+          },
+          {
+            label: 'Projects without results',
+            note: 'No results created yet',
+            value: j.projects.without_results,
+            color: PFM_STATE.alert.fill,
+            kind: 'act',
+            target: 'projects_without'
+          }
         ],
         action: {
           value: j.projects.without_results,
@@ -118,12 +149,41 @@ export class PfmJourneyCardComponent {
       {
         title: 'Approve or reject results',
         value: reported,
-        caption: 'Results reported in STAR',
-        story: `${fmt(reported)} results have been reported under ${fmt(j.projects.with_results)} bilateral projects mapped to the CGIAR portfolio. Before anything can go to PRMS, each one has to be approved in STAR.`,
+        caption: 'Results reported',
+        story: tip
+          ? `${fmt(reported)} results have been reported under ${fmt(j.projects.with_results)} bilateral projects mapped to the CGIAR portfolio: ${fmt(reported - tip)} in STAR and ${fmt(tip)} knowledge products in TIP. Before anything can go to PRMS, a STAR result has to be approved in STAR; a TIP knowledge product arrives completed in TIP.`
+          : `${fmt(reported)} results have been reported under ${fmt(j.projects.with_results)} bilateral projects mapped to the CGIAR portfolio. Before anything can go to PRMS, each one has to be approved in STAR.`,
         parts: [
-          { label: 'Draft', note: 'Being written by the team', value: j.star.draft, color: STAR_DRAFT, kind: 'act' },
-          { label: 'Submitted', note: 'Waiting for the PI or a delegate to approve', value: j.star.submitted, color: STAR_SUBMITTED, kind: 'act' },
-          { label: 'Approved', note: 'Ready for the next stage', value: j.star.approved, color: PFM_STATE.approved.fill, kind: 'next' }
+          { label: 'Draft', note: 'Being written by the team', value: j.star.draft, color: STAR_DRAFT, kind: 'act', target: 'journey_draft' },
+          {
+            label: 'Submitted',
+            note: 'Waiting for the PI or a delegate to approve',
+            value: j.star.submitted,
+            color: STAR_SUBMITTED,
+            kind: 'act',
+            target: 'journey_submitted'
+          },
+          {
+            label: 'Approved',
+            note: 'Approved in STAR, ready for the next stage',
+            value: j.star.approved,
+            color: PFM_STATE.approved.fill,
+            kind: 'next',
+            target: 'journey_approved'
+          },
+          // TIP's own colour, the same as its platform tag in every row; shown only when there are any.
+          ...(tip
+            ? [
+                {
+                  label: 'Completed in TIP',
+                  note: PFM_HELP.completedInTip,
+                  value: tip,
+                  color: PLATFORM_COLOR_MAP['TIP'].text,
+                  kind: 'next' as const,
+                  target: 'journey_completed_in_tip' as const
+                }
+              ]
+            : [])
         ],
         action: {
           value: j.star.draft + j.star.submitted,
@@ -136,13 +196,34 @@ export class PfmJourneyCardComponent {
       },
       {
         title: 'Define if it contributes to CGIAR',
-        value: j.star.approved,
+        value: approved,
         caption: 'Approved results to classify',
-        story: `${fmt(j.star.approved)} results (${pct(j.star.approved, reported)}) are approved. The CGIAR Portfolio alignment can be answered at any time, but only approved results count from here on.`,
+        story: `${fmt(approved)} results (${pct(approved, reported)}) are approved${tip ? ' in STAR or completed in TIP' : ''}. The CGIAR Portfolio alignment can be answered at any time, but only approved results count from here on.`,
         parts: [
-          { label: 'Mapping not answered', note: 'No Yes / No answer yet', value: j.answer.not_answered, color: PFM_STATE.progress.fill, kind: 'act' },
-          { label: 'Yes · contributes', note: 'Continue to Define the mapping', value: contributes, color: PFM_STATE.complete.fill, kind: 'next' },
-          { label: 'No Science Program contribution', note: 'Not contributing — nothing else to do', value: j.answer.no_sp, color: PFM_STATE.out.fill, kind: 'done' }
+          {
+            label: 'Mapping not answered',
+            note: 'No Yes / No answer yet',
+            value: j.answer.not_answered,
+            color: PFM_STATE.progress.fill,
+            kind: 'act',
+            target: 'journey_not_answered'
+          },
+          {
+            label: 'Yes · contributes',
+            note: 'Continue to Define the mapping',
+            value: contributes,
+            color: PFM_STATE.complete.fill,
+            kind: 'next',
+            target: 'journey_contributes'
+          },
+          {
+            label: 'No Science Program contribution',
+            note: 'Not contributing — nothing else to do',
+            value: j.answer.no_sp,
+            color: PFM_STATE.out.fill,
+            kind: 'done',
+            target: 'journey_no_sp'
+          }
         ],
         action: {
           value: j.answer.not_answered,
@@ -159,8 +240,22 @@ export class PfmJourneyCardComponent {
         caption: 'Contributing results to map',
         story: `${fmt(contributes)} approved results contribute to the CGIAR portfolio. For each one, define the mapping — the Science Program it contributes to — so it can be synced.`,
         parts: [
-          { label: 'Mapping incomplete', note: 'Science Program still missing', value: j.mapping.incomplete, color: PFM_STATE.progress.fill, kind: 'act' },
-          { label: 'Mapping complete', note: 'Continue to Sync to PRMS', value: mapped, color: PFM_STATE.complete.fill, kind: 'next' }
+          {
+            label: 'Mapping incomplete',
+            note: 'Science Program still missing',
+            value: j.mapping.incomplete,
+            color: PFM_STATE.progress.fill,
+            kind: 'act',
+            target: 'journey_mapping_incomplete'
+          },
+          {
+            label: 'Mapping complete',
+            note: 'Continue to Sync to PRMS',
+            value: mapped,
+            color: PFM_STATE.complete.fill,
+            kind: 'next',
+            target: 'journey_mapping_complete'
+          }
         ],
         action: {
           value: j.mapping.incomplete,
@@ -177,8 +272,22 @@ export class PfmJourneyCardComponent {
         caption: 'Mapped results to sync',
         story: `${fmt(mapped)} results are approved and fully mapped. ${fmt(j.sync.ready)} still need to be synced; ${fmt(j.sync.synced)} are already in PRMS for Science Program QA.`,
         parts: [
-          { label: 'Ready to sync', note: 'Approved and mapped, not synced yet', value: j.sync.ready, color: PFM_STATE.ready.fill, kind: 'act' },
-          { label: 'Synced', note: 'Sent to PRMS for Science Program QA', value: j.sync.synced, color: PFM_STATE.done.fill, kind: 'synced' }
+          {
+            label: 'Ready to sync',
+            note: 'Approved and mapped, not synced yet',
+            value: j.sync.ready,
+            color: PFM_STATE.ready.fill,
+            kind: 'act',
+            target: 'journey_ready'
+          },
+          {
+            label: 'Synced',
+            note: 'Sent to PRMS for Science Program QA',
+            value: j.sync.synced,
+            color: PFM_STATE.done.fill,
+            kind: 'synced',
+            target: 'journey_synced'
+          }
         ],
         action: {
           value: j.sync.ready,
@@ -222,6 +331,13 @@ export class PfmJourneyCardComponent {
   select(i: number): void {
     if (i < 0 || i > this.lastIndex()) return;
     this.stageChange.emit(i);
+  }
+
+  /** A card leads to exactly its results: a journey view of the queue, or the projects table. */
+  openPart(target: PartTarget): void {
+    if (target === 'projects_without') this.showProjectsWithoutResults.emit();
+    else if (target === 'projects_with') this.showProjectsWithResults.emit();
+    else this.openQueue.emit(target);
   }
 
   act(): void {
