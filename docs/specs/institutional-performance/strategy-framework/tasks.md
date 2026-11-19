@@ -133,7 +133,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 ### Phase B — Server behaviour
 
 ### T-05 — Element writes, responsibles, staff search, lazy levels, locks
-- **Status:** todo · **Size:** L · **Depends:** T-04, T-07
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-05) · **Size:** L · **Depends:** T-04, T-07
 - **Requirements:** R-STF-001 (scenario: cross-portfolio link → 400 naming the field, MUST NOT store; AC.1), R-STF-003 (all Details; scenario BUT "must NOT accept a parent that is an Indicator or another Dimension"; AC.1, AC.2 API cases; 500 cap), R-STF-004 (scenario BUT "must NOT accept a typed name"; AND IT MUST "reject an unknown staff ID with 400"; AC.1, AC.2), R-STF-005 (scenario AND IT MUST "reject `1.3` with 409 naming `code`"; AC.2), R-STF-006 (element blockers; scenario MUST NOT delete; AC.1, AC.2), R-STF-007 Details "first create on any portfolio" (lazy levels), R-STF-014 (writes reject machine tokens — service side none; guard in T-08)
 - **Design:** §5.2 steps 1–7, §5.4, §3.2 I-1…I-8; D-STF-3, D-STF-6, D-STF-21; P-9, P-24
 - **Scope:** `strategy-framework.service.ts` element half: create (lazy `DEFAULT_LEVELS`, portfolio lock, parent lock, depth, cap, code proposal, responsibles), update (A6 `parentId` semantics, move, code change, responsibles replace), delete (blockers via read service, physical delete, 1451 mapping, `LoggerUtil` line), staff search (parenthesized, active only, max 20); DTOs for A4–A7.

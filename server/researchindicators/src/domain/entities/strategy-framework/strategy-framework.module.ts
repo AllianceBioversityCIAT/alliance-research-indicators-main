@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FrameworkReadService } from './framework-read.service';
 import { FrameworkUsageRegistry } from './framework-usage.registry';
+import { StrategyFrameworkService } from './strategy-framework.service';
 import { FrameworkElementRepository } from './repositories/framework-element.repository';
 import { FrameworkElementResponsibleRepository } from './repositories/framework-element-responsible.repository';
 import { FrameworkLevelRepository } from './repositories/framework-level.repository';
@@ -11,7 +12,8 @@ import { PortfolioLookupRepository } from './repositories/portfolio-lookup.repos
 /**
  * Strategy framework module (design 2.1, D-STF-1). Exports the singleton
  * read service and usage registry so a later module can inject them without
- * request scope. Not on the route graph yet (that registration is T-08).
+ * request scope. The write service is request-scoped and stays unexported.
+ * Not on the route graph yet (that registration is T-08).
  */
 @Module({
   providers: [
@@ -23,6 +25,7 @@ import { PortfolioLookupRepository } from './repositories/portfolio-lookup.repos
     PortfolioLookupRepository,
     FrameworkUsageRegistry,
     FrameworkReadService,
+    StrategyFrameworkService,
   ],
   exports: [FrameworkReadService, FrameworkUsageRegistry],
 })

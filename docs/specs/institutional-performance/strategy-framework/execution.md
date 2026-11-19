@@ -167,3 +167,23 @@ Not run by the Leader: Dev is shared and the owner runs these checks (standing r
 - **Requirements covered:** R-STF-012, R-STF-002 AC.1 (read), R-STF-015 AC.2 (rule), R-STF-009 Details (default year), R-STF-007 (counts, `deletable`, `blockers`).
 - **Running totals (design §14, re-based):** tasks 5/17 · server LOC ≈ 4,150 (`git diff --numstat` at commit) · review rounds 9/≈26.
 - **Approval:** continue gate `auto-approved (owner standing direction)`.
+
+### T-05 — Element writes, responsibles, staff search, lazy levels, locks
+
+- **Status:** PASS (attempt 1) — 2026-11-19
+- **Dispatch:** fresh Grok `grok-4.7-high`, task `task_6c8ccf669fe0`, dispatch `ctx_0ed087a8fb65`. Skills `nestjs-expert`, `error-handling-patterns`, `tdd`. Effort high. Exemplar `organizational-structure.service.ts` + dto/ + write repository. Forward pointers copied: T-02 (cross-portfolio level, I-1), T-04 (move same-portfolio), D-STF-27 (`childrenWayOut` argument order).
+- **Implementer report:** `strategy-framework.service.ts` +940 (element half), spec +1121; DTOs create +80, update +82, search-staff +19, element-id-param +12, `framework-write.dto.spec.ts` +146; module +4/−1 (provider, not exported). Jest (service, DTO, read specs) 92/92; eslint 8 files 0; build 0; `npm test -- --silent` 504/504 suites, 5643/5643 tests.
+  - Reds (restored): greenfield TS2307; "rejects a newly added inactive staff id" resolved `{"id":22,"code":"1.2.2","source":"read"}` (spec:244); "maps a staff-foreign-key 1452 to 400 responsibleCarnets" Expected 400 Received 404 (spec:1057); "locks the portfolio row before any other statement" expected `SELECT id FROM portfolios WHERE id = ? FOR UPDATE`, received the `framework_levels` SELECT (spec:317).
+  - Assumptions: R-STF-001 cross-portfolio *link* is T-06 (matches `tasks.md` §3 coverage); 500 cap names field `portfolioId`; `position` = list index; empty array on a non-indicator level writes no rows; empty description → null; machine tokens rejected by the T-08 guard, not the service.
+- **Leader re-run (non-author, inline): VERIFIED** — jest module 10 suites 151/151; eslint 0; build 0.
+- **Reviewer (`akili-reviewer`, opus, single reviewer over the whole diff): `STATUS: PASS`** — create/move/responsibles/delete/staff-search order and rules match §5.2–5.4 and I-1…I-8; constraint-name mapping matches the T-02 migrations exactly; staff SQL identical to `org-structure-write.repository.ts` `searchActiveStaff`; all three forward pointers have spec rows; Disqualifier honoured.
+  - ADVISORY: (1) the I-1 *level* check is unreachable on a real DB (`loadLevels` filters by portfolio) — **recorded: I-1 for the level holds by construction**; its 400 names `field: 'levelId'`, absent from A5 (cosmetic). (2) Delete blockers are read outside the delete transaction; children/IOB links are FK-protected (1451 → `refusalAfterRace`), but a future provider without an FK to `framework_elements` could race — **forward pointer to child 4 (institutional-indicators) spec.** (3) R-STF-003 BUT "another Dimension" parent is covered at util level, not by a service row. (4) **Doc drift fixed (execute-time edit 2026-11-19):** design §5.4 step 2 example sentence "…that objective first." → "…that institutional objective first." to match D-STF-27. (5) **Forward pointer to T-06:** the IOB-link `FK_iob_elements_element_id` 1452 row belongs on the link insert (the T-05 row proves only the mapper branch).
+- **spawns:** implementer (Cursor/Grok) — not reported by host, ended complete; reviewer — 131,446 tokens, 16 tool calls, ended complete.
+- **Requirements covered:** R-STF-003, 004, 005, 006 (elements), R-STF-007 (lazy levels), R-STF-001 AC.1 (element side).
+- **Running totals:** tasks 6/17 · server LOC **6,549** (`git diff --numstat e75276055 -- server`, incl. this task: 3,049 production / 3,500 tests) · review rounds 10/≈26.
+
+## Budget Tripwire: T-05 (2026-11-19)
+
+- Re-based budget (design §14, 2026-11-19): server ≈ 7,000; **next check "after T-08: server vs 5,000"**. Measured after T-05: **6,549** — +1,549 over that check, three tasks early; server remaining: T-06 (IOB writes), T-08 (controller), T-09 (seed + data file), T-10 (8 integration suites).
+- Cause: tests 53 %; T-05 alone +2,400 (service 940 + spec 1,121).
+- **Stopped for the owner's decision** (tripwire is never auto-approved).
