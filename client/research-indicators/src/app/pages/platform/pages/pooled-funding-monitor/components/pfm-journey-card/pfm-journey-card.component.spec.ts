@@ -171,6 +171,14 @@ describe('PfmJourneyCardComponent', () => {
       expect(stage3.q('pfm-journey-story')?.textContent).toContain('approved in STAR or completed in TIP');
     });
 
+    it('paints the Completed in TIP card with its status colour, not the TIP platform orange', () => {
+      // jsdom drops var() from inline styles, so read the bound value.
+      const { fixture } = render(1, 'all', WITH_TIP);
+      const parts = fixture.componentInstance.current().parts;
+      expect(parts.find(p => p.label === 'Completed in TIP')?.color).toBe('var(--ac-green-500)');
+      expect(parts.find(p => p.label === 'Approved')?.color).not.toBe('var(--ac-green-500)');
+    });
+
     it('shows no TIP card, and the STAR-only story, when there is none', () => {
       const { all, q } = render(1);
       expect(all('pfm-journey-part-label')).not.toContain('Completed in TIP');

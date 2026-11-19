@@ -226,25 +226,7 @@ describe('PfmQueueTabComponent', () => {
     });
   });
 
-  describe('Managed in TIP (DD-PFM-40)', () => {
-    it('is hidden while the view has no TIP knowledge product, so most PIs never see it', () => {
-      expect(setup().q('pfm-chip-managed_in_tip')).toBeNull();
-      expect(
-        setup({ queue: { ...QUEUE, chip_counts: { ...QUEUE.chip_counts, managed_in_tip: 0 } } }).q('pfm-chip-managed_in_tip')
-      ).toBeNull();
-    });
-
-    it('shows last, with its count and its explanation, when the view has TIP knowledge products', () => {
-      const { el, q } = setup({ queue: { ...QUEUE, chip_counts: { ...QUEUE.chip_counts, managed_in_tip: 218 } } });
-      const chips = Array.from(el.querySelectorAll('[data-testid="pfm-chips"] button'));
-      expect(chips.at(-1)?.getAttribute('data-testid')).toBe('pfm-chip-managed_in_tip');
-      expect(q('pfm-chip-managed_in_tip')?.textContent).toContain('Managed in TIP');
-      expect(q('pfm-chip-managed_in_tip')?.textContent).toContain('218');
-      expect(el.querySelector('#pfm-chip-help-managed_in_tip')?.textContent).toContain('nothing to do in STAR');
-    });
-
-    it('stays visible while it is the selected view, even at zero', () => {
-      expect(setup({ chip: 'managed_in_tip' }).q('pfm-chip-managed_in_tip')?.getAttribute('aria-pressed')).toBe('true');
-    });
+  it('has no Managed in TIP view: TIP mapping counts in the STAR views (DD-PFM-43)', () => {
+    expect(setup().q('pfm-chip-managed_in_tip')).toBeNull();
   });
 });
