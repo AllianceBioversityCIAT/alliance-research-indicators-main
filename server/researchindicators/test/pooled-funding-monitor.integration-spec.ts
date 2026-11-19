@@ -73,8 +73,9 @@ const STRANGER = 105; // no staff row, no delegation
 const MINE = (userId: number): PfmRepositoryScope => ({
   scope: PfmScopeEnum.MINE,
   userId,
+  reportYear: YEAR,
 });
-const ALL: PfmRepositoryScope = { scope: PfmScopeEnum.ALL };
+const ALL: PfmRepositoryScope = { scope: PfmScopeEnum.ALL, reportYear: YEAR };
 
 const APPROVED_STATUS_CONFIG = {
   color: { border: '#0B8A3E', text: '#0B8A3E', background: '#E6F4EA' },
@@ -488,7 +489,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     await alignment(6, 20, 1, [['SP09', 'PRIMARY']]);
     await alignment(7, 21, 1, [['SP09', 'PRIMARY']]);
 
-    // HITL 21: the monitor only counts report year 2026 (PFM_REPORT_YEAR).
+    // HITL 21: the monitor only counts the scope's report year (OICR.REPORTING_YEAR, YEAR here).
     // 1017: an otherwise-monitored P-A result of report year 2025 -> must not appear anywhere.
     await result(40, 1017, { year: 2025 });
     await alignment(8, 40, 1, [['SP10', 'PRIMARY']]);
@@ -1292,6 +1293,42 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     it('offers Knowledge Product as a type filter option', async () => {
       const options = await repo.findFilterOptions(ALL);
       expect(options.types.map((t) => t.id)).toContain(3);
+    });
+  });
+
+  // ------------------------------------- report year from OICR.REPORTING_YEAR
+  describe('report year (OICR.REPORTING_YEAR)', () => {
+    beforeAll(async () => {
+      await q('DELETE FROM app_config WHERE `key` = ?', [
+        'OICR.REPORTING_YEAR',
+      ]);
+    });
+
+    it('reads the active value of OICR.REPORTING_YEAR', async () => {
+      await insert('app_config', {
+        key: 'OICR.REPORTING_YEAR',
+        simple_value: '2025',
+        is_active: 1,
+      });
+      expect(await repo.findReportYear()).toBe(2025);
+      await q('DELETE FROM app_config WHERE `key` = ?', [
+        'OICR.REPORTING_YEAR',
+      ]);
+    });
+
+    it('falls back to the current UTC year when the key is missing', async () => {
+      expect(await repo.findReportYear(new Date('2027-06-01T00:00:00Z'))).toBe(
+        2027,
+      );
+    });
+
+    it('a 2025 scope returns the 2025 rows and none of 2026', async () => {
+      const rows = await repo.findMonitoredResults({
+        scope: PfmScopeEnum.ALL,
+        reportYear: 2025,
+      });
+      expect(new Set(rows.map((r) => r.report_year))).toEqual(new Set([2025]));
+      expect(codes(rows)).toContain(1017); // the report-year-2025 row above
     });
   });
 });
