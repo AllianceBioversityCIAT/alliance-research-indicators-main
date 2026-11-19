@@ -128,3 +128,14 @@ Not run by the Leader: Dev is shared and the owner runs these checks (standing r
 - **Requirements covered:** R-STF-002 AC.1 (four-level fixture), R-STF-003 (util level, AC.2), R-STF-005, R-STF-006 (helpers).
 - **Running totals (design §14):** tasks 4/17 · LOC 2,220 (server; T-04 813) · review rounds 7/≈26. Within budget; intermediate tripwire is after T-05 (2,000 LOC server **for T-01…T-05** — already above it at T-04: see the note below).
 - **Approval:** continue gate `auto-approved (owner standing direction)`.
+
+## Budget Tripwire: T-04 (2026-11-19)
+
+- **Measured by the Leader:** `git diff --numstat e75276055 HEAD -- server` → **2,199 lines added** (1,069 production / 1,130 in `*spec.ts`, 51 %). Budget (design §14): intermediate tripwire **2,000 LOC server after T-05**; whole server ≈ 4,800. **Delta: +199 over the tripwire, one task early;** T-05…T-10 (writes, controller, seed, integration) remain.
+- **Cause:** tests are half the diff (migration specs with real-run stand-ins, table-driven util specs), as in the sibling spec (org-structure slice 1: 56 % tests).
+- **Owner decision (2026-11-19):** *Re-basar y seguir* — server ≈ 7,000, whole spec ≈ 12,000, review-round cap unchanged; next check after T-08 (server vs 5,000). Applied to `design.md` §14 (new row; the original row kept as history).
+
+## Spec tension: way-out texts for N = 1 (2026-11-19)
+
+- **Source:** T-04 Reviewer advisory 1 — design §5.4 templates yield «Unlink it from those 1 institutional objectives first.» / «Delete or move its 1 Indicators first.» while §5.4's own N = 1 example is singular.
+- **Owner decision (2026-11-19):** *Singular cuando N = 1.* **Execute-time spec edit:** `design.md` §5.4 step 2 gains the N = 1 wording; decisions log row **D-STF-27**. Changes a text, not an approved requirement (R-STF-006 fixes no way-out wording). Code change dispatched as **T-04 amendment** (below) before T-05; carried as a named conformance check into the next two Reviewer briefs.

@@ -227,7 +227,7 @@ Missing `code` on create → the service applies the A3 proposal. Domain `400`/`
 
 ### 5.4 Delete
 1. Blockers: children count; IOB link count (indicator level); every registered provider's count for the element (`FrameworkUsageRegistry`).
-2. Any non-zero → `409` with `errors = { blockers: [{ reason, count, wayOut }] }` and a description naming each, e.g. *"Cannot delete Indicator 1.2.2: linked by 1 institutional objective. Unlink it from that objective first."* Way-out texts: children → *"Delete or move its N <plural level name> first."* · IOB → *"Unlink it from those N institutional objectives first."* · consumer → *"Remove its N records in <consumerName> first."*
+2. Any non-zero → `409` with `errors = { blockers: [{ reason, count, wayOut }] }` and a description naming each, e.g. *"Cannot delete Indicator 1.2.2: linked by 1 institutional objective. Unlink it from that objective first."* Way-out texts: children → *"Delete or move its N <plural level name> first."* · IOB → *"Unlink it from those N institutional objectives first."* · consumer → *"Remove its N records in <consumerName> first."* **When N = 1 (D-STF-27, 2026-11-19):** singular wording — children → *"Delete or move its 1 <level name> first."* · IOB → *"Unlink it from that institutional objective first."* · consumer → *"Remove its 1 record in <consumerName> first."*
 3. Otherwise physical delete in one transaction (responsibles and links cascade). 1451 on a race → the same `409`.
 4. `LoggerUtil.log` one line: level, id, code, portfolio, user.
 5. A1e (admin only) carries `deletable` and `blockers` per element so the editor can colour the delete icon without a call per row; the `DELETE` always re-checks.
@@ -356,6 +356,7 @@ Agresso staff: read only, through `alliance_user_staff`, filled by the existing 
 | D-STF-24 | 2026-11-17 | Seed on a dedicated query runner with its own transaction | The only mechanism that stays atomic in TypeORM `all` mode after DDL implicit commits (P-26) |
 | D-STF-25 | 2026-11-17 | Four new `--ac-framework-accent-1…4` tokens (light + dark) | No existing token set gives four distinct, visible accents in dark mode (P-29); feature tokens have precedent (`--ac-pfm-*`, `--ac-pool-funding-*`) |
 | D-STF-26 | 2026-11-17 | Interceptor exemption for `400`/`409` on `/strategy-framework`; `pFocusTrap` on drawers; page-managed focus return | PrimeNG drawer and the shared alert do not manage focus (P-33); the global toast would duplicate every inline error (P-34) |
+| D-STF-27 | 2026-11-19 | Way-out texts use the singular when N = 1 (level `name`, "that institutional objective", "1 record") | The §5.4 plural templates contradicted the section's own N = 1 example and would reach the UI tooltip as "those 1 … objectives" (T-04 Reviewer advisory 1); owner decision 2026-11-19 |
 
 **Reversion challenge (Step 2.3):** no decision removes, disables or inverts shipped behavior. D-STF-15 replaces an **unshipped** r3 design (separate tables), not delivered code. Challenge not triggered.
 
@@ -414,6 +415,7 @@ Agresso staff: read only, through `alliance_user_staff`, filled by the existing 
 | --- | --- |
 | Tasks | **17** — the `tasks.md` decomposition (T-01…T-17): the write service split into elements (T-05) and objectives (T-06), plus the Dev/HITL pass (T-17) |
 | LOC | **≈ 9,000** (server ≈ 4,800 incl. tests, migration specs and the data file; client ≈ 4,200 incl. tests). Re-based on the sibling, whose first slice measured 4,427 LOC against a 2,500 tripwire (org design §14). **Intermediate tripwire:** after T-05 (element writes), compare server actuals to 2,000 LOC and re-estimate before continuing |
+| LOC — re-based 2026-11-19 | **≈ 12,000** (server ≈ 7,000, client ≈ 5,000). At T-04 the server measured 2,199 LOC (`git diff --numstat e75276055 HEAD -- server`; 1,069 production / 1,130 tests), above the 2,000 intermediate tripwire one task early. Owner decision: accept and re-base; review-round cap unchanged. Next check: after T-08, server vs 5,000 |
 | Review rounds | **≈ 26** (one per task plus margin for the seed, the role migration, the sidebar and the outline editor) |
 
 Depth stays **Full**: the estimate matches it.
