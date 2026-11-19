@@ -1290,6 +1290,36 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       expect(october?.synced).toBe(1);
     });
 
+    it('DD-PFM-45: each row carries its own accepted sync months, by platform', async () => {
+      const rows = await repo.findMonitoredResults(ALL);
+      const of = (platform: string, code: number) =>
+        rows.find(
+          (r) =>
+            r.platform_code === platform && r.result_official_code === code,
+        );
+      expect(of('TIP', 2002)?.synced_months).toEqual(['2026-10']);
+      expect(of('TIP', 1001)?.synced_months).toEqual([]); // STAR 1001's logs are not its
+      expect(of('STAR', 1001)?.synced_months).toEqual([
+        '2025-12',
+        '2026-03',
+        '2026-05',
+        '2026-09',
+      ]);
+    });
+
+    it('DD-PFM-45: every Sync activity bar counts exactly the rows its month filter keeps', async () => {
+      const [rows, monthly] = await Promise.all([
+        repo.findMonitoredResults(ALL),
+        repo.findMonthlySyncs(ALL, NOW),
+      ]);
+      expect(monthly.length).toBeGreaterThan(0);
+      for (const { month, synced } of monthly) {
+        expect(
+          rows.filter((r) => r.synced_months.includes(month)),
+        ).toHaveLength(synced);
+      }
+    });
+
     it('offers Knowledge Product as a type filter option', async () => {
       const options = await repo.findFilterOptions(ALL);
       expect(options.types.map((t) => t.id)).toContain(3);
