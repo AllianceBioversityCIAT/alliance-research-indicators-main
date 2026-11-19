@@ -58,7 +58,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 ### Phase A — Server foundation
 
 ### T-01 — ODS Admin role: enum, guarded migration, pre-merge checks
-- **Status:** todo · **Size:** S · **Depends:** none
+- **Status:** done (2026-11-19, PASS attempt 2 — `execution.md` § T-01) · **Size:** S · **Depends:** none
 - **Requirements:** R-STF-013 (Details: new role, next free id, focus application; AC.1 idempotent, `down` refuses while held); R-STF-014 Details "Center Admin has no access" (enum basis)
 - **Design:** §3.3 `…000`; D-STF-5; P-2, P-11, P-17, P-22
 - **Scope:**
@@ -74,7 +74,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Disqualifier:** a migration spec that mocks `queryRunner.query` with canned rows cannot prove the FK walk — only the real local run counts for `down`; if the local DB has no `sec_user_roles` row to test with, the task inserts one (and removes it), never asserts on an empty table.
 - **Consumers:** `sec_role.enum.ts` readers — every `@Roles(...)` site compiles against it; `npm run build` covers them. Test files pinning the enum: none found by `grep -rl "SecRolesEnum\.\w* = " src` (enum values are not asserted).
 - **Review:** full — schema change on a shared, non-disposable Dev DB path.
-- **Done criteria:** enum + migration + spec merged-ready; up/up/down/up observed on local DB with outputs quoted; the two Dev checks written in `execution.md` with owner *dev lead*; `npm run migration:scan` clean; `npm run build` green (observed red once with a wrong-typed enum use, K-004).
+- **Done criteria:** enum + migration + spec merged-ready; up/up/down/up observed on local DB with outputs quoted; the two Dev checks written in `execution.md` with owner *dev lead*; no `?` or `:word` outside bound placeholders (by-hand read, design §3.3 — `migration:scan` does not exist); `npm run build` green (observed red once with a wrong-typed enum use, K-004).
 - **Skills:** `nestjs-expert`
 
 ### T-02 — Framework and objective table migrations
@@ -94,7 +94,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Disqualifier:** a "green" that ran against a schema where the tables already existed from an earlier attempt proves nothing — the run starts from `down` to a clean state and quotes the `CREATE TABLE` output.
 - **Consumers:** none (new tables).
 - **Review:** full — schema, generated column (new in this server, P-35) and self-referencing FK.
-- **Done criteria:** both migrations and specs; local up/down/up quoted; P-30 local version quoted; P-1 re-grep quoted; `migration:scan` clean.
+- **Done criteria:** both migrations and specs; local up/down/up quoted; P-30 local version quoted; P-1 re-grep quoted; no `?` or `:word` outside bound placeholders (by-hand read, design §3.3).
 - **Skills:** `nestjs-expert`
 
 ### T-03 — Entities, repositories and module shell
@@ -209,7 +209,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Disqualifier:** counts produced by the same generator that wrote the data file are not independent — the data spec recomputes them from the committed constants; a P-16 count taken on a staff table copied from nowhere (empty local table) is not evidence, report "not measurable locally" instead.
 - **Consumers:** none.
 - **Review:** full — data correctness and migration atomicity.
-- **Done criteria:** generator assertions and data spec green; P-16 result and unmatched list in `execution.md`; `migration:scan` clean; file dates recorded.
+- **Done criteria:** generator assertions and data spec green; P-16 result and unmatched list in `execution.md`; no `?` or `:word` outside bound placeholders (by-hand read, design §3.3); file dates recorded.
 - **Skills:** `nestjs-expert`, `anthropic-skills:xlsx`
 
 ### T-10 — Integration suites (schema, CRUD, levels, carry forward, seed, role, wiring, performance)
