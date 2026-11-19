@@ -8,9 +8,9 @@ import { PfmChip, PfmJourney, PfmScope } from '../../pfm.interfaces';
 type PartKind = 'act' | 'done' | 'next' | 'synced';
 
 /**
- * Where a card leads: the quick view of the same concept when there is one (Mapping pending,
- * Ready to sync, Synced with PRMS; owner 2026-11-19), otherwise the queue view of exactly its
- * results, or the projects table (stage 1).
+ * Where a card leads: the quick view of the same concept when there is one (Pending approval,
+ * Mapping pending, Ready to sync, Synced with PRMS, No SP contribution; owner 2026-11-19),
+ * otherwise the queue view of exactly its results, or the projects table (stage 1).
  */
 type PartTarget = PfmChip | 'projects_with' | 'projects_without';
 
@@ -159,14 +159,14 @@ export class PfmJourneyCardComponent {
           ? `${fmt(reported)} results have been reported under ${fmt(j.projects.with_results)} bilateral projects mapped to the CGIAR portfolio: ${fmt(reported - tip)} in STAR and ${fmt(tip)} knowledge products in TIP. Before anything can go to PRMS, a STAR result has to be approved in STAR; a TIP knowledge product arrives completed in TIP.`
           : `${fmt(reported)} results have been reported under ${fmt(j.projects.with_results)} bilateral projects mapped to the CGIAR portfolio. Before anything can go to PRMS, each one has to be approved in STAR.`,
         parts: [
-          { label: 'Draft', note: 'Being written by the team', value: j.star.draft, color: STAR_DRAFT, kind: 'act', target: 'journey_draft' },
+          { label: 'Draft', note: 'Being written by the team', value: j.star.draft, color: STAR_DRAFT, kind: 'act', target: 'awaiting_pi' },
           {
             label: 'Submitted',
             note: 'Waiting for the PI or a delegate to approve',
             value: j.star.submitted,
             color: STAR_SUBMITTED,
             kind: 'act',
-            target: 'journey_submitted'
+            target: 'awaiting_pi'
           },
           {
             label: 'Approved',
@@ -227,7 +227,7 @@ export class PfmJourneyCardComponent {
             value: j.answer.no_sp,
             color: PFM_STATE.out.fill,
             kind: 'done',
-            target: 'journey_no_sp'
+            target: 'no_sp_contribution'
           }
         ],
         action: {
@@ -259,7 +259,7 @@ export class PfmJourneyCardComponent {
             value: mapped,
             color: PFM_STATE.complete.fill,
             kind: 'next',
-            target: 'journey_mapping_complete'
+            target: 'ready_to_sync'
           }
         ],
         action: {
