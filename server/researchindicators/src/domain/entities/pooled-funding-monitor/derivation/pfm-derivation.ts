@@ -8,6 +8,8 @@ import { PfmStarLabelEnum } from '../enum/pfm-star-label.enum';
  * Pure input: this module never queries or persists (T-01).
  */
 export interface PfmRawRow {
+  /** `results.platform_code`; missing means STAR. TIP rows are Knowledge Products (DD-PFM-40). */
+  platform_code?: string | null;
   result_status_id: number;
   /** STAR status name; shown as-is for ids outside the D-3 table. */
   result_status_name: string;
@@ -44,6 +46,10 @@ export interface PfmDerivedRow {
   isOutOfScope: boolean;
   isReady: boolean;
   needsAttention: boolean;
+  /** Managed in another platform (TIP): visible, never an action in STAR (DD-PFM-40). */
+  isExternal: boolean;
+  /** Approved in STAR, or final in TIP (*Completed in TIP*). */
+  isApproved: boolean;
 }
 
 /** The subset of derived state the filter / chip / rank predicates read. */
@@ -55,6 +61,8 @@ export type PfmDerivedState = Pick<
   | 'isOutOfScope'
   | 'isReady'
   | 'needsAttention'
+  | 'isExternal'
+  | 'isApproved'
 >;
 
 const MONTHS = [
@@ -71,6 +79,14 @@ const MONTHS = [
   'Nov',
   'Dec',
 ];
+
+/** `ResultStatusEnum.COMPLETED_IN_TIP`: final in TIP, so it counts as approved (DD-PFM-40). */
+export const PFM_COMPLETED_IN_TIP_STATUS_ID = 20;
+
+/** A row whose platform is not STAR (a missing platform is STAR). */
+export const isExternalPlatform = (
+  platform: string | null | undefined,
+): boolean => platform != null && platform !== 'STAR';
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
@@ -237,6 +253,7 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
   const prmsStatus = derivePrmsStatus(row);
   const isOutOfScope = mappingState === PfmMappingStateEnum.NO_SP_CONTRIBUTION;
   const notSent = prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
+  const isExternal = isExternalPlatform(row.platform_code);
   return {
     starLabel,
     piLine: derivePiLine(starLabel, row.approved_at),
@@ -259,7 +276,12 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     // Need attention = what is still on us: in PRMS scope with nothing in PRMS yet. Exactly Mapping
     // incomplete + Ready to sync. Anything in PRMS, whatever its review status (rejected included),
     // is done on our side (owner 2026-10-22); out of scope needs nothing.
-    needsAttention: !isOutOfScope && notSent,
+    // A TIP row is never on us: nothing can be done about it in STAR (DD-PFM-40).
+    needsAttention: !isOutOfScope && notSent && !isExternal,
+    isExternal,
+    isApproved:
+      starLabel === PfmStarLabelEnum.APPROVED ||
+      (isExternal && row.result_status_id === PFM_COMPLETED_IN_TIP_STATUS_ID),
   };
 };
 
@@ -270,12 +292,14 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
     // Mapping not finished (Pending or Incomplete), in PRMS scope, nothing in PRMS yet.
     case PfmChipEnum.MAPPING_INCOMPLETE:
       return (
+        !d.isExternal &&
         !d.isOutOfScope &&
         d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT &&
         d.mappingState !== PfmMappingStateEnum.COMPLETE
       );
+    // An action in STAR (the sync button), so never a TIP row (DD-PFM-40).
     case PfmChipEnum.READY_TO_SYNC:
-      return d.isReady;
+      return d.isReady && !d.isExternal;
     case PfmChipEnum.REJECTED:
       return d.prmsStatus === PfmPrmsStatusEnum.REJECTED;
     // In PRMS, whatever its review status: pending review, approved or rejected (owner 2026-10-22).
@@ -284,12 +308,21 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
     // Still to be approved by the PI in STAR, in PRMS scope, nothing in PRMS yet.
     case PfmChipEnum.AWAITING_PI:
       return (
+        !d.isExternal &&
         !d.isOutOfScope &&
         d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT &&
-        d.starLabel !== PfmStarLabelEnum.APPROVED
+        !d.isApproved
+      );
+    // TIP rows in PRMS scope and not in PRMS yet: no action in STAR (DD-PFM-40). With Need
+    // attention, Synced and No SP contribution it partitions every monitored result.
+    case PfmChipEnum.MANAGED_IN_TIP:
+      return (
+        d.isExternal &&
+        !d.isOutOfScope &&
+        d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT
       );
     // Declared no Science Program contribution and never sent: settled, nothing to do.
-    // With Need attention and Synced it partitions every monitored result.
+    // With Need attention, Managed in TIP and Synced it partitions every monitored result.
     case PfmChipEnum.NO_SP_CONTRIBUTION:
       return d.isOutOfScope && d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
     // One PRMS review status each (the PRMS status chart); Synced = all three.

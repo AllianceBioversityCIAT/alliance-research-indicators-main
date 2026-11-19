@@ -10,4 +10,6 @@ export enum PfmChipEnum {
   NO_SP_CONTRIBUTION = 'no_sp_contribution',
   PRMS_PENDING = 'prms_pending',
   PRMS_APPROVED = 'prms_approved',
+  /** TIP rows in PRMS scope, not in PRMS yet: visible, no action in STAR (DD-PFM-40). */
+  MANAGED_IN_TIP = 'managed_in_tip',
 }
