@@ -194,7 +194,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 ### T-09 — Seed: generator, committed data file, seed migration
-- **Status:** todo · **Size:** L · **Depends:** T-02
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-09) · **Size:** L · **Depends:** T-02
 - **Requirements:** R-STF-011 (source table; non-person tokens skipped; unmatched listed; re-run unchanged while staff unchanged; AC.1 3/4/13/31/28/36, every IOB linked, only `1.3.2` unlinked; AC.2; AC.3), NFR-STF-002 (seed atomic)
 - **Design:** §3.3 `…003`, §3.4; D-STF-7, D-STF-8, D-STF-24; P-15, P-16, P-26, P-32
 - **Scope:**
@@ -234,7 +234,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 ### Phase C — Client
 
 ### T-11 — Client access: roles, guard, sidebar, routes, interceptor exemption, accent tokens
-- **Status:** todo · **Size:** M · **Depends:** T-08
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-11; uncommitted until visual approval) · **Size:** M · **Depends:** T-08
 - **Requirements:** R-STF-015 (group after Center admin, before System admin; two items; shown for ODS Admin or System Admin; AC.1), R-STF-014 AC.2 (routes reject Center Admin; group hidden), R-STF-013 AC.2 (ODS-only user sees no Center admin or System admin item), NFR-STF-004 (accents not the only cue — tokens only here)
 - **Design:** §2.1 client rows (roles service, guard, sidebar, interceptor, `colors.scss`), §6.1, §6.7; D-STF-25, D-STF-26; P-7, P-8, P-25, P-29, P-34
 - **Scope:**
