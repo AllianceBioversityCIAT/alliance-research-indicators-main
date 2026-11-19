@@ -383,6 +383,8 @@ export interface PfmSummaryInput {
   contributingProjects?: PfmContributingProjectRow[];
   /** DISTINCT results accepted this calendar year (cannot be summed from months). */
   syncedThisYear: number;
+  /** The monitored report year (OICR.REPORTING_YEAR), for the page's copy. */
+  reportYear?: number;
   isPiOfAny: boolean;
   /**
    * PI or active delegate of at least one project, contributing or not (the
@@ -395,6 +397,8 @@ export interface PfmSummaryInput {
 
 export interface PfmSummary {
   scope: PfmScopeEnum;
+  /** OICR.REPORTING_YEAR, the year every number of the page belongs to (DD-PFM-41). */
+  report_year: number | null;
   is_pi_of_any: boolean;
   manages_any_project: boolean;
   kpis: {
@@ -425,6 +429,7 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => {
   );
   return {
     scope: i.scope,
+    report_year: i.reportYear ?? null,
     is_pi_of_any: i.isPiOfAny,
     manages_any_project: i.managesAnyProject ?? i.isPiOfAny,
     kpis: {
@@ -456,6 +461,8 @@ export interface PfmQueueFilters {
   project?: string;
   sp?: string;
   type?: number;
+  /** 'YYYY-MM': results with an ACCEPTED sync that UTC month (a Sync activity bar, DD-PFM-45). */
+  synced_month?: string;
   chip?: PfmChipEnum;
 }
 
@@ -492,7 +499,8 @@ export const applyPfmFilters = (
       (!f.sp ||
         row.primary_sp?.code === f.sp ||
         row.contributing_sps.some((s) => s.code === f.sp)) &&
-      (f.type == null || row.indicator_id === f.type),
+      (f.type == null || row.indicator_id === f.type) &&
+      (!f.synced_month || row.synced_months.includes(f.synced_month)),
   );
 
 export const applyPfmChip = (

@@ -116,6 +116,7 @@ export class PooledFundingMonitorService {
       monthlySyncs,
       contributingProjects,
       syncedThisYear,
+      reportYear: repoScope.reportYear,
       isPiOfAny,
       managesAnyProject,
       now,
@@ -243,6 +244,7 @@ export class PooledFundingMonitorService {
     if (query.project) filters.project = query.project;
     if (query.sp) filters.sp = query.sp;
     if (query.type != null) filters.type = query.type;
+    if (query.synced_month) filters.synced_month = query.synced_month;
     if (query.chip) filters.chip = query.chip;
     return filters;
   }

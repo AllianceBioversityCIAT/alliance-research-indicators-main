@@ -171,6 +171,13 @@ export class PfmSummaryResponseDto {
   })
   synced_this_year: number;
   @ApiProperty({
+    nullable: true,
+    example: 2026,
+    description:
+      'The monitored report year (OICR.REPORTING_YEAR) every number of the page belongs to.',
+  })
+  report_year: number | null;
+  @ApiProperty({
     type: [PfmSyncedTypeDto],
     description:
       'Results already in PRMS (any review status) by result type, most first.',
