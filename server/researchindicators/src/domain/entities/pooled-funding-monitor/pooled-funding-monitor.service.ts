@@ -39,6 +39,8 @@ export type PfmQueueResponse = PfmQueueAggregate & {
 export interface PfmResultRow {
   result_code: string;
   platform_code: string;
+  /** Managed in TIP: visible, no action in STAR (DD-PFM-40). */
+  is_external: boolean;
   official_code: number;
   report_year: number;
   snapshot_years: number[];
@@ -186,6 +188,7 @@ export class PooledFundingMonitorService {
   private toResultRow = ({ row, d }: PfmDerivedMonitoredRow): PfmResultRow => ({
     result_code: `${row.platform_code}-${row.result_official_code}`,
     platform_code: row.platform_code,
+    is_external: d.isExternal,
     official_code: row.result_official_code,
     report_year: row.report_year,
     snapshot_years: row.snapshot_years,
