@@ -63,9 +63,9 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Design:** §3.3 `…000`; D-STF-5; P-2, P-11, P-17, P-22
 - **Scope:**
   - `src/domain/shared/enum/sec_role.enum.ts` → `ODS_ADMIN = 11`.
-  - `src/db/migrations/1793500000000-createOdsAdminRole.ts`: `up` insert / no-op on same name / throw on another name; `down` counts rows with `role_id = 11` in **every** table whose FK references `sec_roles.sec_role_id` (from `information_schema.KEY_COLUMN_USAGE`, identifiers `^[a-z0-9_]+$` + backticks), throws naming each table and count. Exports only its class.
-  - `src/db/migration-specs/1793500000000-createOdsAdminRole.spec.ts`.
-  - First step: re-run `git fetch && git ls-tree --name-only origin/dev server/researchindicators/src/db/migrations/ | sort | tail -2` (P-11); renumber the block if anything ≥ `1793500000000` exists.
+  - `src/db/migrations/1795000000000-createOdsAdminRole.ts`: `up` insert / no-op on same name / throw on another name; `down` counts rows with `role_id = 11` in **every** table whose FK references `sec_roles.sec_role_id` (from `information_schema.KEY_COLUMN_USAGE`, identifiers `^[a-z0-9_]+$` + backticks), throws naming each table and count. Exports only its class.
+  - `src/db/migration-specs/1795000000000-createOdsAdminRole.spec.ts`.
+  - First step: re-run `git fetch && git ls-tree --name-only origin/dev server/researchindicators/src/db/migrations/ | sort | tail -2` (P-11); renumber the block if anything ≥ `1795000000000` exists.
   - Record in `execution.md` that the dev lead must run, read-only on Dev before merge, `SELECT sec_role_id, name FROM sec_roles WHERE sec_role_id = 11` (P-17) and `SELECT id, name, start_year, end_year, is_active FROM portfolios` (P-31).
   - Backend route: stack NestJS; implement lead `nestjs-expert` support none — project conventions; test-suite lead the spec's scenarios support `nestjs-expert`
 - **Tests:** migration spec (insert, same-name no-op, other-name throw, `down` refuse with an inactive `sec_user_roles` row, `down` delete when none); a real run up → up → down → up on the local DB.
@@ -82,8 +82,8 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Requirements:** R-STF-002 (levels as data; one indicator level), R-STF-003 (one table; parent at depth − 1), R-STF-004 (responsibles keyed by staff ID; unique per element), R-STF-005 (code uniqueness per portfolio; IOB per portfolio + year), R-STF-009 / R-STF-010 (IOB tables), §7 constraints
 - **Design:** §3.1, §3.3 `…001`, `…002`; D-STF-2, D-STF-3, D-STF-15, D-STF-21; P-10, P-30, P-32, P-35
 - **Scope:**
-  - `1793500000001-createFrameworkTables.ts`: `framework_levels` (incl. `short_label`, generated `indicator_portfolio_key` STORED + unique), `framework_elements` (self FK RESTRICT, `uq_framework_elements_portfolio_code`), `framework_element_responsibles` (CASCADE to element, staff FK with `readStaffCarnetColumnClause`).
-  - `1793500000002-createInstitutionalObjectives.ts`: `institutional_objectives`, `institutional_objective_elements` (CASCADE to IOB, RESTRICT to element).
+  - `1795000000001-createFrameworkTables.ts`: `framework_levels` (incl. `short_label`, generated `indicator_portfolio_key` STORED + unique), `framework_elements` (self FK RESTRICT, `uq_framework_elements_portfolio_code`), `framework_element_responsibles` (CASCADE to element, staff FK with `readStaffCarnetColumnClause`).
+  - `1795000000002-createInstitutionalObjectives.ts`: `institutional_objectives`, `institutional_objective_elements` (CASCADE to IOB, RESTRICT to element).
   - All `utf8mb4_0900_ai_ci` (the connection collation, P-37); `down` drops in reverse order.
   - Migration specs in `db/migration-specs/` including the `information_schema.COLUMNS.EXTRA = 'STORED GENERATED'` check for `indicator_portfolio_key`.
   - First step: re-run P-1's grep with `framework_element|framework_level|FrameworkElement|FrameworkLevel` (expect 0) and read `SELECT VERSION()` locally (P-30).
@@ -200,7 +200,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Scope:**
   - Throw-away generator (scratchpad, not committed) over the three workbooks plus canvas `project/kpi-framework.json`; it **fails** unless the §3.4 assertions hold. Record file dates and the generator command in `execution.md`.
   - `src/db/seeds/seed-data/strategy-framework.data.ts` (constants), `src/db/seeds/strategy-framework.seed.ts` (idempotent `INSERT … SELECT … WHERE NOT EXISTS`, bound parameters only, parents first, responsibles matched at run time by trimmed email then exact trimmed full name, unmatched logged).
-  - `1793500000003-seedStrategyFramework.ts`: seed on a **dedicated query runner** with its own transaction (D-STF-24); `down` refuses on non-seed dependants, else one `DELETE` per depth, deepest first.
+  - `1795000000003-seedStrategyFramework.ts`: seed on a **dedicated query runner** with its own transaction (D-STF-24); `down` refuses on non-seed dependants, else one `DELETE` per depth, deepest first.
   - Settle **P-16** first: count candidates that resolve against the local staff table; list the unmatched with reasons.
   - Backend route: stack NestJS; implement lead `nestjs-expert` support none — project conventions; test-suite lead the spec's scenarios support `nestjs-expert`
 - **Tests:** data-file spec re-asserting 3 / 4 / 13 / 31 / 28 / 36, distinct pairs, both pre-merge names on `4.1.1`, `4.6` absent, only `1.3.2` unlinked; seed function returns `affectedRows`; migration spec on SQL shape (no `?`/`:word` in comments).

@@ -79,12 +79,12 @@ flowchart LR
 | `dto/*.dto.ts` | Element create/update, responsibles, IOB create/update, carry forward, query DTOs |
 | sibling `*.spec.ts` for every file above; `strategy-framework.global-exceptions.spec.ts` | Unit tests incl. the real `GlobalExceptions` wire contract (as D-ORG) |
 | `test/strategy-framework-{schema,crud,levels,carry-forward,seed,role,module-wiring,performance}.integration-spec.ts` | Integration on the local development DB (`test:integration`) |
-| `src/db/migrations/1793500000000-createOdsAdminRole.ts` | `sec_roles` row (§3.3) |
-| `src/db/migrations/1793500000001-createFrameworkTables.ts` | Levels, elements, responsibles |
-| `src/db/migrations/1793500000002-createInstitutionalObjectives.ts` | IOB + link table |
-| `src/db/migrations/1793500000003-seedStrategyFramework.ts` | Imports the seed; exports only its class (D-ORG-14) |
+| `src/db/migrations/1795000000000-createOdsAdminRole.ts` | `sec_roles` row (§3.3) |
+| `src/db/migrations/1795000000001-createFrameworkTables.ts` | Levels, elements, responsibles |
+| `src/db/migrations/1795000000002-createInstitutionalObjectives.ts` | IOB + link table |
+| `src/db/migrations/1795000000003-seedStrategyFramework.ts` | Imports the seed; exports only its class (D-ORG-14) |
 | `src/db/seeds/strategy-framework.seed.ts` + `src/db/seeds/seed-data/strategy-framework.data.ts` | Seed data (generated once from the workbooks, §3.4) and idempotent insert functions |
-| `src/db/migration-specs/1793500000000…003-*.spec.ts` | Migration unit specs (server guide §9) |
+| `src/db/migration-specs/1795000000000…003-*.spec.ts` | Migration unit specs (server guide §9) |
 | `src/domain/shared/enum/sec_role.enum.ts` | `ODS_ADMIN = 11` |
 | `src/domain/routes/main.routes.ts`, `src/domain/entities/entities.module.ts` | Register the module at `strategy-framework` — **both** (server guide §4, KZ-017) |
 
@@ -156,7 +156,7 @@ All new tables: InnoDB, `utf8mb4`, collation **`utf8mb4_0900_ai_ci`** declared e
 
 ### 3.3 Migrations
 
-Block `1793500000000…003` — above the newest migration on any remote branch (`origin/dev` `1793389030636`, P-11). Each exports only its class.
+Block `1795000000000…003` — above the newest migration on any remote branch (`origin/dev` `1794920220124` on 2026-11-19, P-11; renumbered from `1793500000000…003` by T-01). Each exports only its class.
 
 - **`…000-createOdsAdminRole`:** `up` reads `sec_roles` where `sec_role_id = 11`. Absent → insert (`name 'ODS Admin'`, `focus_id` = `RolesFocusEnum.APPLICATION`, a description, `is_internal 0`). Present **with name 'ODS Admin'** → no-op. Present with any other name → **throw** naming it (P-17); such a throw would block the Dev deploy, so §11 adds a pre-merge check. `down` finds every FK referencing `sec_roles.sec_role_id` via `information_schema.KEY_COLUMN_USAGE` (filtered on `REFERENCED_TABLE_SCHEMA = DATABASE()`, `REFERENCED_TABLE_NAME = 'sec_roles'`, `REFERENCED_COLUMN_NAME = 'sec_role_id'`; five on the baseline — P-22), counts **all** rows with that column = 11 (an inactive row still blocks the FK); any → throw naming each table and count; none → delete the row. Assignments live in `sec_user_roles`, never `user_roles`.
 - **`…001`:** `framework_levels` (with the generated column and its unique index — MySQL 8 supports stored generated columns in unique indexes, P-30), then `framework_elements` (self FK), then `framework_element_responsibles` (staff FK clause from `readStaffCarnetColumnClause`). **`…002`:** `institutional_objectives`, `institutional_objective_elements`. `down` drops in reverse order.
