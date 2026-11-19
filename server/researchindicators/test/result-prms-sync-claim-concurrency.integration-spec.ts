@@ -3,6 +3,7 @@ import { dataSource } from '../src/db/config/mysql/orm.test.config';
 import { AppConfigService } from '../src/domain/entities/app-config/app-config.service';
 import { IndicatorsEnum } from '../src/domain/entities/indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../src/domain/entities/result-status/enum/result-status.enum';
+import { PrmsPushStatusReader } from '../src/domain/entities/result-prms-sync/prms-push-status.reader';
 import { ResultPrmsSyncAggregateRepository } from '../src/domain/entities/result-prms-sync/repositories/result-prms-sync-aggregate.repository';
 import {
   PrmsSyncGateFacts,
@@ -192,9 +193,13 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
   });
 
   it('two service.sync calls started before either settles produce one POST, one ACCEPTED row, and one 409', async () => {
-    const logRepository = new ResultPrmsSyncLogRepository(dataSource, {
-      resolve: async () => 2026,
-    } as unknown as ReportingYearResolver);
+    const logRepository = new ResultPrmsSyncLogRepository(
+      dataSource,
+      {
+        resolve: async () => 2026,
+      } as unknown as ReportingYearResolver,
+      new PrmsPushStatusReader(dataSource),
+    );
     jest
       .spyOn(logRepository, 'loadGateSnapshot')
       .mockResolvedValue(eligibleFacts(dc11ResultId, DC11_OFFICIAL_CODE));
@@ -282,9 +287,13 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
   });
 
   it('two concurrent REFUSED_BY_STAR inserts get distinct monotonic attempt_numbers', async () => {
-    const logRepository = new ResultPrmsSyncLogRepository(dataSource, {
-      resolve: async () => 2026,
-    } as unknown as ReportingYearResolver);
+    const logRepository = new ResultPrmsSyncLogRepository(
+      dataSource,
+      {
+        resolve: async () => 2026,
+      } as unknown as ReportingYearResolver,
+      new PrmsPushStatusReader(dataSource),
+    );
     const [first, second] = await Promise.all([
       logRepository.insertRefusedByStar({
         resultId: refusalResultId,

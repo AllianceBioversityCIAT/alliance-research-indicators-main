@@ -127,6 +127,11 @@ export interface PrmsSyncResponseData {
   request_id: string | null;
   prms_result_code: number | null;
   failure_reason: string | null;
+  /**
+   * Set on no-row gate refusals. Absent on a completed attempt; null when
+   * a 409 is not a gate entry.
+   */
+  gate_entry_id?: string | null;
 }
 
 /**
@@ -149,6 +154,22 @@ export const persistedStarRefusalData = (
 export class PrmsSyncPersistedRefusalException extends UnprocessableEntityException {
   constructor(readonly responseData: PrmsSyncResponseData) {
     super(responseData.failure_reason ?? 'Refused by STAR');
+  }
+}
+
+/**
+ * Gate refusal that writes no log row (`persistsRow: false`). Carries the
+ * entry id that `throwHttp` used to drop, so the controller can put it on
+ * `gate_entry_id` (design §4 POST).
+ */
+// @akili-spec changes/prms-pending-review-lock
+export class PrmsSyncNoRowRefusalException extends HttpException {
+  constructor(
+    status: number,
+    description: string,
+    readonly entryId: string,
+  ) {
+    super(description, status);
   }
 }
 
@@ -199,19 +220,6 @@ export function redactPrmsPayload<T>(payload: T, apiKey?: string | null): T {
   };
   return walk(cloned) as T;
 }
-
-const throwHttp = (status: number, description: string): never => {
-  if (status === HttpStatus.NOT_FOUND) {
-    throw new NotFoundException(description);
-  }
-  if (status === HttpStatus.CONFLICT) {
-    throw new ConflictException(description);
-  }
-  if (status === HttpStatus.UNPROCESSABLE_ENTITY) {
-    throw new UnprocessableEntityException(description);
-  }
-  throw new HttpException(description, status);
-};
 
 @Injectable()
 export class ResultPrmsSyncService {
@@ -264,9 +272,10 @@ export class ResultPrmsSyncService {
           ),
         );
       }
-      throwHttp(
+      throw new PrmsSyncNoRowRefusalException(
         gate.httpStatus ?? HttpStatus.BAD_REQUEST,
         gate.description ?? 'Refused by STAR',
+        gate.entryId ?? '',
       );
     }
 

@@ -37,6 +37,7 @@ import {
 } from './repository/tip-handle.repository';
 import {
   persistedStarRefusalData,
+  PrmsSyncNoRowRefusalException,
   PrmsSyncPersistedRefusalException,
   ResultPrmsSyncService,
 } from '../../entities/result-prms-sync/result-prms-sync.service';
@@ -2404,6 +2405,31 @@ describe('TipIntegrationService', () => {
       expect(line).toContain('NOT_SENT=0');
       expect(line).toContain('ERROR=0');
       expect(currentUser.clearSystemUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('counts a gate PrmsSyncNoRowRefusalException as NOT_SENT', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      resultPrmsSyncService.sync.mockRejectedValue(
+        new PrmsSyncNoRowRefusalException(
+          409,
+          'This result cannot be resubmitted to PRMS: its PRMS status is Pending Review. Only results rejected in PRMS can be resubmitted.',
+          'prms_resubmittable',
+        ),
+      );
+      const warn = jest.spyOn((service as any).logger, 'warn');
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [candidateRow('http://h/held', 2026)]);
+
+      expect(warn).toHaveBeenCalledWith(
+        'PRMS push NOT_SENT result 101 status=409 message=This result cannot be resubmitted to PRMS: its PRMS status is Pending Review. Only results rejected in PRMS can be resubmitted.',
+      );
+      expect(pushLine(log)).toContain('NOT_SENT=1');
+      expect(pushLine(log)).toContain('REFUSED_BY_STAR=0');
+      expect(pushLine(log)).toContain('ERROR=0');
     });
 
     it('counts a 409 ConflictException as NOT_SENT and warns status and message', async () => {

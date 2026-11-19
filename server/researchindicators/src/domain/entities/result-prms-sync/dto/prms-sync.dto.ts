@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { PrmsPushStatus } from '../eligibility/prms-push-status';
 import { PrmsSyncResponseData } from '../result-prms-sync.service';
 
 /**
@@ -43,6 +44,15 @@ export class PrmsSyncResponseDto implements PrmsSyncResponseData {
 
   @ApiProperty({ type: String, nullable: true })
   failure_reason: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    required: false,
+    description:
+      'Gate entry that refused before a log row. Null when the 409 is not a gate entry (claim collision, or already synced inside the lock).',
+  })
+  gate_entry_id?: string | null;
 }
 
 export class PrmsSyncLastAttemptDto {
@@ -104,6 +114,19 @@ export class PrmsSyncLastDecisionDto {
   delivery_received_at: Date | string | null;
 }
 
+export class PrmsPushStatusDto implements PrmsPushStatus {
+  @ApiProperty({ type: Number })
+  year: number;
+
+  @ApiProperty({
+    enum: ['never_pushed', 'pending_review', 'approved', 'rejected'],
+  })
+  status: PrmsPushStatus['status'];
+
+  @ApiProperty({ type: Boolean })
+  resubmittable: boolean;
+}
+
 export class PrmsSyncStatusDto {
   @ApiProperty({
     enum: ['never_synced', 'synced', 'failed'],
@@ -133,4 +156,11 @@ export class PrmsSyncStatusDto {
       'Latest non-duplicate correlated decision, or null when none exists (R-PWH-008). A projection — earlier decisions stay in the history.',
   })
   last_decision: PrmsSyncLastDecisionDto | null;
+
+  @ApiProperty({
+    type: () => PrmsPushStatusDto,
+    description:
+      'PRMS push status for pushYear, or for the resolved row year when pushYear is absent.',
+  })
+  push_status: PrmsPushStatusDto;
 }

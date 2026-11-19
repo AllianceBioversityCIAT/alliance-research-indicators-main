@@ -39,8 +39,19 @@
   @if (!hasLiveVersion && (cache.getCurrentPlatformCode() === 'STAR' || cache.getCurrentPlatformCode() === '')) {
   <p-divider layout="vertical" class="shrink-0 self-stretch" />
   <span (click)="updateResult()" (keydown.enter)="updateResult()"
-    class="shrink-0 rounded-[8px] border border-[#409acd] bg-transparent pl-3.5 pr-3 text-[12px] max-h-[30px] min-h-[30px] flex items-center font-[500] text-[#409acd] transition-all duration-150 cursor-pointer">
+    [attr.aria-disabled]="updating() || checkingPrms() ? 'true' : null"
+    [attr.aria-busy]="updating() || checkingPrms() ? 'true' : null"
+    class="shrink-0 rounded-[8px] border bg-transparent pl-3.5 pr-3 text-[12px] max-h-[30px] min-h-[30px] flex items-center font-[500] transition-all duration-150
+      {{
+        updating() || checkingPrms()
+          ? 'atc-grey-500 border-[var(--ac-grey-400)] cursor-default'
+          : 'border-[#409acd] text-[#409acd] cursor-pointer'
+      }}">
+    @if (updating() || checkingPrms()) {
+    <i class="pi pi-spinner pi-spin mr-2 !text-[11px] atc-grey-500" aria-hidden="true"></i>
+    } @else {
     <i class="pi pi-pencil mr-2 !text-[11px] text-[#409acd]"></i>
+    }
     Update result
   </span>
   } @else if (cache.getCurrentPlatformCode() !== 'STAR' && cache.getCurrentPlatformCode() !== '') {

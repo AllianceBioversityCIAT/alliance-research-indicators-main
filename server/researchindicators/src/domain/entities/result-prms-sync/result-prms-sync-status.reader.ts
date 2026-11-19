@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { prmsExternalReferenceSql } from '../../tools/prms-normalizer/reference/prms-external-reference';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
   PRMS_SYNC_HTTP_DESCRIPTIONS,
   PrmsSyncLastAttemptDto,
@@ -9,6 +10,7 @@ import {
   PrmsSyncState,
   PrmsSyncStatusDto,
 } from './dto/prms-sync.dto';
+import { PrmsPushStatusReader } from './prms-push-status.reader';
 
 const LAST_ATTEMPT_SQL = `
       SELECT
@@ -40,7 +42,12 @@ const LAST_ATTEMPT_SQL = `
     `;
 
 const RESULT_STATUS_SQL = `
-      SELECT is_synced_to_prms, prms_result_code
+      SELECT
+        is_synced_to_prms,
+        prms_result_code,
+        platform_code,
+        result_official_code,
+        report_year_id
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
@@ -89,6 +96,17 @@ const LAST_DECISION_SQL = `
 
 const asBoolean = (value: unknown): boolean =>
   value === true || value === 1 || value === '1';
+
+/** NULL `results.platform_code` is STAR, matching `loadGateSnapshot`. */
+const platformCodeOf = (row: {
+  platform_code?: unknown;
+}): ReportingPlatformEnum => {
+  const raw = row.platform_code;
+  if (typeof raw !== 'string') {
+    return ReportingPlatformEnum.STAR;
+  }
+  return raw as ReportingPlatformEnum;
+};
 
 /**
  * R-PRMS-014 read surface. Lives here (T-13) so the reviewed write-path
@@ -151,14 +169,26 @@ export function mapLastDecision(
 
 @Injectable()
 export class ResultPrmsSyncStatusReader {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly pushStatusReader: PrmsPushStatusReader,
+  ) {}
 
-  async getStatus(resultId: number): Promise<PrmsSyncStatusDto> {
+  async getStatus(
+    resultId: number,
+    pushYear?: number,
+  ): Promise<PrmsSyncStatusDto> {
     const resultRows = await this.dataSource.query(RESULT_STATUS_SQL, [
       resultId,
     ]);
     const resultRow = resultRows[0] as
-      | { is_synced_to_prms?: unknown; prms_result_code?: unknown }
+      | {
+          is_synced_to_prms?: unknown;
+          prms_result_code?: unknown;
+          platform_code?: unknown;
+          result_official_code?: unknown;
+          report_year_id?: unknown;
+        }
       | undefined;
     if (!resultRow) {
       throw new NotFoundException(PRMS_SYNC_HTTP_DESCRIPTIONS.notFound);
@@ -189,6 +219,22 @@ export class ResultPrmsSyncStatusReader {
       resultRow.prms_result_code == null
         ? null
         : Number(resultRow.prms_result_code);
+    const reportYear =
+      resultRow.report_year_id == null
+        ? null
+        : Number(resultRow.report_year_id);
+    // pushYear names the status year only. The row still comes from the
+    // guarded result id, and its report_year_id is the fallback (DD-5).
+    // A history-read error is not caught here: the controller's existing
+    // catch rethrows it as 500.
+    const pushStatus = await this.pushStatusReader.read({
+      platformCode: platformCodeOf(resultRow),
+      resultOfficialCode:
+        resultRow.result_official_code == null
+          ? ''
+          : String(resultRow.result_official_code),
+      year: pushYear ?? reportYear ?? 0,
+    });
 
     return {
       sync_state: deriveSyncState(isSynced, lastAttempt),
@@ -196,6 +242,7 @@ export class ResultPrmsSyncStatusReader {
       prms_result_code: prmsResultCode,
       last_attempt: lastAttempt,
       last_decision: lastDecision,
+      push_status: pushStatus,
     };
   }
 }

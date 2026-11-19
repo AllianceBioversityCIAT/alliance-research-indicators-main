@@ -4,6 +4,7 @@ import { IndicatorsEnum } from '../src/domain/entities/indicators/enum/indicator
 import { PrmsWebhookDeliveryRepository } from '../src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { ContractRolesEnum } from '../src/domain/entities/result-contracts/enum/contract-roles.enum';
 import { ResultPrmsSyncAggregateRepository } from '../src/domain/entities/result-prms-sync/repositories/result-prms-sync-aggregate.repository';
+import { PrmsPushStatusReader } from '../src/domain/entities/result-prms-sync/prms-push-status.reader';
 import { ResultPrmsSyncLogRepository } from '../src/domain/entities/result-prms-sync/repositories/result-prms-sync-log.repository';
 import {
   PrmsSyncPersistedRefusalException,
@@ -206,7 +207,11 @@ describe('T-05 — TIP PRMS push on the TEST schema', () => {
     expect(seeded).toBe(SEEDED_ROW_COUNT);
 
     const years = new ReportingYearResolver(dataSource);
-    logRepository = new ResultPrmsSyncLogRepository(dataSource, years);
+    logRepository = new ResultPrmsSyncLogRepository(
+      dataSource,
+      years,
+      new PrmsPushStatusReader(dataSource),
+    );
     tipHandles = new TipHandleRepository(dataSource);
     currentUser = new CurrentUserUtil(
       {} as ConstructorParameters<typeof CurrentUserUtil>[0],

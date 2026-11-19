@@ -1,15 +1,18 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   HttpException,
   HttpStatus,
   Post,
+  Query,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -34,6 +37,7 @@ import {
 import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
 import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
 import {
+  PrmsSyncNoRowRefusalException,
   PrmsSyncPersistedRefusalException,
   PrmsSyncResponseData,
   ResultPrmsSyncService,
@@ -57,18 +61,41 @@ const httpExceptionDescription = (error: HttpException): string => {
   return error.message;
 };
 
+const PUSH_YEAR_MESSAGE = 'pushYear must be an integer from 1901 to 2155';
+
+/** MySQL YEAR bounds. Absent or blank means "use the resolved row's year". */
+const parsePushYear = (raw: unknown): number | undefined => {
+  if (raw == null || raw === '') {
+    return undefined;
+  }
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) {
+    throw new BadRequestException(PUSH_YEAR_MESSAGE);
+  }
+  const year = Number(raw);
+  if (year < 1901 || year > 2155) {
+    throw new BadRequestException(PUSH_YEAR_MESSAGE);
+  }
+  return year;
+};
+
 /**
- * Gate entries 1–2 write no log row (design.md §4 / JD-8). The envelope still
- * carries the full data contract so `attempt_number` is explicit `null`, never
- * absent and never `0`. `http_status` inside data is null: no PRMS call ran.
+ * No-row gate refusals (`persistsRow: false`). The envelope still carries the
+ * full data contract so `attempt_number` is explicit `null`, never absent and
+ * never `0`. `gate_entry_id` names the gate entry; claim collision and
+ * already-synced inside the lock leave it null. `http_status` inside data is
+ * null: no PRMS call ran.
  */
-const noRowRefusalData = (failureReason: string): PrmsSyncResponseData => ({
+const noRowRefusalData = (
+  failureReason: string,
+  entryId?: string | null,
+): PrmsSyncResponseData => ({
   outcome: PrmsSyncOutcome.REFUSED_BY_STAR,
   attempt_number: null,
   http_status: null,
   request_id: null,
   prms_result_code: null,
   failure_reason: failureReason,
+  gate_entry_id: entryId ?? null,
 });
 
 const isNoRowRefusalStatus = (status: number): boolean =>
@@ -134,6 +161,7 @@ export class ResultPrmsSyncController {
   })
   @ApiResponse({
     status: HttpStatus.CONFLICT,
+    type: PrmsSyncResponseDto,
     description: PRMS_SYNC_HTTP_DESCRIPTIONS.conflict,
   })
   @ApiResponse({
@@ -174,6 +202,14 @@ export class ResultPrmsSyncController {
           data: error.responseData,
         });
       }
+      if (error instanceof PrmsSyncNoRowRefusalException) {
+        const description = httpExceptionDescription(error);
+        return ResponseUtils.format({
+          description,
+          status: error.getStatus(),
+          data: noRowRefusalData(description, error.entryId),
+        });
+      }
       if (error instanceof HttpException) {
         const status = error.getStatus();
         const description = httpExceptionDescription(error);
@@ -203,6 +239,7 @@ export class ResultPrmsSyncController {
     status: HttpStatus.NOT_FOUND,
     description: PRMS_SYNC_HTTP_DESCRIPTIONS.notFound,
   })
+  @ApiQuery({ name: 'pushYear', required: false })
   @Roles(
     SecRolesEnum.CONTRIBUTOR,
     SecRolesEnum.CENTER_ADMIN,
@@ -210,9 +247,13 @@ export class ResultPrmsSyncController {
   )
   @ResultOwner()
   @UseGuards(RolesGuard, ResultOwnerGuard)
-  async getStatus() {
+  async getStatus(@Query('pushYear') pushYear?: string) {
     try {
-      const data = await this.statusReader.getStatus(this.resultsUtil.resultId);
+      const year = parsePushYear(pushYear);
+      const data = await this.statusReader.getStatus(
+        this.resultsUtil.resultId,
+        year,
+      );
       return ResponseUtils.format({
         description: PRMS_SYNC_HTTP_DESCRIPTIONS.statusFound,
         status: HttpStatus.OK,

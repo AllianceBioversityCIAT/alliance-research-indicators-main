@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { prmsExternalReferenceSql } from '../../tools/prms-normalizer/reference/prms-external-reference';
+import { PrmsPushStatusReader } from './prms-push-status.reader';
 import {
   deriveSyncState,
   mapLastAttempt,
@@ -10,9 +11,11 @@ import {
 
 describe('ResultPrmsSyncStatusReader', () => {
   const query = jest.fn();
-  const reader = new ResultPrmsSyncStatusReader({
-    query,
-  } as unknown as DataSource);
+  const dataSource = { query } as unknown as DataSource;
+  const reader = new ResultPrmsSyncStatusReader(
+    dataSource,
+    new PrmsPushStatusReader(dataSource),
+  );
 
   beforeEach(() => {
     query.mockReset();
@@ -88,6 +91,133 @@ describe('ResultPrmsSyncStatusReader', () => {
           created_at: '2026-09-15T00:00:00.000Z',
         }),
       ).toBe('failed');
+    });
+  });
+
+  it('uses the resolved row year when pushYear is absent', async () => {
+    query.mockImplementation((sql: string) => {
+      if (/JSON_EXTRACT/.test(sql)) {
+        return Promise.resolve([
+          {
+            event_source: 'STAR',
+            status: 'PENDING_REVIEW',
+            decision: null,
+            result_year: 2026,
+            phase_year: null,
+            imported: 0,
+          },
+        ]);
+      }
+      if (/result_prms_sync_log|result_prms_sync_history/.test(sql)) {
+        return Promise.resolve([]);
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          {
+            is_synced_to_prms: 0,
+            prms_result_code: null,
+            report_year_id: 2026,
+            platform_code: null,
+            result_official_code: 100,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+    const pushCall = query.mock.calls.find((call) =>
+      String(call[0]).includes('JSON_EXTRACT'),
+    );
+
+    expect(pushCall?.[1]).toEqual(['STAR', '100']);
+    expect(status.push_status).toEqual({
+      year: 2026,
+      status: 'pending_review',
+      resubmittable: false,
+    });
+  });
+
+  it('uses pushYear 2025 when the resolved row year is 2026 (S-11)', async () => {
+    query.mockImplementation((sql: string) => {
+      if (/JSON_EXTRACT/.test(sql)) {
+        return Promise.resolve([
+          {
+            event_source: 'PRMS',
+            status: null,
+            decision: 'REJECT',
+            result_year: 2025,
+            phase_year: 2025,
+            imported: 0,
+          },
+        ]);
+      }
+      if (/result_prms_sync_log|result_prms_sync_history/.test(sql)) {
+        return Promise.resolve([]);
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          {
+            is_synced_to_prms: 0,
+            prms_result_code: null,
+            report_year_id: 2026,
+            platform_code: 'STAR',
+            result_official_code: 100,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42, 2025);
+
+    expect(status.push_status.year).toBe(2025);
+    expect(status.push_status.status).toBe('rejected');
+  });
+
+  it('keeps the existing status fields when push_status is added', async () => {
+    const baselineLastAttempt = {
+      attempt_number: 1,
+      outcome: PrmsSyncOutcome.TRANSPORT_FAILED,
+      http_status: null,
+      request_id: null,
+      failure_reason: 'PRMS Normalizer returned no HTTP response',
+      environment: 'TEST',
+      prms_type: 'capacity_sharing',
+      created_at: '2026-09-15T00:00:00.000Z',
+    };
+    query.mockImplementation((sql: string) => {
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([baselineLastAttempt]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve([]);
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          {
+            is_synced_to_prms: 0,
+            prms_result_code: null,
+            report_year_id: 2026,
+            platform_code: 'STAR',
+            result_official_code: 100,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+
+    expect(status.sync_state).toBe('failed');
+    expect(status.is_synced_to_prms).toBe(false);
+    expect(status.prms_result_code).toBeNull();
+    expect(status.last_attempt).toEqual(baselineLastAttempt);
+    expect(status.last_decision).toBeNull();
+    expect(status.push_status).toEqual({
+      year: 2026,
+      status: 'never_pushed',
+      resubmittable: true,
     });
   });
 

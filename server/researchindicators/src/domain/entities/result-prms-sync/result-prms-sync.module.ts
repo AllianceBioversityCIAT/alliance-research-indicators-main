@@ -13,6 +13,7 @@ import { PrmsNormalizerModule } from '../../tools/prms-normalizer/prms-normalize
 import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
+import { PrmsPushStatusReader } from './prms-push-status.reader';
 import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
 import { ResultPrmsSyncController } from './result-prms-sync.controller';
 import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
@@ -24,6 +25,7 @@ import { ResultPrmsSyncService } from './result-prms-sync.service';
   providers: [
     ResultPrmsSyncService,
     ResultPrmsSyncStatusReader,
+    PrmsPushStatusReader,
     PrmsSyncHistoryReader,
     ResultPrmsSyncLogRepository,
     ResultPrmsSyncAggregateRepository,

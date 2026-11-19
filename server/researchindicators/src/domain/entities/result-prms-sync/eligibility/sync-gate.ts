@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { IndicatorTypeHomologation } from '../../../tools/prms-normalizer/homologation/indicator-type.homologation';
+import { PrmsPushStatus } from './prms-push-status';
 
 /**
  * Eligibility facts the gate evaluates. T-11 loads them; this module does not
@@ -45,12 +46,18 @@ export interface SyncGateSnapshot {
    * Only server code sets `'TIP_SYNC'`; the column is not stored.
    */
   origin?: 'HTTP' | 'TIP_SYNC';
+  /**
+   * Year's PRMS push status from `PrmsPushStatusReader`. Absent passes,
+   * so snapshot literals written before this field still compile (JD-12).
+   */
+  prms_push_status?: PrmsPushStatus;
 }
 
 export type SyncGateEntryId =
   | 'feature_enabled'
   | 'result_exists'
   | 'not_already_synced'
+  | 'prms_resubmittable'
   | 'reporting_year'
   | 'approved'
   | 'alignment_green'
@@ -65,7 +72,8 @@ export interface SyncGateEntry {
   fails: (snapshot: SyncGateSnapshot) => boolean;
   /**
    * JD-3: a refusal that is not a verdict about the result writes no log row
-   * (feature_enabled, result_exists, not_already_synced, reporting_year).
+   * (feature_enabled, result_exists, not_already_synced, prms_resubmittable,
+   * reporting_year).
    * Later entries write REFUSED_BY_STAR.
    */
   persistsRow: boolean;
@@ -101,6 +109,18 @@ const reportingYearDescription = (snapshot: SyncGateSnapshot): string => {
   return `Result year ${resultYear} is not the reporting year ${snapshot.reporting_year}`;
 };
 
+const prmsResubmitDescription = (
+  label: 'Pending Review' | 'Approved',
+): string =>
+  `This result cannot be resubmitted to PRMS: its PRMS status is ${label}. Only results rejected in PRMS can be resubmitted.`;
+
+const prmsResubmittableDescription = (snapshot: SyncGateSnapshot): string =>
+  prmsResubmitDescription(
+    snapshot.prms_push_status?.status === 'approved'
+      ? 'Approved'
+      : 'Pending Review',
+  );
+
 const contractDescription = (snapshot: SyncGateSnapshot): string => {
   const agreementId = snapshot.primary_contract?.agreement_id;
   if (agreementId) {
@@ -135,6 +155,16 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     httpStatus: HttpStatus.CONFLICT,
     description: 'Result is already synced to PRMS',
     fails: (snapshot) => snapshot.is_synced_to_prms === true,
+    persistsRow: false,
+  },
+  // @akili-spec changes/prms-pending-review-lock
+  {
+    id: 'prms_resubmittable',
+    httpStatus: HttpStatus.CONFLICT,
+    description: prmsResubmittableDescription,
+    fails: (snapshot) =>
+      snapshot.prms_push_status != null &&
+      snapshot.prms_push_status.resubmittable === false,
     persistsRow: false,
   },
   {

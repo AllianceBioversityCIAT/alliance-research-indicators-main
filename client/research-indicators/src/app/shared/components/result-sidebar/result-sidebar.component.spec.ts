@@ -81,6 +81,12 @@ describe('ResultSidebarComponent', () => {
           sync_count: 0,
           events: []
         }
+      }),
+      GET_PrmsPushStatus: jest.fn().mockResolvedValue({
+        successfulRequest: true,
+        data: {
+          push_status: { year: 2026, status: 'never_pushed', resubmittable: true }
+        }
       })
     };
 
@@ -101,6 +107,8 @@ describe('ResultSidebarComponent', () => {
 
     router = {
       navigate: jest.fn(),
+      createUrlTree: jest.fn().mockReturnValue({}),
+      serializeUrl: jest.fn().mockReturnValue('/test'),
       events: of(new NavigationEnd(1, '/test', '/test')),
       url: '/test'
     };
@@ -163,6 +171,7 @@ describe('ResultSidebarComponent', () => {
     fixture = TestBed.createComponent(ResultSidebarComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+    await fixture.whenStable();
   });
 
   it('should create', () => {
@@ -1490,6 +1499,219 @@ describe('ResultSidebarComponent', () => {
       expect(component.prmsAlreadySynced()).toBe(true);
       const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
       expect(button?.disabled).toBe(true);
+    });
+
+    const PENDING_REVIEW_TOOLTIP = 'PRMS is reviewing this version and it can be sent again only if PRMS rejects it.';
+    const GENERIC_SYNC_FAILURE =
+      'This result was not synchronized.<br>Please try again. If the problem continues, contact support.';
+
+    const syncButton = (): HTMLButtonElement => {
+      const button = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]') as HTMLButtonElement | null;
+      if (!button) {
+        throw new Error('PRMS SYNC button is missing');
+      }
+      return button;
+    };
+
+    it('S-21 disables PRMS SYNC and shows the Pending Review tooltip when the viewed version is pending and every other condition holds', async () => {
+      enablePrmsSyncButton();
+      expect(syncButton().disabled).toBe(false);
+
+      let releaseStatus!: (value: unknown) => void;
+      const statusResponse = new Promise(resolve => {
+        releaseStatus = resolve;
+      });
+      apiService.GET_PrmsPushStatus = jest.fn().mockReturnValue(statusResponse);
+
+      versionQueryParams$.next({ version: '2026' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      releaseStatus({
+        successfulRequest: true,
+        data: {
+          push_status: { year: 2026, status: 'pending_review', resubmittable: false }
+        }
+      });
+      await statusResponse;
+      fixture.detectChanges();
+
+      expect(syncButton().disabled).toBe(true);
+      expect(component.prmsSyncTooltip()).toBe(PENDING_REVIEW_TOOLTIP);
+      expect(apiService.GET_PrmsPushStatus).toHaveBeenCalledWith(123);
+
+      await component.onPrmsSync();
+      expect(apiService.POST_PrmsSync).not.toHaveBeenCalled();
+    });
+
+    const settlePushStatus = async (version: string, pushStatus: { year: number; status: string; resubmittable: boolean }) => {
+      let release!: (value: unknown) => void;
+      const pending = new Promise(resolve => {
+        release = resolve;
+      });
+      const statusMock = jest.fn().mockReturnValue(pending);
+      apiService.GET_PrmsPushStatus = statusMock;
+      versionQueryParams$.next({ version });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+      release({
+        successfulRequest: true,
+        data: { push_status: pushStatus }
+      });
+      // The component awaits the same promise. Waiting on the mock's returned
+      // promise, then one more turn, is what lets that read land before the assert.
+      await Promise.all(statusMock.mock.results.map(result => result.value as Promise<unknown>));
+      await Promise.resolve();
+      fixture.detectChanges();
+    };
+
+    it('S-22 disables PRMS SYNC with the Approved tooltip', async () => {
+      enablePrmsSyncButton();
+      await settlePushStatus('2028', { year: 2026, status: 'approved', resubmittable: false });
+
+      expect(syncButton().disabled).toBe(true);
+      expect(component.prmsSyncTooltip()).toBe('PRMS already approved this version.');
+    });
+
+    it('S-23 keeps each existing tooltip when the year is held but that condition already explains the button', async () => {
+      enablePrmsSyncButton();
+      await settlePushStatus('2024', { year: 2024, status: 'pending_review', resubmittable: false });
+      expect(component.prmsHeldByPrms()).toBe(true);
+
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true,
+        is_synced_to_prms: true
+      });
+      fixture.detectChanges();
+      expect(component.prmsSyncTooltip()).toBe('This result has already been synced to PRMS.');
+
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true,
+        is_synced_to_prms: false
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 1 });
+      fixture.detectChanges();
+      expect(component.canSyncPrms()).toBe(false);
+      expect(component.prmsSyncTooltip()).toBe(
+        'This button will become available once the result is approved and Pool Funding Alignment is completed.'
+      );
+
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: false,
+        is_synced_to_prms: false
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      fixture.detectChanges();
+      expect(component.prmsSyncTooltip()).toBe(
+        'This result does not contribute to a Science Program or Accelerator, so there is nothing to sync to PRMS.'
+      );
+    });
+
+    it('S-24 leaves PRMS SYNC enabled when the viewed version was rejected', async () => {
+      enablePrmsSyncButton();
+      await settlePushStatus('2023', { year: 2026, status: 'rejected', resubmittable: true });
+
+      expect(component.prmsHeldByPrms()).toBe(false);
+      expect(syncButton().disabled).toBe(false);
+      expect(component.prmsSyncTooltip()).toBe('');
+    });
+
+    it('disables PRMS SYNC while the push-status read is loading', async () => {
+      enablePrmsSyncButton();
+      expect(syncButton().disabled).toBe(false);
+
+      let releaseStatus!: (value: unknown) => void;
+      const statusResponse = new Promise(resolve => {
+        releaseStatus = resolve;
+      });
+      (apiService.GET_PrmsPushStatus as jest.Mock).mockImplementation(() => statusResponse);
+
+      versionQueryParams$.next({ version: '2027' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(component.prmsPushStatusLoading()).toBe(true);
+      expect(syncButton().disabled).toBe(true);
+      await component.onPrmsSync();
+      expect(apiService.POST_PrmsSync).not.toHaveBeenCalled();
+
+      releaseStatus({
+        successfulRequest: true,
+        data: { push_status: { year: 2027, status: 'never_pushed', resubmittable: true } }
+      });
+      await statusResponse;
+    });
+
+    it('does not keep the previous year held state while the next version read is pending', async () => {
+      enablePrmsSyncButton();
+      await settlePushStatus('2024', { year: 2024, status: 'pending_review', resubmittable: false });
+      expect(component.prmsSyncTooltip()).toBe(PENDING_REVIEW_TOOLTIP);
+
+      let releaseNext!: (value: unknown) => void;
+      const nextResponse = new Promise(resolve => {
+        releaseNext = resolve;
+      });
+      (apiService.GET_PrmsPushStatus as jest.Mock).mockImplementation(() => nextResponse);
+      versionQueryParams$.next({ version: '2025' });
+      TestBed.flushEffects();
+      fixture.detectChanges();
+
+      expect(component.prmsPushStatus()).toBeNull();
+      expect(component.prmsHeldByPrms()).toBe(false);
+      expect(component.prmsSyncTooltip()).not.toBe(PENDING_REVIEW_TOOLTIP);
+      expect(component.prmsPushStatusLoading()).toBe(true);
+
+      releaseNext({
+        successfulRequest: true,
+        data: { push_status: { year: 2025, status: 'rejected', resubmittable: true } }
+      });
+      await nextResponse;
+    });
+
+    it('S-25 shows the gate description for a 409 with gate_entry_id and the generic copy without it', async () => {
+      enablePrmsSyncButton();
+      const description =
+        'This result cannot be resubmitted to PRMS: its PRMS status is Pending Review. Only results rejected in PRMS can be resubmitted. <note>';
+      (apiService.GET_PrmsPushStatus as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: { push_status: { year: 2026, status: 'rejected', resubmittable: true } }
+      });
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValueOnce({
+        successfulRequest: false,
+        status: 409,
+        errorDetail: {
+          description,
+          data: { gate_entry_id: 'prms_resubmittable' }
+        }
+      });
+
+      const statusCallsBefore = (apiService.GET_PrmsPushStatus as jest.Mock).mock.calls.length;
+      await component.onPrmsSync();
+
+      const alertDetail = () => ((actionsService.showGlobalAlert as jest.Mock).mock.calls.at(-1)?.[0] as { detail: string }).detail;
+      expect(alertDetail()).toBe(
+        'This result cannot be resubmitted to PRMS: its PRMS status is Pending Review. Only results rejected in PRMS can be resubmitted. &lt;note&gt;'
+      );
+      expect((apiService.GET_PrmsPushStatus as jest.Mock).mock.calls.length).toBe(statusCallsBefore + 1);
+
+      (actionsService.showGlobalAlert as jest.Mock).mockClear();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValueOnce({
+        successfulRequest: false,
+        status: 409,
+        errorDetail: {
+          description,
+          data: { gate_entry_id: 'not_already_synced' }
+        }
+      });
+      const callsAfterGate = (apiService.GET_PrmsPushStatus as jest.Mock).mock.calls.length;
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toBe(GENERIC_SYNC_FAILURE);
+      expect(alertDetail()).not.toContain('Pending Review');
+      expect((apiService.GET_PrmsPushStatus as jest.Mock).mock.calls.length).toBe(callsAfterGate);
     });
   });
 

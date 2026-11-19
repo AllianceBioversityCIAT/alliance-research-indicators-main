@@ -14,6 +14,7 @@ import { CustomTagComponent } from '../custom-tag/custom-tag.component';
 import { PrmsSyncCardComponent } from '../prms-sync-card/prms-sync-card.component';
 import { PrmsSyncHistoryModalComponent } from '../prms-sync-history-modal/prms-sync-history-modal.component';
 import { PrmsSyncHistoryResponse } from '@shared/interfaces/prms-sync-history.interface';
+import { PrmsPushStatus } from '@shared/interfaces/prms-push-status.interface';
 import { StatusDropdownComponent } from '../status-dropdown/status-dropdown.component';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
 import { RolesService } from '@shared/services/cache/roles.service';
@@ -160,7 +161,16 @@ export class ResultSidebarComponent {
     if (this.prmsAlreadySynced()) {
       return 'This result has already been synced to PRMS.';
     }
-    if (this.canSyncPrms()) return '';
+    // Held copy stays inside this branch (S-23). A year that is not approved,
+    // or that does not contribute, keeps the tooltip it already had.
+    if (this.canSyncPrms()) {
+      if (this.prmsHeldByPrms()) {
+        return this.prmsPushStatus()?.status === 'approved'
+          ? 'PRMS already approved this version.'
+          : 'PRMS is reviewing this version and it can be sent again only if PRMS rejects it.';
+      }
+      return '';
+    }
     if (this.bilateralService.currentAlignment()?.has_contribution === false) {
       return 'This result does not contribute to a Science Program or Accelerator, so there is nothing to sync to PRMS.';
     }
@@ -177,6 +187,16 @@ export class ResultSidebarComponent {
   readonly prmsHistoryPhase = signal<'loading' | 'loaded' | 'failed'>('loading');
   readonly prmsHistoryOpen = signal(false);
   private prmsHistoryFetchGen = 0;
+
+  readonly prmsPushStatus = signal<PrmsPushStatus | null>(null);
+  readonly prmsPushStatusLoading = signal(false);
+  private prmsPushStatusFetchGen = 0;
+
+  /** The status read succeeded and the server says this year cannot be pushed again. */
+  readonly prmsHeldByPrms = computed(() => {
+    const status = this.prmsPushStatus();
+    return status !== null && !status.resubmittable;
+  });
 
   /**
    * `prms_result_code` here is the history payload's copy of `results.prms_result_code`
@@ -208,6 +228,7 @@ export class ResultSidebarComponent {
     this.versionWatcher.version();
     untracked(() => {
       void this.fetchPrmsSyncHistory(resultCode);
+      void this.fetchPrmsPushStatus(resultCode);
     });
   });
 
@@ -260,8 +281,47 @@ export class ResultSidebarComponent {
     }
   }
 
+  /**
+   * Push status for the viewed version. No `pushYear`: the result interceptor
+   * already sends the version on the URL, and the server uses that year's row.
+   * A new read clears the previous year before it waits, and a stale response
+   * is dropped with `prmsPushStatusFetchGen`.
+   */
+  async fetchPrmsPushStatus(resultCode: number): Promise<void> {
+    const generation = ++this.prmsPushStatusFetchGen;
+    this.prmsPushStatus.set(null);
+    this.prmsPushStatusLoading.set(true);
+    try {
+      const response = await this.api.GET_PrmsPushStatus(resultCode);
+      if (generation !== this.prmsPushStatusFetchGen) return;
+      const pushStatus = response?.successfulRequest ? response.data?.push_status : null;
+      if (!pushStatus) {
+        this.prmsPushStatus.set(null);
+        console.error('PRMS push status request failed', { resultCode });
+        return;
+      }
+      this.prmsPushStatus.set(pushStatus);
+    } catch {
+      if (generation !== this.prmsPushStatusFetchGen) return;
+      this.prmsPushStatus.set(null);
+      console.error('PRMS push status request failed', { resultCode });
+    } finally {
+      if (generation === this.prmsPushStatusFetchGen) {
+        this.prmsPushStatusLoading.set(false);
+      }
+    }
+  }
+
   async onPrmsSync(): Promise<void> {
-    if (!this.canSyncPrms() || this.prmsSyncInFlight() || this.prmsAlreadySynced()) return;
+    if (
+      !this.canSyncPrms() ||
+      this.prmsSyncInFlight() ||
+      this.prmsAlreadySynced() ||
+      this.prmsPushStatusLoading() ||
+      this.prmsHeldByPrms()
+    ) {
+      return;
+    }
     this.prmsSyncInFlight.set(true);
     try {
       const response = await this.api.POST_PrmsSync(this.cache.getCurrentNumericResultId());
@@ -270,6 +330,7 @@ export class ResultSidebarComponent {
         const resultCode = this.route.snapshot.paramMap.get('id') ?? String(this.cache.getCurrentNumericResultId());
         await this.bilateralService.getAlignment(resultCode);
         await this.fetchPrmsSyncHistory(this.cache.getCurrentNumericResultId());
+        await this.fetchPrmsPushStatus(this.cache.getCurrentNumericResultId());
         // A successful push is a terminal, irreversible event -- the result becomes
         // read-only in STAR -- so it gets a blocking modal rather than a toast that
         // scrolls away unseen. Reuses the SAME `showGlobalAlert` the reporting-year
@@ -307,16 +368,21 @@ export class ResultSidebarComponent {
         // PRMS's own validation messages, when it sent any, are shown verbatim --
         // they name the field and say what to do about it. Everything else keeps
         // the generic copy, because those failures are developer-facing.
-        const rejections = this.prmsRejectionMessages(response);
+        // A held-year 409 is the exception: the server's description is the
+        // reason, and only `gate_entry_id` selects it (DD-7).
+        const gateRefusal = this.isPrmsResubmittableGate(response);
+        const rejections = gateRefusal ? [] : this.prmsRejectionMessages(response);
         // A real <ul>, not bullet characters joined by <br>. `.alert` is
         // text-align: center, so hand-made bullets centre line by line and never
         // line up. The alignment lives in a CSS class rather than an inline
         // style because Angular's [innerHTML] sanitizer strips `style` but keeps
         // `class`.
-        const detail = rejections.length
-          ? 'This result was not synchronized. PRMS reported:' +
-            `<ul class="alert-detail-list">${rejections.map(message => `<li>${this.escapeHtml(message)}</li>`).join('')}</ul>`
-          : 'This result was not synchronized.<br>Please try again. If the problem continues, contact support.';
+        const detail = gateRefusal
+          ? this.escapeHtml(this.prmsGateDescription(response))
+          : rejections.length
+            ? 'This result was not synchronized. PRMS reported:' +
+              `<ul class="alert-detail-list">${rejections.map(message => `<li>${this.escapeHtml(message)}</li>`).join('')}</ul>`
+            : 'This result was not synchronized.<br>Please try again. If the problem continues, contact support.';
 
         this.actions.showGlobalAlert({
           severity: 'error',
@@ -326,10 +392,32 @@ export class ResultSidebarComponent {
           generalButton: true,
           confirmCallback: { label: 'Continue' }
         });
+        if (gateRefusal) {
+          await this.fetchPrmsPushStatus(this.cache.getCurrentNumericResultId());
+        }
       }
     } finally {
       this.prmsSyncInFlight.set(false);
     }
+  }
+
+  /**
+   * ToPromise stores the HTTP error body on `errorDetail` (the same object
+   * `failure_reason` is read from). The wire field is still `data.gate_entry_id`.
+   * The description is never consulted here.
+   */
+  private isPrmsResubmittableGate(response: unknown): boolean {
+    const body = response as {
+      data?: { gate_entry_id?: unknown } | null;
+      errorDetail?: { data?: { gate_entry_id?: unknown } | null } | null;
+    };
+    const entryId = body?.errorDetail?.data?.gate_entry_id ?? body?.data?.gate_entry_id;
+    return entryId === 'prms_resubmittable';
+  }
+
+  private prmsGateDescription(response: unknown): string {
+    const description = (response as { errorDetail?: { description?: unknown } | null })?.errorDetail?.description;
+    return typeof description === 'string' ? description : '';
   }
 
   private prmsSyncFailureMessage(response: { description?: string; errorDetail?: { errors?: string; description?: string } | null }): string {
