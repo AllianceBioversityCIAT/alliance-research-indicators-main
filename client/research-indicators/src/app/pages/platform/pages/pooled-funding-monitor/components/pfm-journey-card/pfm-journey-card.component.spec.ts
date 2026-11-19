@@ -10,10 +10,10 @@ const JOURNEY: PfmJourney = {
   sync: { ready: 12, synced: 18, rejected: 2 }
 };
 
-function render(stage = 0, scope: 'all' | 'mine' = 'all') {
+function render(stage = 0, scope: 'all' | 'mine' = 'all', journey: PfmJourney = JOURNEY) {
   TestBed.configureTestingModule({ imports: [PfmJourneyCardComponent] });
   const fixture = TestBed.createComponent(PfmJourneyCardComponent);
-  fixture.componentRef.setInput('journey', JOURNEY);
+  fixture.componentRef.setInput('journey', journey);
   fixture.componentRef.setInput('scope', scope);
   fixture.componentRef.setInput('stage', stage);
   fixture.detectChanges();
@@ -46,7 +46,7 @@ describe('PfmJourneyCardComponent', () => {
   it('each stage caption starts with a capital letter', () => {
     const { el } = render();
     const captions = Array.from(el.querySelectorAll('[data-testid^="pfm-journey-stage-"][role="tab"] > span:last-child')).map(e => e.textContent?.trim() ?? '');
-    expect(captions).toEqual(['Bilateral projects', 'Results reported in STAR', 'Approved results to classify', 'Contributing results to map', 'Mapped results to sync']);
+    expect(captions).toEqual(['Bilateral projects', 'Results reported', 'Approved results to classify', 'Contributing results to map', 'Mapped results to sync']);
   });
 
   it('each stage splits its results and says what to do', () => {
@@ -143,5 +143,72 @@ describe('PfmJourneyCardComponent', () => {
     fixture.componentRef.setInput('scope', 'all');
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('NaN');
+  });
+
+  describe('TIP knowledge products in stage 2 (DD-PFM-40)', () => {
+    const WITH_TIP: PfmJourney = { ...JOURNEY, star: { ...JOURNEY.star, completed_in_tip: 100 } };
+
+    it('adds a Completed in TIP card with its share, and counts it in the reported total', () => {
+      const { all, q } = render(1, 'all', WITH_TIP);
+      expect(all('pfm-journey-part-label')).toEqual(['Draft', 'Submitted', 'Approved', 'Completed in TIP']);
+      expect(all('pfm-journey-part-value')).toEqual(['20', '30', '50', '100']);
+      // 100 of 200 reported
+      expect(q('pfm-journey-detail')?.textContent).toContain('50%');
+      expect(q('pfm-journey-stage-2')?.textContent).toContain('200');
+      expect(q('pfm-journey-stage-2')?.textContent).toContain('Results reported');
+      expect(q('pfm-journey-stage-2')?.textContent).not.toContain('in STAR');
+    });
+
+    it('tells STAR and TIP apart in the stage 2 story', () => {
+      const story = render(1, 'all', WITH_TIP).q('pfm-journey-story')?.textContent ?? '';
+      expect(story).toContain('100 in STAR and 100 knowledge products in TIP');
+      expect(story).toContain('arrives completed in TIP');
+    });
+
+    it('stage 3 starts from both the STAR approved and the TIP completed', () => {
+      const stage3 = render(2, 'all', WITH_TIP);
+      expect(stage3.q('pfm-journey-stage-3')?.textContent).toContain('150');
+      expect(stage3.q('pfm-journey-story')?.textContent).toContain('approved in STAR or completed in TIP');
+    });
+
+    it('shows no TIP card, and the STAR-only story, when there is none', () => {
+      const { all, q } = render(1);
+      expect(all('pfm-journey-part-label')).not.toContain('Completed in TIP');
+      expect(q('pfm-journey-story')?.textContent).toContain('each one has to be approved in STAR');
+    });
+  });
+
+  describe('every card opens exactly what it counts (DD-PFM-42)', () => {
+    const WITH_TIP: PfmJourney = { ...JOURNEY, star: { ...JOURNEY.star, completed_in_tip: 100 } };
+
+    it.each([
+      [1, ['journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip']],
+      [2, ['journey_not_answered', 'journey_contributes', 'journey_no_sp']],
+      [3, ['journey_mapping_incomplete', 'journey_mapping_complete']],
+      [4, ['journey_ready', 'journey_synced']]
+    ])('stage %i cards open their own queue view', (stage, chips) => {
+      const { fixture, el } = render(stage as number, 'all', WITH_TIP);
+      const opened: PfmChip[] = [];
+      fixture.componentInstance.openQueue.subscribe(c => opened.push(c));
+      const cards = Array.from(el.querySelectorAll<HTMLButtonElement>('button[data-testid="pfm-journey-part"]'));
+      cards.forEach(card => card.click());
+      expect(opened).toEqual(chips);
+    });
+
+    it('stage 1 cards show the projects with or without results in the table below', () => {
+      const { fixture, el } = render(0);
+      const events: string[] = [];
+      fixture.componentInstance.showProjectsWithResults.subscribe(() => events.push('with'));
+      fixture.componentInstance.showProjectsWithoutResults.subscribe(() => events.push('without'));
+      fixture.componentInstance.openQueue.subscribe(c => events.push(c));
+      el.querySelectorAll<HTMLButtonElement>('button[data-testid="pfm-journey-part"]').forEach(card => card.click());
+      expect(events).toEqual(['with', 'without']);
+    });
+
+    it('each card is a keyboard-reachable button that names what it opens', () => {
+      const card = render(1).el.querySelector('button[data-testid="pfm-journey-part"]');
+      expect(card?.getAttribute('type')).toBe('button');
+      expect(card?.getAttribute('aria-label')).toBe('Open Draft: 20 results');
+    });
   });
 });
