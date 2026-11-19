@@ -412,6 +412,6 @@ The owner ran this branch's server and client natively against the shared Dev DB
   - The owner confirmed the cause: "ese fue un problema que tuve por que mi local tenia zona horaria diferente". They corrected the Dev data themselves and re-tested.
   - The rule in this spec orders by `id` and is not affected by timestamps.
 - **Owner verdict after the re-test:** "si quedo al pelo".
-- **Steps 3 and 4 (picker year, keyboard) were not reported one by one.** The owner's approval covers them, but they are not quoted as observed (KZ-002), so the HITL box stays unticked.
+- **Steps 3 and 4 (picker year, keyboard), observed by the owner.** Asked separately, the owner confirmed: "sí probé los pasos 3 y 4". The HITL box is ticked on that statement.
 - **Step 5** was not run. It was optional, at the owner's choice.
 - **Copy:** the warning and tooltip wording chosen by the workers was accepted as shown.

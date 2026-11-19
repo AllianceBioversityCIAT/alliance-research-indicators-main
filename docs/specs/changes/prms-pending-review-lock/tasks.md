@@ -290,7 +290,7 @@ graph TD
 
 ### T-05 — Sidebar: PRMS SYNC disabled while held, plus the live Dev check
 
-- **Status:** done 2026-11-19 (attempt 1; owner approved; HITL steps 3–4 not quoted individually) — see `execution.md` · **Size:** M · **Dependencies:** T-02, T-03 (T-04 for the shared API method)
+- **Status:** done 2026-11-19 (attempt 1; owner approved the HITL) — see `execution.md` · **Size:** M · **Dependencies:** T-02, T-03 (T-04 for the shared API method)
 - **Requirements:** R-PRL-005 (S-21…S-25), NFR-PRL-002, NFR-PRL-004 (client half)
 - **Design:** §5.4, DD-7 (client half)
 - **Files:** `client/.../shared/components/result-sidebar/result-sidebar.component.{ts,html}` (+ spec)
@@ -335,7 +335,7 @@ graph TD
 - **Done:**
   - [x] specs green, with reds and falsifiers quoted
   - [x] lint + type-check clean
-  - [ ] HITL steps 1–4 observed and quoted (step 5 only if the owner chooses) — steps 1–2 quoted; 3–4 covered by the owner's approval but not quoted (KZ-002)
+  - [x] HITL steps 1–4 observed and quoted (step 5 only if the owner chooses)
   - [x] the owner approves visually → only then commit the client tasks
 
 ## 4. Review intensity
