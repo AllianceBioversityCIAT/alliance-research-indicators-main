@@ -7,8 +7,8 @@ import { PfmSyncActivityCardComponent } from '../pfm-sync-activity-card/pfm-sync
 import { PfmSyncedByTypeCardComponent } from '../pfm-synced-by-type-card/pfm-synced-by-type-card.component';
 
 /**
- * Stats tab: the monitor's charts, two by two. A click on a Science Program or a PRMS status opens
- * the Results queue on it, as it did on the coverage tab. Loading / error / Retry live in the page panel.
+ * Stats tab: the monitor's charts, two by two. A click on a Science Program, a PRMS status, a result
+ * type or a month opens the Results queue on exactly those results. Loading / error / Retry live in the page panel.
  */
 @Component({
   selector: 'app-pfm-stats-tab',
