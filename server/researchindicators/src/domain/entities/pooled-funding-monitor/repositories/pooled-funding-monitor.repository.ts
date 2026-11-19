@@ -104,6 +104,12 @@ export interface PfmFilterOptions {
 export const PFM_MONITORED_INDICATOR_IDS = [1, 2, 3, 4, 6] as const;
 export const PFM_PLATFORM_CODE = 'STAR';
 /**
+ * DD-PFM-40: TIP results are monitored too, but only Knowledge Products. AICCRA
+ * stays out, and the report year rule applies to every platform.
+ */
+export const PFM_TIP_PLATFORM_CODE = 'TIP';
+export const PFM_KNOWLEDGE_PRODUCT_INDICATOR_ID = 3;
+/**
  * The monitor counts ONLY results of this report year (`results.report_year_id`
  * holds the year value itself): queue, chips, KPIs, coverage, pipeline, monthly
  * series, filter options. Bound as a parameter in `monitoredWhere`.
@@ -139,6 +145,19 @@ const utcIso = (column: string): string =>
 
 /** `result_prms_sync_*` store the official code as VARCHAR; `results` as BIGINT. */
 const CODE_AS_TEXT_SQL = `(CAST(r.result_official_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
+
+/**
+ * Official codes are numbered per platform, so STAR 123 and TIP 123 can share a
+ * year (DD-PFM-40). The sync tables carry the platform; the explicit COLLATE
+ * keeps the comparison valid whichever collation those tables have (1267).
+ */
+const PLATFORM_AS_TEXT_SQL = `(r.platform_code COLLATE utf8mb4_unicode_520_ci)`;
+
+/**
+ * The reference a sync-log row stores: the bare code for STAR, `<platform>-<code>`
+ * for any other platform (`prmsRef`, prms-external-reference.ts).
+ */
+const PRMS_REF_AS_TEXT_SQL = `(CAST(IF(r.platform_code = 'STAR', r.result_official_code, CONCAT(r.platform_code, '-', r.result_official_code)) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
 
 /**
  * `result_pool_funding_alignment_sp.sp_code` is utf8mb4_0900_ai_ci while
@@ -387,6 +406,7 @@ export class PooledFundingMonitorRepository {
           FROM result_prms_sync_history h
           WHERE h.result_official_code = ${CODE_AS_TEXT_SQL}
             AND h.result_year = r.report_year_id
+            AND h.platform_code = ${PLATFORM_AS_TEXT_SQL}
             AND h.correlation_outcome = 'CORRELATED'
             AND h.duplicate_of_id IS NULL
             AND h.is_active = 1
@@ -536,7 +556,8 @@ export class PooledFundingMonitorRepository {
            COUNT(DISTINCT r.result_id) AS synced
          ${this.monitoredFrom()}
          INNER JOIN result_prms_sync_log l
-           ON l.external_reference = ${CODE_AS_TEXT_SQL}
+           ON l.external_reference = ${PRMS_REF_AS_TEXT_SQL}
+          AND l.platform_code = ${PLATFORM_AS_TEXT_SQL}
           AND l.result_year = r.report_year_id
           AND l.outcome = 'ACCEPTED'
           AND l.is_active = 1
@@ -569,7 +590,8 @@ export class PooledFundingMonitorRepository {
       `SELECT COUNT(DISTINCT r.result_id) AS synced
        ${this.monitoredFrom()}
        INNER JOIN result_prms_sync_log l
-         ON l.external_reference = ${CODE_AS_TEXT_SQL}
+         ON l.external_reference = ${PRMS_REF_AS_TEXT_SQL}
+        AND l.platform_code = ${PLATFORM_AS_TEXT_SQL}
         AND l.result_year = r.report_year_id
         AND l.outcome = 'ACCEPTED'
         AND l.is_active = 1
@@ -738,9 +760,15 @@ export class PooledFundingMonitorRepository {
    * so no AND can bind across it (KZ-017); the integration spec asserts it on rows.
    */
   private monitoredWhere(scope: PfmRepositoryScope): Fragment {
-    const params: unknown[] = [PFM_PLATFORM_CODE, PFM_REPORT_YEAR];
+    const params: unknown[] = [
+      PFM_PLATFORM_CODE,
+      PFM_TIP_PLATFORM_CODE,
+      PFM_KNOWLEDGE_PRODUCT_INDICATOR_ID,
+      PFM_REPORT_YEAR,
+    ];
     const clauses = [
-      `r.platform_code = ?`,
+      // STAR, or a TIP Knowledge Product (DD-PFM-40). One parenthesised unit (KZ-017).
+      `(r.platform_code = ? OR (r.platform_code = ? AND r.indicator_id = ?))`,
       `r.report_year_id = ?`,
       `r.is_snapshot = 0`,
       `r.is_active = 1`,
