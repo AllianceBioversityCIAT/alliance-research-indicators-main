@@ -9,7 +9,7 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved'] as const;
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved', 'managed_in_tip'] as const;
 export type PfmChip = (typeof PFM_CHIPS)[number];
 
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
@@ -185,6 +185,8 @@ export interface PfmChipCounts {
   /** In PRMS, pending review / approved (Synced = both). Optional: older servers omit them. */
   prms_pending?: number;
   prms_approved?: number;
+  /** TIP knowledge products in PRMS scope, not in PRMS yet: no action in STAR. Optional: older servers omit it. */
+  managed_in_tip?: number;
 }
 
 export interface PfmGroupCounts {
@@ -235,6 +237,8 @@ export interface PfmResultRow {
   /** Platform + official code, e.g. 'STAR-1234'. */
   result_code: string;
   platform_code: string;
+  /** Managed in another platform (TIP): shown for visibility, no action in STAR. Optional: older servers omit it. */
+  is_external?: boolean;
   official_code: number;
   report_year: number;
   /** Active snapshot years, newest first. */
