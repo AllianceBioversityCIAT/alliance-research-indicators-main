@@ -60,6 +60,11 @@ export class AppConfig {
     return process.env.ARI_AGROVOC_URL;
   }
 
+  // Public URL of the 2026 OICR Word template. Read on every download; not cached.
+  get ARI_OICR_TEMPLATE_URL(): string {
+    return process.env.ARI_OICR_TEMPLATE_URL;
+  }
+
   // PRMS Normalizer host
   get ARI_PRMS_NORMALIZER_HOST(): string {
     return process.env.ARI_PRMS_NORMALIZER_HOST;

@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { routes } from './app.routes';
+import { rolesGuard } from '@guards/roles.guard';
 import { CacheService } from '@services/cache/cache.service';
 
 /**
@@ -60,5 +61,19 @@ describe('app.routes — unauthenticated deep links', () => {
 
   it('keeps protected pages reachable when logged in', async () => {
     await expect(navigate('/results-center', true)).resolves.toBe('/results-center');
+  });
+});
+
+describe('app.routes — oicr download', () => {
+  const guardedIndex = routes.findIndex(route => route.path === 'oicr/download/:resultCode');
+  const legacyIndex = routes.findIndex(route => route.path === 'oicr/download');
+
+  it('requires login on /oicr/download/:resultCode and declares that route before the legacy entry', () => {
+    const guarded = routes[guardedIndex];
+
+    expect(guardedIndex).toBeGreaterThanOrEqual(0);
+    expect(guarded.canMatch).toContain(rolesGuard);
+    expect(guarded.data?.['isLoggedIn']).toBe(true);
+    expect(guardedIndex).toBeLessThan(legacyIndex);
   });
 });

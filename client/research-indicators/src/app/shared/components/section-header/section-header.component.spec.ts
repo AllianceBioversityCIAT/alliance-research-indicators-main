@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { SectionHeaderComponent } from './section-header.component';
 import { ActivatedRoute, Router, NavigationEnd } from '@angular/router';
 import { of } from 'rxjs';
@@ -208,6 +209,7 @@ describe('SectionHeaderComponent', () => {
   });
 
   it('should execute delete confirm flow successfully', async () => {
+    const invalidate = jest.spyOn(TestBed.inject(ResultsCenterService), 'invalidateResultsListFetchCache');
     // Trigger menu open to register the alert with confirm callback
     const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
     const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
@@ -225,10 +227,14 @@ describe('SectionHeaderComponent', () => {
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
     expect(actionsService.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
     expect(routerSpy.navigate as jest.Mock).toHaveBeenCalledWith(['/results-center']);
+    // Results Center must re-fetch instead of showing its cached list with the deleted result.
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate.mock.invocationCallOrder[0]).toBeLessThan((routerSpy.navigate as jest.Mock).mock.invocationCallOrder.at(-1)!);
   });
 
   it('should handle unsuccessful delete response', async () => {
     (apiService.DELETE_Result as jest.Mock).mockResolvedValueOnce({ successfulRequest: false });
+    const invalidate = jest.spyOn(TestBed.inject(ResultsCenterService), 'invalidateResultsListFetchCache');
 
     const deleteMenuItem = component.items().find(item => item.items?.some(subItem => subItem.label === 'Delete Result'));
     const deleteCommand = deleteMenuItem?.items?.find(item => item.label === 'Delete Result')?.command;
@@ -245,6 +251,7 @@ describe('SectionHeaderComponent', () => {
     const innerErrorPayload = (actionsService.showGlobalAlert as jest.Mock).mock.calls.pop()?.[0];
     innerErrorPayload.confirmCallback.event();
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
+    expect(invalidate).not.toHaveBeenCalled();
   });
 
   it('should handle delete API throwing error', async () => {
@@ -289,54 +296,45 @@ describe('SectionHeaderComponent', () => {
     expect(result).toBe('Test Item');
   });
 
-  it('should not show delete option when status_id is not 4, 5, or 7', () => {
-    cacheService.currentMetadata?.set({ status_id: 1 });
-    fixture.detectChanges();
+  describe('delete option by status: any status except Published', () => {
+    const expectDeleteShown = (shown: boolean) => {
+      fixture.detectChanges();
+      expect(component.showDeleteOption()).toBe(shown);
+      const items = component.items();
+      expect(items[0].items?.length).toBe(shown ? 1 : 0);
+      if (shown) expect(items[0].items?.[0].label).toBe('Delete Result');
+    };
 
-    expect(component.showDeleteOption()).toBe(false);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(0);
-  });
+    it.each([1, 2, 4, 5, 6, 7, 9, 10, 12, 13])('shows it to the creator when status_id is %p', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (cacheService as any).isMyResult.mockReturnValue(true);
+      expectDeleteShown(true);
+    });
 
-  it('should show delete option when status_id is 5', () => {
-    cacheService.currentMetadata?.set({ status_id: 5 });
-    fixture.detectChanges();
+    it.each([4, 6, 2])('shows it to an admin who is not the creator when status_id is %p', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (rolesService.isAdmin as unknown as jest.Mock).mockReturnValue(true);
+      expectDeleteShown(true);
+    });
 
-    expect(component.showDeleteOption()).toBe(true);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(1);
-    expect(items[0].items?.[0].label).toBe('Delete Result');
-  });
+    it('hides it for a Published result (14), even for the creator who is also an admin', () => {
+      cacheService.currentMetadata?.set({ status_id: 14 });
+      (cacheService as any).isMyResult.mockReturnValue(true);
+      (rolesService.isAdmin as unknown as jest.Mock).mockReturnValue(true);
+      expectDeleteShown(false);
+    });
 
-  it('should show delete option when status_id is 7', () => {
-    cacheService.currentMetadata?.set({ status_id: 7 });
-    fixture.detectChanges();
+    it.each([5, 7])('shows it to any user on a Revised/Rejected result (status_id %p)', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (cacheService as any).isMyResult.mockReturnValue(false);
+      expectDeleteShown(true);
+    });
 
-    expect(component.showDeleteOption()).toBe(true);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(1);
-    expect(items[0].items?.[0].label).toBe('Delete Result');
-  });
-
-  it('should show delete option when status_id is 4 and isMyResult is true', () => {
-    cacheService.currentMetadata?.set({ status_id: 4 });
-    (cacheService as any).isMyResult.mockReturnValue(true);
-    fixture.detectChanges();
-
-    expect(component.showDeleteOption()).toBe(true);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(1);
-    expect(items[0].items?.[0].label).toBe('Delete Result');
-  });
-
-  it('should not show delete option when status_id is 4 and isMyResult is false', () => {
-    cacheService.currentMetadata?.set({ status_id: 4 });
-    (cacheService as any).isMyResult.mockReturnValue(false);
-    fixture.detectChanges();
-
-    expect(component.showDeleteOption()).toBe(false);
-    const items = component.items();
-    expect(items[0].items?.length).toBe(0);
+    it.each([1, 2, 4, 6])('hides it from a user who is neither the creator nor an admin (status_id %p)', statusId => {
+      cacheService.currentMetadata?.set({ status_id: statusId });
+      (cacheService as any).isMyResult.mockReturnValue(false);
+      expectDeleteShown(false);
+    });
   });
 
   it('F-1: should not show delete option for an external result even for an admin (status_id 5)', () => {
@@ -453,20 +451,23 @@ describe('SectionHeaderComponent', () => {
     expect(items[0].items?.length).toBe(0);
   });
 
-  it('showOicrTemplateDownload is true for an OICR outside Portfolio 2', () => {
+  it('showOicrTemplateDownload is true for a Portfolio 1 OICR and false when the portfolio is missing or other', () => {
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
     expect(component.showOicrTemplateDownload()).toBe(true);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 5 });
-    expect(component.showOicrTemplateDownload()).toBe(true);
+    expect(component.showOicrTemplateDownload()).toBe(false);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 3 });
+    expect(component.showOicrTemplateDownload()).toBe(false);
   });
 
-  it('showOicrTemplateDownload is false for a Portfolio 2 OICR', () => {
+  it('showOicrTemplateDownload is true for a Portfolio 2 OICR', () => {
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
-    expect(component.showOicrTemplateDownload()).toBe(false);
+    expect(component.showOicrTemplateDownload()).toBe(true);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 2 });
-    expect(component.showOicrTemplateDownload()).toBe(false);
+    expect(component.showOicrTemplateDownload()).toBe(true);
   });
 
   it('showOicrTemplateDownload is false for a non-OICR result', () => {
@@ -474,16 +475,27 @@ describe('SectionHeaderComponent', () => {
     expect(component.showOicrTemplateDownload()).toBe(false);
   });
 
-  it('renders the download icon only when showOicrTemplateDownload() is true', () => {
+  it('renders the download icon after Portfolio 2 metadata arrives', () => {
     // Pins the TEMPLATE binding: asserting the computed alone cannot catch the @if
-    // still reading `indicator_id === 5` directly.
-    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
+    // still reading `indicator_id === 5` directly. The first detectChanges() already
+    // ran in beforeEach, before this metadata, so the icon must appear on the update.
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
     fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 3 });
+    fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
+  });
+
+  it('renders the download icon after Portfolio 1 metadata arrives', () => {
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
   });
 
   it('showStarPdfReport should require STAR result and supported indicators', () => {

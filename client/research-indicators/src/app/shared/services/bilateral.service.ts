@@ -77,6 +77,11 @@ export class BilateralService {
   readonly currentAlignment = signal<AlignmentResponse | null>(null);
   readonly loadingAlignment = signal(false);
   readonly savingAlignment = signal(false);
+  // Same request-seq as `scienceProgramsRequestSeq`: a response for a result that
+  // is no longer the latest request must not write the root singleton. The key
+  // strips a STAR- prefix so `STAR-123` and `123` are one result.
+  private alignmentRequestSeq = 0;
+  private alignmentResultKey: string | null = null;
 
   // Per-result SP picker source (REQ-BIL-ASR-01). `mappingStatus` discriminates the
   // empty states: `unmapped` → contact-ops message; `mapped` + empty list → no-SPs
@@ -86,6 +91,7 @@ export class BilateralService {
   readonly loadingSciencePrograms = signal(false);
   private scienceProgramsInflight = new Map<string, Promise<PoolFundingScienceProgram[]>>();
   private scienceProgramsRequestSeq = 0;
+  private scienceProgramsResultKey: string | null = null;
 
   // R-RC-005 — external (TIP/AICCRA/PRMS) results are always read-only on this tab,
   // regardless of `is_read_only`/ownership/admin. Must short-circuit BEFORE those
@@ -114,6 +120,7 @@ export class BilateralService {
   readonly tocCatalogError = signal(false);
   private tocCatalogInflight = new Map<string, Promise<BilateralTocCatalogResponse | null>>();
   private tocCatalogRequestSeq = 0;
+  private tocCatalogResultKey: string | null = null;
 
   async getContract(code: string): Promise<AgressoContractRow | null> {
     this.loadingContract.set(true);
@@ -158,17 +165,32 @@ export class BilateralService {
 
   // R-PFG-001 — the guard lives here (DD-1), covering all 5 call sites in one
   // change. The ineligible path CLEARS state rather than merely skipping the
-  // fetch (DD-3): `currentAlignment` is a root-scoped singleton with no reset on
-  // navigation, and today the failing request is the only thing that nulls it.
-  // `loadingAlignment` is never raised on this path — there is nothing to await.
-  async getAlignment(resultCode: string): Promise<AlignmentResponse | null> {
+  // fetch (DD-3). A later request for a different result also clears the
+  // singleton, and a response that is no longer the latest request does not
+  // write it (same seq guard as getSciencePrograms). `loadingAlignment` is
+  // never raised on the ineligible path — there is nothing to await.
+  async getAlignment(resultCode: string): Promise<AlignmentResponse | null | undefined> {
+    const key = resultCode.replace(/^STAR-/i, '');
     if (!isPoolFundingCapable(resultCode)) {
+      this.alignmentRequestSeq++;
+      this.alignmentResultKey = key;
       this.currentAlignment.set(null);
+      this.loadingAlignment.set(false);
+      this.dropScienceProgramsForOtherResult(resultCode);
       return null;
     }
+    const requestSeq = ++this.alignmentRequestSeq;
+    if (this.alignmentResultKey !== null && this.alignmentResultKey !== key) {
+      this.currentAlignment.set(null);
+    }
+    this.alignmentResultKey = key;
+    this.dropScienceProgramsForOtherResult(resultCode);
     this.loadingAlignment.set(true);
     try {
       const res = await this.api.GET_PoolFundingAlignment(resultCode);
+      if (requestSeq !== this.alignmentRequestSeq) {
+        return undefined;
+      }
       if (!res?.successfulRequest) {
         this.currentAlignment.set(null);
         return null;
@@ -176,8 +198,32 @@ export class BilateralService {
       this.currentAlignment.set(res.data);
       return res.data;
     } finally {
-      this.loadingAlignment.set(false);
+      if (requestSeq === this.alignmentRequestSeq) {
+        this.loadingAlignment.set(false);
+      }
     }
+  }
+
+  // `mappingStatus === null` with an empty list is the page's not-loaded state
+  // (the picker stays hidden). Clearing only when a different result starts
+  // keeps a same-result refresh, including a version switch, on the list it
+  // already has until that result's own response arrives. The seq bump drops
+  // a list that is already in flight for the result we just left.
+  private dropScienceProgramsForOtherResult(resultCode: string): void {
+    const key = resultCode.replace(/^STAR-/i, '');
+    if (this.scienceProgramsResultKey !== null && this.scienceProgramsResultKey !== key) {
+      this.scienceProgramsRequestSeq++;
+      this.sciencePrograms.set([]);
+      this.mappingStatus.set(null);
+      this.loadingSciencePrograms.set(false);
+      // The bumped seq makes the pending promise write nothing. Leaving it in
+      // the map would hand that same promise back on a quick return, so the
+      // picker stays empty with no new request and no spinner.
+      for (const inflightKey of [...this.scienceProgramsInflight.keys()]) {
+        if (inflightKey !== key) this.scienceProgramsInflight.delete(inflightKey);
+      }
+    }
+    this.scienceProgramsResultKey = key;
   }
 
   async getSciencePrograms(resultCode: string): Promise<PoolFundingScienceProgram[]> {
@@ -185,6 +231,7 @@ export class BilateralService {
     const inflight = this.scienceProgramsInflight.get(key);
     if (inflight) return inflight;
 
+    this.dropScienceProgramsForOtherResult(resultCode);
     const requestSeq = ++this.scienceProgramsRequestSeq;
     const promise = this.fetchSciencePrograms(resultCode, requestSeq).finally(() => {
       if (this.scienceProgramsInflight.get(key) === promise) {
@@ -225,11 +272,21 @@ export class BilateralService {
   }
 
   async patchAlignment(resultCode: string, body: UpdatePoolFundingAlignmentDto): Promise<PatchAlignmentResult> {
+    const key = resultCode.replace(/^STAR-/i, '');
+    // A save is newer than any GET already in flight for this result, so that
+    // GET must not write over the saved payload. A save for a result that is
+    // no longer the one on screen must not write the shared signal at all.
+    const requestSeq = ++this.alignmentRequestSeq;
+    // The in-flight GET's finally only clears loading when its seq is still
+    // current. This bump makes that finally skip, so clear it here.
+    this.loadingAlignment.set(false);
     this.savingAlignment.set(true);
     try {
       const res = await this.api.PATCH_PoolFundingAlignment(resultCode, body);
       if (res?.successfulRequest) {
-        this.currentAlignment.set(res.data);
+        if (requestSeq === this.alignmentRequestSeq && this.alignmentResultKey === key) {
+          this.currentAlignment.set(res.data);
+        }
         // The sidebar green check AND the PRMS SYNC gate both read
         // `cache.greenChecks()`, which is refreshed ONLY by ToPromiseService's
         // `loadingTrigger` finalize hook — a hook no PATCH goes through. Without
@@ -403,6 +460,11 @@ export class BilateralService {
     if (inflight) return inflight;
 
     const requestSeq = ++this.tocCatalogRequestSeq;
+    if (this.tocCatalogResultKey !== null && this.tocCatalogResultKey !== key) {
+      this.tocCatalog.set(null);
+      this.tocCatalogError.set(false);
+    }
+    this.tocCatalogResultKey = key;
     const promise = this.fetchTocCatalog(resultCode, requestSeq).finally(() => {
       if (this.tocCatalogInflight.get(key) === promise) {
         this.tocCatalogInflight.delete(key);

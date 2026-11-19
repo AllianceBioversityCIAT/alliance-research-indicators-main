@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 import { WasmService } from './wasm.service';
 
 describe('WasmService', () => {
@@ -168,10 +169,13 @@ describe('WasmService', () => {
   });
 
   describe('downloadTemplate', () => {
-    it('returns bytes from http', async () => {
+    it('returns bytes from the 2025 template', async () => {
       (http.get as jest.Mock).mockReturnValue(of(new ArrayBuffer(2)));
       const res = await (service as any).downloadTemplate();
       expect(res).toBeInstanceOf(Uint8Array);
+      expect(http.get).toHaveBeenCalledWith(`${environment.filesStorageUrl}templates/2025_OICR_Template.docx`, {
+        responseType: 'arraybuffer'
+      });
     });
 
     it('throws on http error', async () => {
