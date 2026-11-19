@@ -65,6 +65,11 @@ export interface PfmMonitoredRow extends PfmRawRow {
   primary_sp: PfmSpRef | null;
   /** Every active SP of the alignment except the primary one. */
   contributing_sps: PfmSpRef[];
+  /**
+   * UTC months ('YYYY-MM') with an ACCEPTED sync of this result, oldest first: the same log rows
+   * the monthly series counts, so a month bar and the queue it opens agree (DD-PFM-45).
+   */
+  synced_months: string[];
 }
 
 /** A contributing project of the scope, whether it has results or not (coverage stage 1). */
@@ -197,6 +202,10 @@ const ALIGNMENT_ID_SQL = `(
             AND a.is_active = 1
         )`;
 
+/** 'YYYY-MM' of a TIMESTAMP in UTC, the month key of the monthly series. */
+const UTC_MONTH_SQL = (column: string): string =>
+  `DATE_FORMAT(DATE_ADD(CAST('1970-01-01' AS DATETIME), INTERVAL FLOOR(UNIX_TIMESTAMP(${column})) SECOND), '%Y-%m')`;
+
 const toDate = (value: unknown): Date | null => {
   if (value == null || value === '') return null;
   if (value instanceof Date) return value;
@@ -319,6 +328,9 @@ export const mapMonitoredRow = (
     prms_history_status: latest?.status ?? null,
     prms_justification: latest?.justification ?? null,
     creator: (row.creator_name as string | null) ?? null,
+    synced_months: [
+      ...new Set(toJsonArray<string>(row.synced_months).map(String)),
+    ].sort(),
   } as PfmMonitoredRow;
 };
 
@@ -444,7 +456,16 @@ export class PooledFundingMonitorRepository {
             AND h.status IS NOT NULL
           ORDER BY COALESCE(h.decided_at, h.occurred_at) DESC, h.id DESC
           LIMIT 1
-        ) AS prms_latest
+        ) AS prms_latest,
+        (
+          SELECT JSON_ARRAYAGG(${UTC_MONTH_SQL('l.created_at')})
+          FROM result_prms_sync_log l
+          WHERE l.external_reference = ${PRMS_REF_AS_TEXT_SQL}
+            AND l.platform_code = ${PLATFORM_AS_TEXT_SQL}
+            AND l.result_year = r.report_year_id
+            AND l.outcome = 'ACCEPTED'
+            AND l.is_active = 1
+        ) AS synced_months
       ${this.monitoredFrom()}
       LEFT JOIN indicators i ON i.indicator_id = r.indicator_id
       LEFT JOIN result_status rs ON rs.result_status_id = r.result_status_id
@@ -583,7 +604,7 @@ export class PooledFundingMonitorRepository {
     const rows: { month: string; synced: string | number }[] =
       await this.dataSource.query(
         `SELECT
-           DATE_FORMAT(DATE_ADD(CAST('1970-01-01' AS DATETIME), INTERVAL FLOOR(UNIX_TIMESTAMP(l.created_at)) SECOND), '%Y-%m') AS month,
+           ${UTC_MONTH_SQL('l.created_at')} AS month,
            COUNT(DISTINCT r.result_id) AS synced
          ${this.monitoredFrom()}
          INNER JOIN result_prms_sync_log l
