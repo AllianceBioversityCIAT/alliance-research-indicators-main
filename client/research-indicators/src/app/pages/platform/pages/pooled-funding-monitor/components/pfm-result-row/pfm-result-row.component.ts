@@ -9,6 +9,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { FormatDatePipe } from '@shared/pipes/format-date.pipe';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { PRMS_STATUS_BORDER, statusColor } from '@shared/constants/pfm-status-colors';
+import { PFM_HELP } from '../../pfm-help';
 
 /** Semantic token pair (foreground doubles as the outline) for a tag; bound as var() strings, never hex. */
 export interface PfmTagTone {
@@ -50,6 +51,8 @@ export class PfmResultRowComponent {
   /** Same padding as the Results Center code chip (formatResultCode). */
   codeNumber = computed(() => String(this.row().official_code ?? '').padStart(3, '0'));
   fullTitle = computed(() => this.row().title || this.row().result_code);
+  /** A TIP row is shown for visibility only: the platform tag says so (DD-PFM-40). */
+  externalNote = computed(() => (this.row().is_external ? PFM_HELP.fromTip : undefined));
 
   /**
    * STAR tag tooltip: the status description, then the approval date when there is one.
