@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { PFM_STATE } from '@shared/constants/pfm-status-colors';
-import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
 import { PFM_HELP } from '../../pfm-help';
 import { PfmChip, PfmJourney, PfmScope } from '../../pfm.interfaces';
 
@@ -44,6 +43,8 @@ const PART_TAG: Record<PartKind, string> = { act: 'Needs action', done: 'Finishe
 /** STAR's own status colours for Draft / Submitted / Approved (result_status config). */
 const STAR_DRAFT = 'var(--ac-light-blue-300)';
 const STAR_SUBMITTED = 'var(--ac-primary-blue-500)';
+/** The Completed in TIP status colour (result_status 20 config text), as its tag shows it. */
+const TIP_COMPLETED = 'var(--ac-green-500)';
 
 /**
  * Coverage tab, "the journey of a result": five stages a result goes through, each a subset of
@@ -171,14 +172,14 @@ export class PfmJourneyCardComponent {
             kind: 'next',
             target: 'journey_approved'
           },
-          // TIP's own colour, the same as its platform tag in every row; shown only when there are any.
+          // The Completed in TIP status colour, the same as its tag in every row; shown only when there are any.
           ...(tip
             ? [
                 {
                   label: 'Completed in TIP',
                   note: PFM_HELP.completedInTip,
                   value: tip,
-                  color: PLATFORM_COLOR_MAP['TIP'].text,
+                  color: TIP_COMPLETED,
                   kind: 'next' as const,
                   target: 'journey_completed_in_tip' as const
                 }
