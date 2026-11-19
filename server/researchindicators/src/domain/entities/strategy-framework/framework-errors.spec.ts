@@ -34,6 +34,36 @@ describe('framework-errors (design 2.1, R-STF-006, design 5.4 step 2)', () => {
     expect(plain.getResponse()).toEqual({
       message: { description: 'the framework changed, reload' },
     });
+
+    const emptyField = conflict('the framework changed, reload', '');
+    expect(emptyField.getResponse()).toEqual({
+      message: { description: 'the framework changed, reload', field: '' },
+    });
+  });
+
+  it.each([
+    ['children', 1, 'Delete or move its 1 Indicator first.'],
+    ['children', 2, 'Delete or move its 2 Indicators first.'],
+    [
+      'institutional-objective',
+      1,
+      'Unlink it from that institutional objective first.',
+    ],
+    [
+      'institutional-objective',
+      2,
+      'Unlink it from those 2 institutional objectives first.',
+    ],
+    ['consumer', 1, 'Remove its 1 record in KPIs first.'],
+    ['consumer', 2, 'Remove its 2 records in KPIs first.'],
+  ])('way-out %s when N = %s', (kind, count, expected) => {
+    const wayOut =
+      kind === 'children'
+        ? childrenWayOut(count, 'Indicator', 'Indicators')
+        : kind === 'institutional-objective'
+          ? institutionalObjectivesWayOut(count)
+          : consumerWayOut(count, 'KPIs');
+    expect(wayOut).toBe(expected);
   });
 
   it('blocked builds { message: { description, blockers } } with a way out per blocker', () => {
@@ -41,7 +71,7 @@ describe('framework-errors (design 2.1, R-STF-006, design 5.4 step 2)', () => {
       {
         reason: 'children',
         count: 2,
-        wayOut: childrenWayOut(2, 'Indicators'),
+        wayOut: childrenWayOut(2, 'Indicator', 'Indicators'),
       },
       {
         reason: 'institutional-objective',
@@ -56,7 +86,7 @@ describe('framework-errors (design 2.1, R-STF-006, design 5.4 step 2)', () => {
     ];
     expect(blockers.map((blocker) => blocker.wayOut)).toEqual([
       'Delete or move its 2 Indicators first.',
-      'Unlink it from those 1 institutional objectives first.',
+      'Unlink it from that institutional objective first.',
       'Remove its 4 records in KPIs first.',
     ]);
 

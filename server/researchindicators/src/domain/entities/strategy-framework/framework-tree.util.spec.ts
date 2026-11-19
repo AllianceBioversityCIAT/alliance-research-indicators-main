@@ -16,8 +16,8 @@ const el = (
 ): TreeElement => ({ id, parentId, depth, code });
 
 /**
- * Four levels, with a gap in the sense that depth 4 exists only as fixture
- * data (R-STF-002 AC.1). Counts are literals, not recomputed.
+ * Four levels. Depth 4 is present only so this fixture is not a three-level
+ * tree (R-STF-002 AC.1). Counts are literals, not recomputed.
  *
  * 1 Area
  *   2 Dimension 1.1

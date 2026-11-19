@@ -139,3 +139,14 @@ Not run by the Leader: Dev is shared and the owner runs these checks (standing r
 
 - **Source:** T-04 Reviewer advisory 1 — design §5.4 templates yield «Unlink it from those 1 institutional objectives first.» / «Delete or move its 1 Indicators first.» while §5.4's own N = 1 example is singular.
 - **Owner decision (2026-11-19):** *Singular cuando N = 1.* **Execute-time spec edit:** `design.md` §5.4 step 2 gains the N = 1 wording; decisions log row **D-STF-27**. Changes a text, not an approved requirement (R-STF-006 fixes no way-out wording). Code change dispatched as **T-04 amendment** (below) before T-05; carried as a named conformance check into the next two Reviewer briefs.
+
+### T-04 amendment — D-STF-27 singular way-out texts
+
+- **Status:** PASS (attempt 1) — 2026-11-19
+- **Dispatch:** fresh Grok `grok-4.7-medium`, task `task_6f366e840ee5`, dispatch `ctx_35a1c7c48e99`. Effort medium. Scope: `framework-errors.ts` + spec, plus T-04 Reviewer advisories 3 (`conflict` keeps `field` when `!== undefined`) and 4 (fixture comment).
+- **Implementer report:** `framework-errors.ts` +24/−7 (`childrenWayOut(count, levelName, pluralLevelName)`; three N = 1 branches), `framework-errors.spec.ts` +32/−2 (N = 1 / N = 2 table per kind; empty-field assertion), `framework-tree.util.spec.ts` +2/−2. Jest 6 suites / 50 tests; eslint 0; build 0. Falsifier (IOB N = 1 branch reverted): `framework-errors.spec.ts:66` Expected "Unlink it from that institutional objective first." Received "Unlink it from those 1 institutional objectives first." — restored. Assumption: only N === 1 is singular (N = 0 never reaches the helpers — §5.4 "Any non-zero").
+- **Leader re-run (non-author, inline): VERIFIED** — jest 6 suites 50/50; eslint 0; build 0.
+- **Reviewer (T-04 context resumed): `STATUS: PASS`** — three singular texts word for word against §5.4 L230 / D-STF-27 L359; plurals unchanged; advisories 3 and 4 fixed; signature change breaks no caller (T-04 Consumers: none).
+  - ADVISORY → **forward pointer to T-05:** pass the level's `name` as singular and `plural_name` as plural to `childrenWayOut` (both strings — a swap compiles); plus the move-time same-portfolio check in the service (T-04 advisory 2) and the cross-portfolio *level* case (T-02).
+- **spawns:** implementer (Cursor/Grok) — not reported by host, ended complete; reviewer — not reported by host, ended complete.
+- **Running totals:** tasks 4/17 (+ amendment) · server LOC ≈ 2,250 · review rounds 8 / ≈ 26 · re-based budget server ≈ 7,000.
