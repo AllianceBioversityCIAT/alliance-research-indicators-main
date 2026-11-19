@@ -149,9 +149,11 @@ const CODE_AS_TEXT_SQL = `(CAST(r.result_official_code AS CHAR CHARACTER SET utf
 /**
  * Official codes are numbered per platform, so STAR 123 and TIP 123 can share a
  * year (DD-PFM-40). The sync tables carry the platform; the explicit COLLATE
- * keeps the comparison valid whichever collation those tables have (1267).
+ * keeps the comparison valid whichever collation those tables have (1267). The
+ * CAST comes first because `results.platform_code` is not utf8mb4 on every
+ * schema (utf8mb3 on the scratch one), and a utf8mb4 COLLATE on it fails.
  */
-const PLATFORM_AS_TEXT_SQL = `(r.platform_code COLLATE utf8mb4_unicode_520_ci)`;
+const PLATFORM_AS_TEXT_SQL = `(CAST(r.platform_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
 
 /**
  * The reference a sync-log row stores: the bare code for STAR, `<platform>-<code>`
