@@ -153,8 +153,8 @@ A result SHALL be monitored iff **all** of the following hold:
 - GIVEN a TIP Knowledge Product of the monitored report year (status *Completed in TIP*) whose primary contract is a contributing project
 - THEN it is monitored, in every count, chart, step and row, with its real mapping and PRMS state
 - AND *Completed in TIP* counts as approved: it is final in TIP, so it is neither *Draft* nor *Awaiting PI*
-- AND it needs no action in STAR: it is never in *Need attention*, *Mapping incomplete*, *Ready to sync* or *Awaiting PI*; while it is in PRMS scope and not in PRMS yet it is in *Managed in TIP*
-- AND its row is marked *From TIP*, with a tooltip saying it is managed in TIP and needs no action in STAR
+- AND its mapping counts exactly like a STAR result's (DD-PFM-43): it is in *Need attention*, *Mapping pending* and *Ready to sync* when its mapping says so, and never in *Pending approval*
+- AND its row is marked by the TIP platform tag, with a tooltip saying it was reported and completed in TIP
 - BUT a TIP Knowledge Product of another report year is not monitored (R-PFM-003 item 4 applies to every platform)
 
 #### Scenario: Same code on two platforms
