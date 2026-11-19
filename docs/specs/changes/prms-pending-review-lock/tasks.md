@@ -2,7 +2,7 @@
 
 - **Module:** result-prms-sync (server) · version-selector + result-sidebar (client)
 - **Spec id:** 2026-11-prms-pending-review-lock
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** owner + delegated workers (all code goes to a worker; Claude briefs and reviews)
 - **Linked requirements:** ./requirements.md · **Linked design:** ./design.md · **Review:** ./judgment.md
 - **Branch:** `fix/prevent-prms-resubmission-during-active-review`
@@ -70,7 +70,7 @@ graph TD
 
 ### T-01 — Pure rule, history reader, and SQL fixture
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done (2026-11-19, PASS attempt 1 — see `execution.md`) · **Size:** M · **Dependencies:** none
 - **Requirements:** R-PRL-001. Scenarios: S-1…S-6, S-26, S-27 (S-4 "no rows" half)
 - **Design:** §3, §5.1, DD-1, DD-2, DD-8, P-1, P-3, P-9, P-11, P-12
 - **Files:**
@@ -131,11 +131,11 @@ graph TD
 - **Review:** full. This is the core rule; SQL semantics cannot be seen by mocked tests.
 - **Skills:** `nestjs-expert`, `tdd`
 - **Done:**
-  - [ ] rule and reader specs green
-  - [ ] fixture green against the TEST schema
-  - [ ] falsifiers (a)–(d) each observed red, quoted in `execution.md`
-  - [ ] `npm run build` clean; eslint clean
-  - [ ] no write to any table outside `result_prms_sync_history` in the fixture
+  - [x] rule and reader specs green
+  - [x] fixture green against the TEST schema
+  - [x] falsifiers (a)–(d) each observed red, quoted in `execution.md`
+  - [x] `npm run build` clean; eslint clean
+  - [x] no write to any table outside `result_prms_sync_history` in the fixture
 
 ### T-02 — Gate entry `prms_resubmittable` and the typed refusal
 

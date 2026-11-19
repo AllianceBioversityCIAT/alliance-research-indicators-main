@@ -124,6 +124,7 @@ No data model changes. The design reads `result_prms_sync_history`, which **thre
 
 1. **Event shape and contract.** The reader yields one event per relevant row:
    - `{ kind: 'push' | 'decision', decision: 'APPROVE' | 'REJECT' | null, year: number, imported: boolean }`.
+   - *Amended 2026-11-19 (T-01, execute-time):* the rule's input type widens `decision` to `string | null`, so the "unknown verb" unit test (S-6) can feed a verb the rule must ignore. The reader still emits only `'APPROVE' | 'REJECT' | null`.
    - The input array is **already in `id` ascending order**, the order the SQL returns. The rule never compares ids. Unit tests feed sequences in `id` order and include one whose timestamps disagree (698).
 2. **Event year:**
    - A push uses `result_year`.
