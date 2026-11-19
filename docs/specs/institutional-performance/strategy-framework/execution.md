@@ -224,3 +224,24 @@ Not run by the Leader: Dev is shared and the owner runs these checks (standing r
 - **Requirements covered:** R-STF-014, R-STF-013 AC.2, NFR-STF-003, NFR-STF-005.
 - **Running totals:** tasks 8/17 · server LOC ≈ 9,600 (re-based server ≈ 12,000) · review rounds 14/≈26.
 - **Approval:** continue gate `auto-approved (owner standing direction)`.
+
+## Dev pre-merge checks — results (2026-11-19 20:16:34, run by the Leader at the owner's request)
+
+Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TRANSACTION READ ONLY; … COMMIT`), host `dbprod04.cgiarad.org`, database `alliancereportingdb`. No write issued.
+
+1. **P-17** — `SELECT sec_role_id, name FROM sec_roles WHERE sec_role_id = 11;` → **no row** (`COUNT(*) = 0`). id 11 is free on Dev; T-01's `up()` will insert `ODS Admin` and will not throw. Re-check only if the merge is delayed (another branch could take id 11).
+2. **P-31** — `SELECT id, name, start_year, end_year, is_active FROM portfolios;` →
+
+   | id | name | start_year | end_year | is_active |
+   | --- | --- | --- | --- | --- |
+   | 1 | Portfolio 1 | 2010 | 2025 | 1 |
+   | 2 | Portfolio 2 | 2026 | 2030 | 1 |
+
+   **Forward pointer to T-09 (answered):** the seed's target portfolio is **Portfolio 2 (id 2, 2026–2030)**; on 2026-11-19 it is the only portfolio containing today, so the §5.1 default rule resolves to it (R-STF-015 AC.2). The scratch copy holds the same two rows.
+
+## Session pause (2026-11-19)
+
+- **Done:** T-01…T-08 (+ T-04 amendment), all PASS, committed on `institutional-kpis` (not pushed). Server LOC 9,600 (re-based server ≈ 12,000; next budget check after T-10). Review rounds 14/≈26.
+- **Next:** T-09 (seed: generator, committed data file, seed migration — unblocked by P-31 above), then T-10 (integration suites; carries forward pointers from T-02 EXTRA check, T-06 update-vs-create concurrency, T-08 live Swagger count). Client T-11…T-16 after; UI changes stay uncommitted until the owner's visual approval.
+- **Environment:** scratch `127.0.0.1:3307/ari_scratch_test` = Dev copy + family migrations + `1795000000000…002` applied. Docker container `research_indicators_server_test_mysql` must be running.
+- No Orca worker left open for this spec.
