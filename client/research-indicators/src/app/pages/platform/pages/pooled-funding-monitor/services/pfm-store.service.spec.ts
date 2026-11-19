@@ -177,7 +177,7 @@ describe('PfmStoreService', () => {
     store.openQueue({ chip: 'ready_to_sync' });
     expect(store.tab()).toBe('queue');
     expect(store.chip()).toBe('ready_to_sync');
-    expect(store.filters()).toEqual({ project: null, sp: null, type: null });
+    expect(store.filters()).toEqual({ project: null, sp: null, type: null, synced_month: null });
     expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
     expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ chip: 'ready_to_sync', project: null, type: null }));
     expect(router.navigate).toHaveBeenCalled();
@@ -324,7 +324,7 @@ describe('PfmStoreService', () => {
 
       expect(store.scope()).toBe('all');
       expect(store.tab()).toBe('queue');
-      expect(store.filters()).toEqual({ project: 'P1', sp: 'SP01', type: 3 });
+      expect(store.filters()).toEqual({ project: 'P1', sp: 'SP01', type: 3, synced_month: null });
       expect(store.chip()).toBe('synced');
       expect(store.groupViews()).toEqual({ P1: view });
       expect([...store.openGroups()]).toEqual(['P1', 'P2']);
@@ -421,7 +421,7 @@ describe('PfmStoreService', () => {
     store.resetFilters();
     await new Promise(r => setTimeout(r));
 
-    expect(store.filters()).toEqual({ project: null, sp: null, type: null });
+    expect(store.filters()).toEqual({ project: null, sp: null, type: null, synced_month: null });
     expect(store.chip()).toBeNull();
     expect(store.groupRows()).toEqual({});
     expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
@@ -536,6 +536,33 @@ describe('PfmStoreService', () => {
       slowFail.reject(new Error('late'));
       await new Promise(r => setTimeout(r));
       expect(store.groupState()['P2']).toBeUndefined();
+    });
+  });
+
+  describe('Stats charts open the queue on exactly their results (DD-PFM-45)', () => {
+    it('a result type opens Synced with PRMS narrowed to that type', async () => {
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+      store.openQueue({ chip: 'synced', type: 6 });
+      expect(store.tab()).toBe('queue');
+      expect(store.chip()).toBe('synced');
+      expect(store.filters()).toEqual({ project: null, sp: null, type: 6, synced_month: null });
+      expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ chip: 'synced', type: 6 }));
+    });
+
+    it('a month opens the queue on the results synced that month, and removing it keeps the rest', async () => {
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+      store.openQueue({ synced_month: '2026-06' });
+      expect(store.filters().synced_month).toBe('2026-06');
+      expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ synced_month: '2026-06' }));
+      store.setChip('need_attention');
+      store.clearSyncedMonth();
+      expect(store.filters().synced_month).toBeNull();
+      expect(store.chip()).toBe('need_attention');
+      expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ synced_month: null, chip: 'need_attention' }));
     });
   });
 });

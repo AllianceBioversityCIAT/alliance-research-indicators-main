@@ -1,7 +1,6 @@
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmPrmsStatusEnum } from '../enum/pfm-prms-status.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
-import { PfmStarLabelEnum } from '../enum/pfm-star-label.enum';
 import type {
   PfmContributingProjectRow,
   PfmProjectDelegate,
@@ -203,9 +202,17 @@ export const buildPortfolioProjects = (
  */
 export interface PfmJourney {
   projects: { total: number; with_results: number; without_results: number };
-  /** Draft includes Returned; Submitted includes Under review. */
-  star: { draft: number; submitted: number; approved: number };
-  /** Approved results only. */
+  /**
+   * Draft includes Returned; Submitted includes Under review. `approved` is STAR only;
+   * `completed_in_tip` is the TIP Knowledge Products, final in TIP (DD-PFM-40). Both move on.
+   */
+  star: {
+    draft: number;
+    submitted: number;
+    approved: number;
+    completed_in_tip: number;
+  };
+  /** Approved (or Completed in TIP) results only. */
   answer: { not_answered: number; contributes: number; no_sp: number };
   /** Approved results that contribute. */
   mapping: { incomplete: number; complete: number };
@@ -223,43 +230,20 @@ export const buildJourney = (
       with_results: projects.filter((p) => p.results > 0).length,
       without_results: projects.filter((p) => p.results === 0).length,
     },
-    star: { draft: 0, submitted: 0, approved: 0 },
+    star: { draft: 0, submitted: 0, approved: 0, completed_in_tip: 0 },
     answer: { not_answered: 0, contributes: 0, no_sp: 0 },
     mapping: { incomplete: 0, complete: 0 },
     sync: { ready: 0, synced: 0, rejected: 0 },
   };
-  for (const { row, d } of rows) {
-    if (d.starLabel === PfmStarLabelEnum.APPROVED) {
-      j.star.approved += 1;
-    } else if (
-      d.starLabel === PfmStarLabelEnum.SUBMITTED ||
-      d.starLabel === PfmStarLabelEnum.UNDER_REVIEW
-    ) {
-      j.star.submitted += 1;
-      continue;
-    } else {
-      j.star.draft += 1;
-      continue;
-    }
-    if (!row.has_alignment || row.has_contribution == null) {
-      j.answer.not_answered += 1;
-      continue;
-    }
-    if (!row.has_contribution) {
-      j.answer.no_sp += 1;
-      continue;
-    }
-    j.answer.contributes += 1;
-    if (!row.mapping_complete) {
-      j.mapping.incomplete += 1;
-      continue;
-    }
-    j.mapping.complete += 1;
-    if (d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT) {
-      j.sync.ready += 1;
-    } else {
-      j.sync.synced += 1;
-      if (d.prmsStatus === PfmPrmsStatusEnum.REJECTED) j.sync.rejected += 1;
+  // One path per result (deriveJourneyPath): the cards count it, the journey views list it.
+  for (const { d } of rows) {
+    const p = d.journey;
+    j.star[p.star] += 1;
+    if (p.answer) j.answer[p.answer] += 1;
+    if (p.mapping) j.mapping[p.mapping] += 1;
+    if (p.sync) j.sync[p.sync] += 1;
+    if (p.sync === 'synced' && d.prmsStatus === PfmPrmsStatusEnum.REJECTED) {
+      j.sync.rejected += 1;
     }
   }
   return j;
@@ -399,6 +383,8 @@ export interface PfmSummaryInput {
   contributingProjects?: PfmContributingProjectRow[];
   /** DISTINCT results accepted this calendar year (cannot be summed from months). */
   syncedThisYear: number;
+  /** The monitored report year (OICR.REPORTING_YEAR), for the page's copy. */
+  reportYear?: number;
   isPiOfAny: boolean;
   /**
    * PI or active delegate of at least one project, contributing or not (the
@@ -411,6 +397,8 @@ export interface PfmSummaryInput {
 
 export interface PfmSummary {
   scope: PfmScopeEnum;
+  /** OICR.REPORTING_YEAR, the year every number of the page belongs to (DD-PFM-41). */
+  report_year: number | null;
   is_pi_of_any: boolean;
   manages_any_project: boolean;
   kpis: {
@@ -441,6 +429,7 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => {
   );
   return {
     scope: i.scope,
+    report_year: i.reportYear ?? null,
     is_pi_of_any: i.isPiOfAny,
     manages_any_project: i.managesAnyProject ?? i.isPiOfAny,
     kpis: {
@@ -472,6 +461,8 @@ export interface PfmQueueFilters {
   project?: string;
   sp?: string;
   type?: number;
+  /** 'YYYY-MM': results with an ACCEPTED sync that UTC month (a Sync activity bar, DD-PFM-45). */
+  synced_month?: string;
   chip?: PfmChipEnum;
 }
 
@@ -489,8 +480,11 @@ export const PFM_CHIP_COUNT_KEYS = {
   [PfmChipEnum.PRMS_APPROVED]: 'prms_approved',
 } as const;
 
+/** Chips with a count in `chip_counts` (every chip but the journey views). */
+export type PfmCountedChip = keyof typeof PFM_CHIP_COUNT_KEYS;
+
 export type PfmChipCounts = Record<
-  (typeof PFM_CHIP_COUNT_KEYS)[PfmChipEnum],
+  (typeof PFM_CHIP_COUNT_KEYS)[PfmCountedChip],
   number
 >;
 
@@ -505,7 +499,8 @@ export const applyPfmFilters = (
       (!f.sp ||
         row.primary_sp?.code === f.sp ||
         row.contributing_sps.some((s) => s.code === f.sp)) &&
-      (f.type == null || row.indicator_id === f.type),
+      (f.type == null || row.indicator_id === f.type) &&
+      (!f.synced_month || row.synced_months.includes(f.synced_month)),
   );
 
 export const applyPfmChip = (
@@ -518,7 +513,8 @@ export const countPfmChips = (
   rows: PfmDerivedMonitoredRow[],
 ): PfmChipCounts => {
   const out = {} as PfmChipCounts;
-  for (const chip of Object.values(PfmChipEnum)) {
+  // Journey views are not counted here: the journey has its own numbers (DD-PFM-42).
+  for (const chip of Object.keys(PFM_CHIP_COUNT_KEYS) as PfmCountedChip[]) {
     out[PFM_CHIP_COUNT_KEYS[chip]] = rows.filter(({ d }) =>
       matchesChip(d, chip),
     ).length;

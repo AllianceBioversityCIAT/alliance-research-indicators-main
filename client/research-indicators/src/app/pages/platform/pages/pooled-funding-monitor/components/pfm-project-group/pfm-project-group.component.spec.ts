@@ -227,9 +227,10 @@ describe('PfmProjectGroupComponent', () => {
     fixture.detectChanges();
     expect(el.querySelector('[data-testid="pfm-row-view"]')).toBeNull();
     const views = Array.from(el.querySelectorAll<HTMLAnchorElement>('[data-testid="pfm-row-title"]'));
+    // Code descending by default: 2 before 1.
     expect(views.map(v => v.getAttribute('href'))).toEqual([
-      '/result/STAR-1?from=pfm-monitor',
-      '/result/STAR-2/general-information?version=2025&from=pfm-monitor'
+      '/result/STAR-2/general-information?version=2025&from=pfm-monitor',
+      '/result/STAR-1?from=pfm-monitor'
     ]);
     views[0].addEventListener('click', e => e.preventDefault());
     views[0].click();
@@ -320,6 +321,24 @@ describe('PfmProjectGroupComponent', () => {
     expect(box.querySelector('app-search-export-controls')).not.toBeNull();
     expect(box.textContent).toContain('Clear Filters');
     expect(box.textContent).not.toContain('Apply Filters');
+  });
+
+  it('is sorted by Code, newest first, by default, and Clear goes back to it', () => {
+    const rows = [1, 3, 2].map(n => row({ result_code: `STAR-${n}`, official_code: n, title: `Result ${n}` }));
+    const { el, fixture, bodyRows } = openWith(rows);
+    const codes = () => bodyRows().map(r => r.querySelector('[data-testid="pfm-row-code-number"]')?.textContent?.trim());
+    expect(codes()).toEqual(['003', '002', '001']);
+    const header = el.querySelector('[data-testid="pfm-col-official_code"]');
+    expect(header?.getAttribute('aria-sort')).toBe('descending');
+
+    (el.querySelector('[data-testid="pfm-col-title_sort"]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.sortField()).toBe('title_sort');
+
+    fixture.componentInstance.clear();
+    fixture.detectChanges();
+    expect([fixture.componentInstance.sortField(), fixture.componentInstance.sortOrder()]).toEqual(['official_code', -1]);
+    expect(codes()).toEqual(['003', '002', '001']);
   });
 
   it('sorting Updated uses the real instant, not the "dd Mon, HH:mm" label', () => {
@@ -435,9 +454,15 @@ describe('project table search helpers', () => {
 
       expect(cmp.search()).toBe('');
       expect(cmp.pageSize()).toBe(5);
-      expect(cmp.sortField()).toBeNull();
-      expect(cmp.sortOrder()).toBe(1);
+      expect(cmp.sortField()).toBe('official_code');
+      expect(cmp.sortOrder()).toBe(-1);
       expect(cmp.first()).toBe(0);
+    });
+
+    it('a saved view keeps the sort the user chose', () => {
+      const saved = { first: 0, rows: 5, search: '', sortField: 'title_sort', sortOrder: 1 } as PfmGroupView;
+      const cmp = setup(GROUP, { P100: saved }).fixture.componentInstance;
+      expect([cmp.sortField(), cmp.sortOrder()]).toEqual(['title_sort', 1]);
     });
 
     it('is loading while open with neither rows nor state; not loading when it has errored', () => {

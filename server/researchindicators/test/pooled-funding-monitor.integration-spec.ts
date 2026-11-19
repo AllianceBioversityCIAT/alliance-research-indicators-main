@@ -16,6 +16,7 @@ import { CreatePiDelegates1787600000000 } from '../src/db/migrations/17876000000
 import { CreateResultPrmsSyncLogTable1789479131116 } from '../src/db/migrations/1789479131116-createResultPrmsSyncLogTable';
 import { ReplaceResultIdWithOfficialCodeInPrmsSyncLog1790023167000 } from '../src/db/migrations/1790023167000-replaceResultIdWithOfficialCodeInPrmsSyncLog';
 import { CreatePrmsWebhookDeliveryTable1790086170692 } from '../src/db/migrations/1790086170692-createPrmsWebhookDeliveryTable';
+import { AddPlatformCodeToPrmsSyncTables1792673320363 } from '../src/db/migrations/1792673320363-addPlatformCodeToPrmsSyncTables';
 
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor - T-02
 //
@@ -72,8 +73,9 @@ const STRANGER = 105; // no staff row, no delegation
 const MINE = (userId: number): PfmRepositoryScope => ({
   scope: PfmScopeEnum.MINE,
   userId,
+  reportYear: YEAR,
 });
-const ALL: PfmRepositoryScope = { scope: PfmScopeEnum.ALL };
+const ALL: PfmRepositoryScope = { scope: PfmScopeEnum.ALL, reportYear: YEAR };
 
 const APPROVED_STATUS_CONFIG = {
   color: { border: '#0B8A3E', text: '#0B8A3E', background: '#E6F4EA' },
@@ -109,15 +111,17 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       tableSource[tableName] = 'persistent';
       return;
     }
-    const shim = {
-      query: async (sql: string) => {
-        if (/ADD CONSTRAINT|DROP FOREIGN KEY/i.test(sql)) return undefined;
-        return q(sql.replace(/^\s*CREATE TABLE/i, 'CREATE TEMPORARY TABLE'));
-      },
-    } as unknown as QueryRunner;
-    for (const migration of migrations) await migration.up(shim);
+    for (const migration of migrations) await migration.up(temporaryShim);
     tableSource[tableName] = 'temporary';
   };
+
+  /** Only adds TEMPORARY and skips FK statements (see header, point 3). */
+  const temporaryShim = {
+    query: async (sql: string) => {
+      if (/ADD CONSTRAINT|DROP FOREIGN KEY/i.test(sql)) return undefined;
+      return q(sql.replace(/^\s*CREATE TABLE/i, 'CREATE TEMPORARY TABLE'));
+    },
+  } as unknown as QueryRunner;
 
   beforeAll(async () => {
     const c = config();
@@ -166,6 +170,16 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     await replayAsTemporary('result_prms_sync_history', [
       new CreatePrmsWebhookDeliveryTable1790086170692(),
     ]);
+    // Both sync tables carry the platform since 1792673320363 (DD-PFM-40 reads it). The
+    // migration spans both tables, so it replays once both temporary tables exist.
+    if (
+      tableSource.result_prms_sync_log === 'temporary' &&
+      tableSource.result_prms_sync_history === 'temporary'
+    ) {
+      await new AddPlatformCodeToPrmsSyncTables1792673320363().up(
+        temporaryShim,
+      );
+    }
     console.info('PFM integration table sources:', tableSource);
 
     await q(`START TRANSACTION`);
@@ -475,7 +489,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     await alignment(6, 20, 1, [['SP09', 'PRIMARY']]);
     await alignment(7, 21, 1, [['SP09', 'PRIMARY']]);
 
-    // HITL 21: the monitor only counts report year 2026 (PFM_REPORT_YEAR).
+    // HITL 21: the monitor only counts the scope's report year (OICR.REPORTING_YEAR, YEAR here).
     // 1017: an otherwise-monitored P-A result of report year 2025 -> must not appear anywhere.
     await result(40, 1017, { year: 2025 });
     await alignment(8, 40, 1, [['SP10', 'PRIMARY']]);
@@ -493,6 +507,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     // ---- PRMS history (outbound STAR push + inbound PRMS decisions) ------
     const history = (o: Record<string, unknown>) =>
       insert('result_prms_sync_history', {
+        platform_code: 'STAR',
         environment: 'TEST',
         correlation_outcome: 'CORRELATED',
         processing_state: 'PROCESSED',
@@ -575,6 +590,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       createdAt: string,
     ) =>
       insert('result_prms_sync_log', {
+        platform_code: 'STAR',
         external_reference: code,
         result_year: year,
         attempt_number: 1,
@@ -949,6 +965,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       await align(20, 60, 1, 0, true); // deactivated by the versioning SP
       await align(21, 61, 1, 1, true);
       await insert('result_prms_sync_history', {
+        platform_code: 'STAR',
         environment: 'TEST',
         correlation_outcome: 'CORRELATED',
         processing_state: 'PROCESSED',
@@ -1165,6 +1182,183 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
         'Scaling programs',
         'Accelerators',
       ]);
+    });
+  });
+
+  // ------------------------------------------ DD-PFM-40: TIP knowledge products
+  // Seeded last, inside the same rolled-back transaction, so every count above is
+  // measured before these rows exist.
+  describe('DD-PFM-40: TIP knowledge products', () => {
+    const tipResult = async (
+      id: number,
+      code: number,
+      o: Partial<{
+        platform: string;
+        indicator: number;
+        year: number;
+        synced: number;
+      }> = {},
+    ) => {
+      await insert('results', {
+        result_id: id,
+        result_official_code: code,
+        title: `Result ${code}`,
+        indicator_id: o.indicator ?? 3,
+        result_status_id: 20,
+        report_year_id: o.year ?? YEAR,
+        is_snapshot: 0,
+        platform_code: o.platform ?? 'TIP',
+        is_active: 1,
+        is_synced_to_prms: o.synced ?? 0,
+        updated_at: '2026-10-01 10:20:30',
+      });
+      await insert('result_contracts', {
+        result_id: id,
+        contract_role_id: 1,
+        contract_id: 'P-A',
+        is_primary: 1,
+        is_active: 1,
+      });
+    };
+
+    beforeAll(async () => {
+      await tipResult(70, 2001); // TIP KP of 2026 on a contributing project
+      await tipResult(71, 1001); // same code as STAR 1001 (APPROVED history, accepted logs)
+      await tipResult(72, 2002, { synced: 1 }); // TIP KP in PRMS, own history and log
+      await tipResult(73, 2003, { year: 2025 }); // TIP KP of another report year
+      await tipResult(74, 2004, { platform: 'AICCRA' }); // AICCRA KP
+      await tipResult(75, 2005, { indicator: 1 }); // TIP, not a Knowledge Product
+      await insert('result_prms_sync_history', {
+        platform_code: 'TIP',
+        result_official_code: '2002',
+        result_year: YEAR,
+        environment: 'TEST',
+        correlation_outcome: 'CORRELATED',
+        processing_state: 'PROCESSED',
+        event_source: 'STAR',
+        status: 'PENDING_REVIEW',
+        occurred_at: '2026-10-02 10:00:00',
+        is_active: 1,
+      });
+      await insert('result_prms_sync_log', {
+        platform_code: 'TIP',
+        external_reference: 'TIP-2002',
+        result_year: YEAR,
+        attempt_number: 1,
+        environment: 'TEST',
+        outcome: 'ACCEPTED',
+        created_at: '2026-10-02 08:00:00',
+      });
+    });
+
+    it('monitors 2026 TIP Knowledge Products only: not another year, not AICCRA, not another TIP type', async () => {
+      const rows = await repo.findMonitoredResults(ALL);
+      const tip = rows
+        .filter((r) => r.platform_code === 'TIP')
+        .map((r) => r.result_official_code)
+        .sort((a, b) => a - b);
+      expect(tip).toEqual([1001, 2001, 2002]);
+      expect(codes(rows)).not.toContain(2003);
+      expect(codes(rows)).not.toContain(2004);
+      expect(codes(rows)).not.toContain(2005);
+      expect(codes(rows)).not.toContain(1007);
+      expect(rows.some((r) => r.platform_code === 'AICCRA')).toBe(false);
+    });
+
+    it('STAR 1001 and TIP 1001 each read only their own PRMS history', async () => {
+      const rows = await repo.findMonitoredResults(ALL);
+      const of = (platform: string, code: number) =>
+        rows.filter(
+          (r) =>
+            r.platform_code === platform && r.result_official_code === code,
+        );
+      expect(of('STAR', 1001)).toHaveLength(1);
+      expect(of('TIP', 1001)).toHaveLength(1);
+      expect(of('STAR', 1001)[0].prms_history_status).toBe('APPROVED');
+      expect(of('TIP', 1001)[0].prms_history_status).toBeNull();
+      expect(of('TIP', 1001)[0].is_synced_to_prms).toBe(false);
+      expect(of('TIP', 2002)[0].prms_history_status).toBe('PENDING_REVIEW');
+      expect(of('TIP', 2002)[0].is_synced_to_prms).toBe(true);
+    });
+
+    it('counts a TIP sync once, by its own TIP- reference, never through the STAR code', async () => {
+      // STAR 1001, 1003, 1005 (3, above) + TIP 2002. TIP 1001 shares STAR 1001's logs but not its platform.
+      expect(await repo.countSyncedThisYear(ALL, NOW)).toBe(4);
+      const october = (await repo.findMonthlySyncs(ALL, NOW)).find(
+        (m) => m.month === '2026-10',
+      );
+      expect(october?.synced).toBe(1);
+    });
+
+    it('DD-PFM-45: each row carries its own accepted sync months, by platform', async () => {
+      const rows = await repo.findMonitoredResults(ALL);
+      const of = (platform: string, code: number) =>
+        rows.find(
+          (r) =>
+            r.platform_code === platform && r.result_official_code === code,
+        );
+      expect(of('TIP', 2002)?.synced_months).toEqual(['2026-10']);
+      expect(of('TIP', 1001)?.synced_months).toEqual([]); // STAR 1001's logs are not its
+      expect(of('STAR', 1001)?.synced_months).toEqual([
+        '2025-12',
+        '2026-03',
+        '2026-05',
+        '2026-09',
+      ]);
+    });
+
+    it('DD-PFM-45: every Sync activity bar counts exactly the rows its month filter keeps', async () => {
+      const [rows, monthly] = await Promise.all([
+        repo.findMonitoredResults(ALL),
+        repo.findMonthlySyncs(ALL, NOW),
+      ]);
+      expect(monthly.length).toBeGreaterThan(0);
+      for (const { month, synced } of monthly) {
+        expect(
+          rows.filter((r) => r.synced_months.includes(month)),
+        ).toHaveLength(synced);
+      }
+    });
+
+    it('offers Knowledge Product as a type filter option', async () => {
+      const options = await repo.findFilterOptions(ALL);
+      expect(options.types.map((t) => t.id)).toContain(3);
+    });
+  });
+
+  // ------------------------------------- report year from OICR.REPORTING_YEAR
+  describe('report year (OICR.REPORTING_YEAR)', () => {
+    beforeAll(async () => {
+      await q('DELETE FROM app_config WHERE `key` = ?', [
+        'OICR.REPORTING_YEAR',
+      ]);
+    });
+
+    it('reads the active value of OICR.REPORTING_YEAR', async () => {
+      await insert('app_config', {
+        key: 'OICR.REPORTING_YEAR',
+        simple_value: '2025',
+        is_active: 1,
+      });
+      expect(await repo.findReportYear()).toBe(2025);
+      await q('DELETE FROM app_config WHERE `key` = ?', [
+        'OICR.REPORTING_YEAR',
+      ]);
+    });
+
+    it('falls back to the current UTC year when the key is missing', async () => {
+      expect(await repo.findReportYear(new Date('2027-06-01T00:00:00Z'))).toBe(
+        2027,
+      );
+    });
+
+    it('a 2025 scope returns the 2025 rows and none of 2026', async () => {
+      const rows = await repo.findMonitoredResults({
+        scope: PfmScopeEnum.ALL,
+        reportYear: 2025,
+      });
+      expect(new Set(rows.map((r) => r.report_year))).toEqual(new Set([2025]));
+      expect(codes(rows)).toContain(1017); // the report-year-2025 row above
     });
   });
 });

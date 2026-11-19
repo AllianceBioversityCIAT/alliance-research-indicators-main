@@ -30,7 +30,19 @@ const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
   rejected: 'Rejected by PRMS',
   no_sp_contribution: 'No SP contribution',
   prms_pending: 'Pending review in PRMS',
-  prms_approved: 'Approved by PRMS'
+  prms_approved: 'Approved by PRMS',
+  // Opened from the journey cards of the coverage tab.
+  journey_draft: 'Draft',
+  journey_submitted: 'Submitted',
+  journey_approved: 'Approved in STAR',
+  journey_completed_in_tip: 'Completed in TIP',
+  journey_not_answered: 'Mapping not answered',
+  journey_contributes: 'Contributes to CGIAR',
+  journey_no_sp: 'No Science Program contribution',
+  journey_mapping_incomplete: 'Mapping incomplete',
+  journey_mapping_complete: 'Mapping complete',
+  journey_ready: 'Ready to sync',
+  journey_synced: 'Synced to PRMS'
 };
 
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
@@ -52,6 +64,14 @@ export class PfmQueueTabComponent {
     const key = this.store.chip();
     if (!key || CHIPS.some(c => c.key === key)) return null;
     return HIDDEN_CHIP_LABELS[key] ? { key, label: HIDDEN_CHIP_LABELS[key] } : null;
+  });
+
+  /** 'Jun 2026' for the Sync activity month the queue is narrowed to, if any. */
+  readonly syncedMonthLabel = computed(() => {
+    const m = this.store.filters().synced_month;
+    if (!m) return null;
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${MONTHS[Number(m.slice(5, 7)) - 1] ?? m.slice(5, 7)} ${m.slice(0, 4)}`;
   });
 
   /** Last loaded queue: stays rendered (filters included) while a refetch is in flight. */

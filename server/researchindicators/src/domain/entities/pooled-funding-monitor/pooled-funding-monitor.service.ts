@@ -39,6 +39,8 @@ export type PfmQueueResponse = PfmQueueAggregate & {
 export interface PfmResultRow {
   result_code: string;
   platform_code: string;
+  /** Reported in TIP (DD-PFM-40); its mapping counts like a STAR one (DD-PFM-43). */
+  is_external: boolean;
   official_code: number;
   report_year: number;
   snapshot_years: number[];
@@ -88,7 +90,7 @@ export class PooledFundingMonitorService {
     now: Date = new Date(),
   ): Promise<PfmSummary> {
     const startedAt = performance.now();
-    const repoScope = this.resolveScope(userId, scope);
+    const repoScope = await this.resolveScope(userId, scope);
     const [
       monitored,
       projectsTotal,
@@ -114,6 +116,7 @@ export class PooledFundingMonitorService {
       monthlySyncs,
       contributingProjects,
       syncedThisYear,
+      reportYear: repoScope.reportYear,
       isPiOfAny,
       managesAnyProject,
       now,
@@ -128,7 +131,7 @@ export class PooledFundingMonitorService {
   ): Promise<PfmQueueResponse> {
     const startedAt = performance.now();
     const scope = query.scope ?? PfmScopeEnum.MINE;
-    const repoScope = this.resolveScope(userId, scope);
+    const repoScope = await this.resolveScope(userId, scope);
     const [monitored, filterOptions] = await Promise.all([
       this.repository.findMonitoredResults(repoScope),
       this.repository.findFilterOptions(repoScope),
@@ -159,7 +162,7 @@ export class PooledFundingMonitorService {
   ): Promise<PfmResultRow[]> {
     const startedAt = performance.now();
     const scope = query.scope ?? PfmScopeEnum.MINE;
-    const repoScope = this.resolveScope(userId, scope);
+    const repoScope = await this.resolveScope(userId, scope);
     const rows = deriveMonitoredRows(
       await this.repository.findMonitoredResults(repoScope),
     );
@@ -186,6 +189,7 @@ export class PooledFundingMonitorService {
   private toResultRow = ({ row, d }: PfmDerivedMonitoredRow): PfmResultRow => ({
     result_code: `${row.platform_code}-${row.result_official_code}`,
     platform_code: row.platform_code,
+    is_external: d.isExternal,
     official_code: row.result_official_code,
     report_year: row.report_year,
     snapshot_years: row.snapshot_years,
@@ -219,18 +223,20 @@ export class PooledFundingMonitorService {
    * raw Error when it is missing; that must never surface on the HTTP path, and
    * must never fall through to the portfolio (R-PFM-002).
    */
-  private resolveScope(
+  private async resolveScope(
     userId: number,
     scope: PfmScopeEnum,
-  ): PfmRepositoryScope {
+  ): Promise<PfmRepositoryScope> {
     if (!Number.isInteger(userId)) {
       throw new ForbiddenException(
         'CGIAR Portfolio Contribution Monitor requires an authenticated user',
       );
     }
+    // Read once per request, so every number of one response uses the same year.
+    const reportYear = await this.repository.findReportYear();
     return scope === PfmScopeEnum.ALL
-      ? { scope: PfmScopeEnum.ALL }
-      : { scope: PfmScopeEnum.MINE, userId };
+      ? { scope: PfmScopeEnum.ALL, reportYear }
+      : { scope: PfmScopeEnum.MINE, userId, reportYear };
   }
 
   private toFilters(query: PfmQueueQueryDto): PfmQueueFilters {
@@ -238,6 +244,7 @@ export class PooledFundingMonitorService {
     if (query.project) filters.project = query.project;
     if (query.sp) filters.sp = query.sp;
     if (query.type != null) filters.type = query.type;
+    if (query.synced_month) filters.synced_month = query.synced_month;
     if (query.chip) filters.chip = query.chip;
     return filters;
   }

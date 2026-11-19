@@ -39,6 +39,7 @@ const row = (o: Partial<PfmMonitoredRow> = {}): PfmMonitoredRow =>
     prms_history_status: null,
     prms_justification: null,
     creator: 'Ana Perez',
+    synced_months: [],
     ...o,
   }) as PfmMonitoredRow;
 
@@ -60,6 +61,7 @@ describe('PooledFundingMonitorService', () => {
           updated_at: null,
         }),
       ]),
+      findReportYear: jest.fn().mockResolvedValue(2031),
       countContributingProjects: jest.fn().mockResolvedValue(9),
       findContributingProjects: jest.fn().mockResolvedValue([]),
       findMonthlySyncs: jest.fn().mockResolvedValue([]),
@@ -79,7 +81,7 @@ describe('PooledFundingMonitorService', () => {
     it('defaults to mine and hands the AUTHENTICATED user id to every scoped read', async () => {
       const summary = await service.getSummary(77);
       expect(summary.scope).toBe(PfmScopeEnum.MINE);
-      const mine = { scope: PfmScopeEnum.MINE, userId: 77 };
+      const mine = { scope: PfmScopeEnum.MINE, userId: 77, reportYear: 2031 };
       expect(repo.findMonitoredResults).toHaveBeenCalledWith(mine);
       expect(repo.findMonthlySyncs).toHaveBeenCalledWith(
         mine,
@@ -92,15 +94,39 @@ describe('PooledFundingMonitorService', () => {
       expect(repo.isPiOfAnyContributingProject).toHaveBeenCalledWith(77);
     });
 
+    it('reports the configured report year in the summary', async () => {
+      expect((await service.getSummary(77, PfmScopeEnum.ALL)).report_year).toBe(
+        2031,
+      );
+    });
+
     it('scope=all uses the portfolio and still reports is_pi_of_any for the user', async () => {
       repo.isPiOfAnyContributingProject.mockResolvedValue(false);
       const summary = await service.getSummary(77, PfmScopeEnum.ALL);
       expect(repo.findMonitoredResults).toHaveBeenCalledWith({
         scope: PfmScopeEnum.ALL,
+        reportYear: 2031,
       });
       expect(summary.is_pi_of_any).toBe(false);
       expect(summary.synced_this_year).toBe(4);
       expect(summary.kpis.projects_total).toBe(9);
+    });
+
+    it('reads the report year once per request and gives every scoped read the same one', async () => {
+      await service.getSummary(77, PfmScopeEnum.ALL);
+      expect(repo.findReportYear).toHaveBeenCalledTimes(1);
+      const years = [
+        repo.findMonitoredResults.mock.calls[0][0],
+        repo.findMonthlySyncs.mock.calls[0][0],
+        repo.countSyncedThisYear.mock.calls[0][0],
+        repo.findContributingProjects.mock.calls[0][0],
+      ].map((scope) => scope.reportYear);
+      expect(years).toEqual([2031, 2031, 2031, 2031]);
+
+      repo.findReportYear.mockClear();
+      await service.getQueue(77, { scope: PfmScopeEnum.ALL });
+      expect(repo.findReportYear).toHaveBeenCalledTimes(1);
+      expect(repo.findFilterOptions.mock.calls[0][0].reportYear).toBe(2031);
     });
 
     // The m.lundy case: PI of many projects, none contributing. The page must
@@ -145,6 +171,24 @@ describe('PooledFundingMonitorService', () => {
   });
 
   describe('queue', () => {
+    it('DD-PFM-45: a synced month keeps only the results synced that month', async () => {
+      repo.findMonitoredResults.mockResolvedValueOnce([
+        row({ synced_months: ['2026-05', '2026-09'] }),
+        row({
+          result_id: 2,
+          result_official_code: 1002,
+          project_code: 'P-B',
+          synced_months: ['2026-06'],
+        }),
+      ]);
+      const q = await service.getQueue(77, {
+        scope: PfmScopeEnum.ALL,
+        synced_month: '2026-09',
+      });
+      expect(q.totals.results).toBe(1);
+      expect(q.groups.map((g) => g.code)).toEqual(['P-A']);
+    });
+
     it('adds filter_options from the repository and applies the chip after counting', async () => {
       // Ready to sync = mapping complete, so P-B's row needs an incomplete mapping here.
       repo.findMonitoredResults.mockResolvedValueOnce([
@@ -189,6 +233,7 @@ describe('PooledFundingMonitorService', () => {
       expect(r).toEqual({
         result_code: 'STAR-1002',
         platform_code: 'STAR',
+        is_external: false,
         official_code: 1002,
         report_year: 2026,
         snapshot_years: [2025],

@@ -6,7 +6,11 @@
       data-testid="pfm-row-code-platform"
       [style.color]="platformColors().text"
       [style.background-color]="platformColors().background"
-      >{{ row().platform_code }}</span
+      [pTooltip]="externalNote()"
+      tooltipEvent="both"
+      tooltipPosition="top"
+      [attr.tabindex]="externalNote() ? 0 : null"
+      >{{ row().platform_code }}@if (externalNote(); as note) {<span class="sr-only" data-testid="pfm-row-external-note">: {{ note }}</span>}</span
     >
     <span
       class="min-w-[43px] rounded-r-lg bg-[var(--ac-pfm-neutral-bg)] px-2 py-1 text-center text-[13px] text-[var(--ac-pfm-neutral-fg)]"

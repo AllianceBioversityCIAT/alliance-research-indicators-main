@@ -123,4 +123,37 @@ describe('PfmSyncActivityCardComponent', () => {
       expect(bars[0].height).toBe('0%');
     });
   });
+
+  describe('DD-PFM-45: clickable months and the configured year', () => {
+    it('a month with syncs opens the queue on that month; an empty month is not clickable', () => {
+      const { el, fixture } = render('all');
+      const opened: string[] = [];
+      fixture.componentInstance.openMonth.subscribe(m => opened.push(m));
+      const may = el.querySelector('[data-testid="pfm-month-open-2026-05"]') as HTMLButtonElement;
+      const march = el.querySelector('[data-testid="pfm-month-open-2026-03"]') as HTMLButtonElement;
+      expect(may.getAttribute('aria-label')).toBe('Open 52 results synced in May');
+      may.click();
+      march.click();
+      expect(march.disabled).toBe(true);
+      expect(opened).toEqual(['2026-05']);
+    });
+
+    it('the subtitle names the configured report year, not the calendar one', () => {
+      const fixture = TestBed.createComponent(PfmSyncActivityCardComponent);
+      fixture.componentRef.setInput('monthly', MONTHLY);
+      fixture.componentRef.setInput('syncedThisYear', 3);
+      fixture.componentRef.setInput('scope', 'all');
+      fixture.componentRef.setInput('reportYear', 2031);
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="pfm-sync-sub"]')?.textContent).toContain('Results of the 2031 reporting cycle pushed to PRMS');
+      // The footer counts syncs of the calendar year, so it keeps the calendar year.
+      expect(el.querySelector('[data-testid="pfm-sync-foot"]')?.textContent).toContain('synced in 2026');
+    });
+
+    it('falls back to the calendar year from an older server without report_year', () => {
+      const { q } = render('all');
+      expect(q('[data-testid="pfm-sync-sub"]')).toBe('Results of the 2026 reporting cycle pushed to PRMS');
+    });
+  });
 });

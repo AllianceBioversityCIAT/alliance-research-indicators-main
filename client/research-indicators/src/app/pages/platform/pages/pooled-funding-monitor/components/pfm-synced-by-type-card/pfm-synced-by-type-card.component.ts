@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmSyncedType } from '../../pfm.interfaces';
@@ -16,6 +16,8 @@ import { PfmSyncedType } from '../../pfm.interfaces';
 })
 export class PfmSyncedByTypeCardComponent {
   types = input.required<PfmSyncedType[]>();
+  /** A type row: open the queue on that type's results in PRMS (Synced with PRMS + the type). */
+  openType = output<number>();
 
   /** The steel blue of the Sync activity scale; the track is the card's neutral background. */
   readonly barFill = 'var(--ac-pfm-month-5)';

@@ -11,6 +11,10 @@ import { PfmPortfolioProjectsComponent } from '../pfm-portfolio-projects/pfm-por
 export interface PfmQueueTarget {
   chip?: PfmChip;
   sp?: string;
+  /** Result type (indicator id), e.g. a Synced results by type row. */
+  type?: number;
+  /** 'YYYY-MM', a Sync activity bar. */
+  synced_month?: string;
 }
 
 /**

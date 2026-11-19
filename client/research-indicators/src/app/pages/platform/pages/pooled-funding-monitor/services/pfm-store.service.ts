@@ -24,7 +24,7 @@ import {
 } from '../pfm.interfaces';
 import { PfmGroupView, savePfmReturnState, takePfmReturnState } from '../pfm-return-state';
 
-const EMPTY_FILTERS: PfmFilters = { project: null, sp: null, type: null };
+const EMPTY_FILTERS: PfmFilters = { project: null, sp: null, type: null, synced_month: null };
 
 @Injectable()
 export class PfmStoreService {
@@ -137,8 +137,8 @@ export class PfmStoreService {
    * Jump from a coverage chart to the Results queue showing exactly what was clicked: filters are
    * cleared (so the queue count equals the chart number), then the quick view and / or SP is applied.
    */
-  openQueue(opts: { chip?: PfmChip | null; sp?: string | null }): void {
-    this.filters.set({ ...EMPTY_FILTERS, sp: opts.sp ?? null });
+  openQueue(opts: { chip?: PfmChip | null; sp?: string | null; type?: number | null; synced_month?: string | null }): void {
+    this.filters.set({ ...EMPTY_FILTERS, sp: opts.sp ?? null, type: opts.type ?? null, synced_month: opts.synced_month ?? null });
     this.chip.set(opts.chip ?? null);
     this.resetGroups();
     this.tab.set('queue');
@@ -150,6 +150,13 @@ export class PfmStoreService {
   setFilter<K extends keyof PfmFilters>(key: K, value: PfmFilters[K]): void {
     this.filters.update(f => ({ ...f, [key]: value }));
     this.chip.set(null);
+    this.resetGroups();
+    void this.loadQueue();
+  }
+
+  /** Remove the Sync activity month and keep everything else, the quick view included. */
+  clearSyncedMonth(): void {
+    this.filters.update(f => ({ ...f, synced_month: null }));
     this.resetGroups();
     void this.loadQueue();
   }

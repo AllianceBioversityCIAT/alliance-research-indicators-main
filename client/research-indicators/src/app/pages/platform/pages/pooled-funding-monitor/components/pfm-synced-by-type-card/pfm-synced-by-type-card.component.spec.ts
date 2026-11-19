@@ -9,7 +9,7 @@ function render(types: PfmSyncedType[]) {
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
   const all = (id: string) => Array.from(el.querySelectorAll(`[data-testid="${id}"]`)) as HTMLElement[];
-  return { el, all };
+  return { el, all, fixture };
 }
 
 describe('PfmSyncedByTypeCardComponent', () => {
@@ -40,5 +40,19 @@ describe('PfmSyncedByTypeCardComponent', () => {
     const { el, all } = render([{ id: 5, name: 'Knowledge Product', synced: 0 }]);
     expect(all('pfm-type-label')).toHaveLength(0);
     expect(el.querySelector('[data-testid="pfm-empty-state"]')?.textContent?.trim()).toBe('Nothing yet');
+  });
+
+  it('each type is a button that opens the queue on that type (DD-PFM-45)', () => {
+    const { el, fixture } = render([
+      { id: 6, name: 'Innovation Use', synced: 6 },
+      { id: 2, name: 'Innovation Development', synced: 5 }
+    ]);
+    const opened: number[] = [];
+    fixture.componentInstance.openType.subscribe(id => opened.push(id));
+    const row = el.querySelector('[data-testid="pfm-type-row-2"]') as HTMLButtonElement;
+    expect(row.tagName).toBe('BUTTON');
+    expect(row.getAttribute('aria-label')).toBe('Open Innovation Development: 5 results in PRMS');
+    row.click();
+    expect(opened).toEqual([2]);
   });
 });

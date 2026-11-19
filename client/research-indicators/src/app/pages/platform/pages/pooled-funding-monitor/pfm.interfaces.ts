@@ -9,7 +9,10 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved'] as const;
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved',
+  // One view per journey card: the queue lists exactly what the card counts (server DD-PFM-42).
+  'journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip', 'journey_not_answered', 'journey_contributes',
+  'journey_no_sp', 'journey_mapping_incomplete', 'journey_mapping_complete', 'journey_ready', 'journey_synced'] as const;
 export type PfmChip = (typeof PFM_CHIPS)[number];
 
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
@@ -65,9 +68,12 @@ export interface PfmSyncedType {
 /** Coverage tab, "the journey of a result": five stages, each a subset of the one before. */
 export interface PfmJourney {
   projects: { total: number; with_results: number; without_results: number };
-  /** Draft includes Returned; Submitted includes Under review. */
-  star: { draft: number; submitted: number; approved: number };
-  /** Approved results only. */
+  /**
+   * Draft includes Returned; Submitted includes Under review. `approved` is STAR only;
+   * `completed_in_tip` are the TIP knowledge products (final in TIP). Optional: older servers omit it.
+   */
+  star: { draft: number; submitted: number; approved: number; completed_in_tip?: number };
+  /** Approved (or Completed in TIP) results only. */
   answer: { not_answered: number; contributes: number; no_sp: number };
   /** Approved results that contribute. */
   mapping: { incomplete: number; complete: number };
@@ -136,6 +142,8 @@ export interface PfmSummary {
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthly[];
   synced_this_year: number;
+  /** OICR.REPORTING_YEAR, the year the page counts. Optional: older servers omit it. */
+  report_year?: number | null;
   /** Results already in PRMS by result type, most first. Optional: older servers omit it. */
   synced_by_type?: PfmSyncedType[];
   /** Coverage tab stages. Optional: older servers omit it. */
@@ -235,6 +243,8 @@ export interface PfmResultRow {
   /** Platform + official code, e.g. 'STAR-1234'. */
   result_code: string;
   platform_code: string;
+  /** Reported in another platform (TIP). Optional: older servers omit it. */
+  is_external?: boolean;
   official_code: number;
   report_year: number;
   /** Active snapshot years, newest first. */
@@ -277,6 +287,8 @@ export interface PfmFilters {
   project: string | null;
   sp: string | null;
   type: number | null;
+  /** 'YYYY-MM': results synced to PRMS that UTC month (opened from a Sync activity bar). */
+  synced_month?: string | null;
 }
 
 /** Query accepted by /queue and /queue/projects/:projectCode/results. */
@@ -285,6 +297,7 @@ export interface PfmQueueQuery {
   project?: string | null;
   sp?: string | null;
   type?: number | null;
+  synced_month?: string | null;
   chip?: PfmChip | null;
 }
 

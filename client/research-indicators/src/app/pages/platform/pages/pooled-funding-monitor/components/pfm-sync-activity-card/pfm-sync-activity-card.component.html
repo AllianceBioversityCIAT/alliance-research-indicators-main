@@ -1,6 +1,6 @@
 <section class="flex h-full flex-col rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6" data-testid="pfm-sync-card" aria-labelledby="pfm-sync-title">
   <h2 id="pfm-sync-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Sync activity</h2>
-  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sync-sub">Results pushed to PRMS over the {{ year() }} reporting cycle</p>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sync-sub">Results of the {{ cycleYear() }} reporting cycle pushed to PRMS</p>
   @if (empty()) {
     <app-pfm-empty-state />
   } @else {
@@ -8,14 +8,21 @@
   <ul class="m-0 mt-4 grid min-h-[150px] flex-1 list-none grid-cols-6 gap-3 p-0" data-testid="pfm-sync-bars">
     @for (b of bars(); track b.month; let i = $index) {
       <li class="relative flex h-full flex-col items-center" [attr.data-testid]="'pfm-month-' + b.month">
-        <div class="relative w-full flex-1">
+        <!-- A month with syncs opens the queue on exactly those results; an empty month is not a button -->
+        <button
+          type="button"
+          class="relative w-full flex-1 border-0 bg-transparent p-0 font-[inherit] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{ b.synced > 0 ? 'cursor-pointer hover:opacity-80' : 'cursor-default' }}"
+          [disabled]="b.synced === 0"
+          [attr.aria-label]="'Open ' + (b.synced | number) + (b.synced === 1 ? ' result' : ' results') + ' synced in ' + b.label"
+          [attr.data-testid]="'pfm-month-open-' + b.month"
+          (click)="openMonth.emit(b.month)">
           <div
             class="absolute inset-x-0 bottom-0 rounded-t-md {{ b.fill }} {{ b.synced > 0 ? 'min-h-[6px]' : '' }}"
             [style.height]="b.height"
             [pTooltip]="(b.synced | number) + (b.synced === 1 ? ' result' : ' results') + ' synced in ' + b.label"
             tooltipPosition="top"
             data-testid="pfm-month-bar"></div>
-        </div>
+        </button>
         <span class="sr-only" data-testid="pfm-month-value">{{ b.synced | number }}</span>
         <span class="mt-2 font-mono text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-month-label">{{ b.label }}</span>
       </li>
