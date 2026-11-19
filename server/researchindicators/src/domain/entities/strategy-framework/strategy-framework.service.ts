@@ -7,12 +7,17 @@ import {
 import { DataSource, EntityManager } from 'typeorm';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { CarryForwardObjectivesDto } from './dto/carry-forward-objectives.dto';
 import { CreateFrameworkElementDto } from './dto/create-framework-element.dto';
+import { CreateInstitutionalObjectiveDto } from './dto/create-institutional-objective.dto';
 import { UpdateFrameworkElementDto } from './dto/update-framework-element.dto';
+import { UpdateInstitutionalObjectiveDto } from './dto/update-institutional-objective.dto';
 import { FrameworkElement } from './entities/framework-element.entity';
 import { FrameworkElementResponsible } from './entities/framework-element-responsible.entity';
 import { FrameworkLevel } from './entities/framework-level.entity';
-import { proposeElementCode } from './framework-code.util';
+import { InstitutionalObjective } from './entities/institutional-objective.entity';
+import { InstitutionalObjectiveElement } from './entities/institutional-objective-element.entity';
+import { proposeElementCode, proposeIobCode } from './framework-code.util';
 import {
   FrameworkBlocker,
   badRequest,
@@ -25,8 +30,10 @@ import {
 import { createDepthViolation, moveViolation } from './framework-tree.util';
 import {
   ElementBlockersView,
+  FrameworkBlockerView,
   FrameworkElementView,
   FrameworkReadService,
+  ObjectiveView,
 } from './framework-read.service';
 import {
   CODE_MAX_LENGTH,
@@ -36,9 +43,10 @@ import {
 } from './strategy-framework.constants';
 
 /**
- * Element half of the request-scoped write service (design 2.1, 5.2, 5.4).
- * IOB writes are added later to this class. Machine tokens are rejected by
- * the guard (R-STF-014, T-08), not here. One transaction per write.
+ * Request-scoped writes (design 2.1, 5.2, 5.4, 5.5). Element CRUD and the
+ * IOB half: create, update, delete, carry forward. Lists stay on
+ * `FrameworkReadService` (A9). Machine tokens are rejected by the guard
+ * (R-STF-014, T-08), not here. One transaction per write.
  *
  * @akili-spec institutional-performance/strategy-framework
  */
@@ -341,6 +349,196 @@ export class StrategyFrameworkService {
       }
       throw error;
     }
+  }
+
+  /** A10 create. Portfolio lock, year in range, indicator links, `IOB-n`. */
+  async createObjective(
+    dto: CreateInstitutionalObjectiveDto,
+  ): Promise<ObjectiveView> {
+    assertPositiveInt(dto.portfolioId, 'portfolioId');
+    if (!Number.isInteger(dto.year)) {
+      throw badRequest('year', 'year is required');
+    }
+    const statement = dto.statement?.trim() ?? '';
+    if (!statement) throw badRequest('statement', 'statement is required');
+    const requested = cleanText(dto.code) ?? undefined;
+    if (requested && requested.length > CODE_MAX_LENGTH) {
+      throw badRequest('code', 'code is too long');
+    }
+    const hint: { code?: string } = { code: requested };
+    const created = await this.inTransaction(async (manager) => {
+      const range = await this.lockPortfolioRange(manager, dto.portfolioId);
+      this.assertYearInRange(dto.year, range);
+      const existing = await this.loadObjectives(
+        manager,
+        dto.portfolioId,
+        dto.year,
+      );
+      const code = requested ?? this.proposeIob(existing);
+      hint.code = code;
+      this.assertIobCodeFree(existing, code);
+      const elementIds = await this.assertLinkTargets(
+        manager,
+        dto.portfolioId,
+        dto.elementIds ?? [],
+      );
+      const userId = this.currentUser.user_id;
+      const inserted = await manager.insert(InstitutionalObjective, {
+        portfolio_id: dto.portfolioId,
+        year: dto.year,
+        code,
+        statement,
+        created_by: userId,
+        is_active: true,
+      });
+      const id = asNumber(inserted.identifiers[0]?.id);
+      await this.insertLinks(manager, id, elementIds ?? [], userId);
+      return id;
+    }, hint);
+    return this.objectiveView(dto.portfolioId, dto.year, created);
+  }
+
+  /** A10 update. `portfolioId` never arrives (the pipe rejects it). */
+  async updateObjective(
+    id: number,
+    dto: UpdateInstitutionalObjectiveDto,
+  ): Promise<ObjectiveView> {
+    assertPositiveInt(id, 'id');
+    const hint: { code?: string } = {};
+    const located = await this.inTransaction(async (manager) => {
+      const locked = await this.lockObjective(manager, id);
+      if (!locked) throw notFound('Institutional objective not found', 'id');
+      const range = await this.lockPortfolioRange(manager, locked.portfolio_id);
+      const year = dto.year ?? locked.year;
+      if (dto.year !== undefined) this.assertYearInRange(year, range);
+      const patch: {
+        updated_by: number;
+        year?: number;
+        code?: string;
+        statement?: string;
+      } = { updated_by: this.currentUser.user_id };
+      if (dto.statement !== undefined) {
+        const statement = dto.statement.trim();
+        if (!statement) throw badRequest('statement', 'statement is required');
+        patch.statement = statement;
+      }
+      if (
+        dto.code !== undefined ||
+        (dto.year !== undefined && year !== locked.year)
+      ) {
+        const existing = await this.loadObjectives(
+          manager,
+          locked.portfolio_id,
+          year,
+        );
+        const code = dto.code !== undefined ? dto.code.trim() : locked.code;
+        if (!code) throw badRequest('code', 'code is required');
+        if (code.length > CODE_MAX_LENGTH) {
+          throw badRequest('code', 'code is too long');
+        }
+        this.assertIobCodeFree(existing, code, locked.id);
+        hint.code = code;
+        if (dto.code !== undefined) patch.code = code;
+      }
+      if (dto.year !== undefined) patch.year = year;
+      const elementIds = await this.assertLinkTargets(
+        manager,
+        locked.portfolio_id,
+        dto.elementIds,
+      );
+      const columns =
+        patch.code !== undefined ||
+        patch.statement !== undefined ||
+        patch.year !== undefined;
+      if (columns) {
+        await manager.update(InstitutionalObjective, { id: locked.id }, patch);
+      }
+      if (elementIds !== null) {
+        await manager.query(
+          `DELETE FROM institutional_objective_elements
+            WHERE institutional_objective_id = ?`,
+          [locked.id],
+        );
+        await this.insertLinks(
+          manager,
+          locked.id,
+          elementIds,
+          this.currentUser.user_id,
+        );
+      }
+      return { portfolioId: locked.portfolio_id, year };
+    }, hint);
+    return this.objectiveView(located.portfolioId, located.year, id);
+  }
+
+  /**
+   * A10 delete. Blocked only by a provider that counts objectives
+   * (R-STF-006, design 5.4 step 6). Links cascade in the database.
+   */
+  async deleteObjective(id: number): Promise<{ id: number }> {
+    assertPositiveInt(id, 'id');
+    const held: { row?: ObjectiveRow } = {};
+    try {
+      const row = await this.dataSource.transaction(async (manager) => {
+        const locked = await this.lockObjective(manager, id);
+        if (!locked) throw notFound('Institutional objective not found', 'id');
+        held.row = locked;
+        const blockers = await this.read.getObjectiveBlockers(locked.id);
+        if (blockers.length > 0) {
+          throw blocked(
+            this.objectiveDeleteDescription(locked, blockers),
+            blockers,
+          );
+        }
+        await manager.query(
+          `DELETE FROM institutional_objectives WHERE id = ?`,
+          [locked.id],
+        );
+        return locked;
+      });
+      this.logger._log(
+        `strategy_framework.delete objective id=${row.id} code=${row.code} portfolio=${row.portfolio_id} year=${row.year} user=${this.currentUser.user_id}`,
+      );
+      return { id: row.id };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (errnoOf(error) === MYSQL_ROW_IS_REFERENCED && held.row) {
+        const blockers = await this.read.getObjectiveBlockers(held.row.id);
+        if (blockers.length > 0) {
+          throw blocked(
+            this.objectiveDeleteDescription(held.row, blockers),
+            blockers,
+          );
+        }
+        throw blocked(
+          `Cannot delete ${held.row.code}: it is still referenced.`,
+          [
+            {
+              reason: 'referenced',
+              count: 1,
+              wayOut: 'Remove the records that reference it first.',
+            },
+          ],
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** A11. Check the target year before any insert (design 5.5). */
+  async carryForward(
+    dto: CarryForwardObjectivesDto,
+  ): Promise<{ fromYear: number; toYear: number; copied: number }> {
+    assertPositiveInt(dto.portfolioId, 'portfolioId');
+    if (!Number.isInteger(dto.fromYear)) {
+      throw badRequest('fromYear', 'fromYear is required');
+    }
+    const toYear = dto.fromYear + 1;
+    const copied = await this.copyYear(dto.portfolioId, dto.fromYear, toYear);
+    this.logger._log(
+      `strategy_framework.carry_forward fromYear=${dto.fromYear} toYear=${toYear} copied=${copied} portfolio=${dto.portfolioId} user=${this.currentUser.user_id}`,
+    );
+    return { fromYear: dto.fromYear, toYear, copied };
   }
 
   private async inTransaction<T>(
@@ -885,6 +1083,293 @@ export class StrategyFrameworkService {
     );
   }
 
+  private async copyYear(
+    portfolioId: number,
+    fromYear: number,
+    toYear: number,
+  ): Promise<number> {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const range = await this.lockPortfolioRange(manager, portfolioId);
+        if (fromYear < range.start_year || fromYear > range.end_year) {
+          throw badRequest(
+            'fromYear',
+            `year must be between ${range.start_year} and ${range.end_year}`,
+          );
+        }
+        if (toYear > range.end_year) {
+          throw badRequest(
+            'fromYear',
+            'the next year is outside the portfolio',
+          );
+        }
+        const source = await this.loadObjectives(
+          manager,
+          portfolioId,
+          fromYear,
+        );
+        if (source.length === 0) {
+          throw badRequest(
+            'fromYear',
+            'the year has no institutional objectives',
+          );
+        }
+        await this.assertTargetEmpty(manager, portfolioId, toYear);
+        await this.copyObjectives(manager, source, portfolioId, toYear);
+        return source.length;
+      });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (errnoOf(error) === MYSQL_DUPLICATE) {
+        throw conflict('the target year already has institutional objectives');
+      }
+      this.mapWriteError(error, {});
+    }
+  }
+
+  /** Design 5.5 step 2, re-checked under the portfolio lock before any insert. */
+  private async assertTargetEmpty(
+    manager: EntityManager,
+    portfolioId: number,
+    toYear: number,
+  ): Promise<void> {
+    const target = await this.loadObjectives(manager, portfolioId, toYear);
+    if (target.length > 0) {
+      throw conflict('the target year already has institutional objectives');
+    }
+  }
+
+  private async copyObjectives(
+    manager: EntityManager,
+    source: readonly ObjectiveRow[],
+    portfolioId: number,
+    toYear: number,
+  ): Promise<void> {
+    const links = await this.loadLinks(
+      manager,
+      source.map((row) => row.id),
+    );
+    const userId = this.currentUser.user_id;
+    for (const row of source) {
+      const inserted = await manager.insert(InstitutionalObjective, {
+        portfolio_id: portfolioId,
+        year: toYear,
+        code: row.code,
+        statement: row.statement,
+        created_by: userId,
+        is_active: true,
+      });
+      const id = asNumber(inserted.identifiers[0]?.id);
+      const own = links.filter(
+        (link) => link.institutional_objective_id === row.id,
+      );
+      for (const link of own) {
+        await manager.insert(InstitutionalObjectiveElement, {
+          institutional_objective_id: id,
+          element_id: link.element_id,
+          created_by: userId,
+          is_active: true,
+        });
+      }
+    }
+  }
+
+  private async lockPortfolioRange(
+    manager: EntityManager,
+    portfolioId: number,
+  ): Promise<PortfolioRange> {
+    const rows: RawPortfolio[] = await manager.query(
+      `SELECT id, start_year, end_year
+         FROM portfolios
+        WHERE id = ?
+        FOR UPDATE`,
+      [portfolioId],
+    );
+    if (!rows[0]) throw notFound('Portfolio not found', 'portfolioId');
+    return {
+      id: asNumber(rows[0].id),
+      start_year: asNumber(rows[0].start_year),
+      end_year: asNumber(rows[0].end_year),
+    };
+  }
+
+  private assertYearInRange(year: number, range: PortfolioRange): void {
+    if (year < range.start_year || year > range.end_year) {
+      throw badRequest(
+        'year',
+        `year must be between ${range.start_year} and ${range.end_year}`,
+      );
+    }
+  }
+
+  private async loadObjectives(
+    manager: EntityManager,
+    portfolioId: number,
+    year: number,
+  ): Promise<ObjectiveRow[]> {
+    const rows: RawObjective[] = await manager.query(
+      `SELECT id, portfolio_id, year, code, statement
+         FROM institutional_objectives
+        WHERE portfolio_id = ? AND year = ?
+        ORDER BY id`,
+      [portfolioId, year],
+    );
+    return rows.map(asObjective);
+  }
+
+  private async lockObjective(
+    manager: EntityManager,
+    id: number,
+  ): Promise<ObjectiveRow | null> {
+    const rows: RawObjective[] = await manager.query(
+      `SELECT id, portfolio_id, year, code, statement
+         FROM institutional_objectives
+        WHERE id = ?
+        FOR UPDATE`,
+      [id],
+    );
+    return rows[0] ? asObjective(rows[0]) : null;
+  }
+
+  private async loadLinks(
+    manager: EntityManager,
+    objectiveIds: readonly number[],
+  ): Promise<ObjectiveLinkRow[]> {
+    if (objectiveIds.length === 0) return [];
+    const placeholders = objectiveIds.map(() => '?').join(', ');
+    const rows: RawObjectiveLink[] = await manager.query(
+      `SELECT institutional_objective_id, element_id
+         FROM institutional_objective_elements
+        WHERE institutional_objective_id IN (${placeholders})`,
+      [...objectiveIds],
+    );
+    return rows.map((row) => ({
+      institutional_objective_id: asNumber(row.institutional_objective_id),
+      element_id: asNumber(row.element_id),
+    }));
+  }
+
+  /**
+   * `undefined` leaves the links. An array replaces them. A non-indicator
+   * or another portfolio is 400 naming the codes, before any write (I-1, I-6).
+   */
+  private async assertLinkTargets(
+    manager: EntityManager,
+    portfolioId: number,
+    elementIds: readonly number[] | undefined,
+  ): Promise<number[] | null> {
+    if (elementIds === undefined) return null;
+    if (elementIds.length === 0) return [];
+    for (const id of elementIds) assertPositiveInt(id, 'elementIds');
+    if (new Set(elementIds).size !== elementIds.length) {
+      throw badRequest('elementIds', 'an indicator is listed more than once');
+    }
+    const placeholders = elementIds.map(() => '?').join(', ');
+    const rows: RawLinkTarget[] = await manager.query(
+      `SELECT e.id AS id,
+              e.portfolio_id AS portfolio_id,
+              e.code AS code,
+              l.is_indicator_level AS is_indicator_level
+         FROM framework_elements e
+         INNER JOIN framework_levels l ON l.id = e.level_id
+        WHERE e.id IN (${placeholders})`,
+      [...elementIds],
+    );
+    const byId = new Map(rows.map(asLinkTarget).map((row) => [row.id, row]));
+    const missing = elementIds.filter((id) => !byId.has(id));
+    if (missing.length > 0) {
+      throw badRequest(
+        'elementIds',
+        `an element does not exist: ${missing.join(', ')}`,
+      );
+    }
+    const chosen = elementIds.map((id) => byId.get(id) as LinkTarget);
+    const otherPortfolio = chosen.filter(
+      (row) => row.portfolio_id !== portfolioId,
+    );
+    if (otherPortfolio.length > 0) {
+      throw badRequest(
+        'elementIds',
+        `linked indicators belong to another portfolio: ${otherPortfolio
+          .map((row) => row.code)
+          .sort(byCode)
+          .join(', ')}`,
+      );
+    }
+    const wrongLevel = chosen.filter((row) => row.is_indicator_level !== 1);
+    if (wrongLevel.length > 0) {
+      throw badRequest(
+        'elementIds',
+        `linked indicators are not at the indicator level: ${wrongLevel
+          .map((row) => row.code)
+          .sort(byCode)
+          .join(', ')}`,
+      );
+    }
+    return [...elementIds];
+  }
+
+  private proposeIob(existing: readonly ObjectiveRow[]): string {
+    const proposal = proposeIobCode(existing.map((row) => row.code));
+    if ('field' in proposal) {
+      throw badRequest(proposal.field, proposal.description);
+    }
+    return proposal.code;
+  }
+
+  private assertIobCodeFree(
+    rows: readonly ObjectiveRow[],
+    code: string,
+    excludeId?: number,
+  ): void {
+    const needle = code.trim().toLowerCase();
+    const taken = rows.some(
+      (row) => row.id !== excludeId && row.code.trim().toLowerCase() === needle,
+    );
+    if (taken) throw conflict(`Code ${code} is already used`, 'code');
+  }
+
+  private async insertLinks(
+    manager: EntityManager,
+    objectiveId: number,
+    elementIds: readonly number[],
+    userId: number,
+  ): Promise<void> {
+    for (const elementId of elementIds) {
+      await manager.insert(InstitutionalObjectiveElement, {
+        institutional_objective_id: objectiveId,
+        element_id: elementId,
+        created_by: userId,
+        is_active: true,
+      });
+    }
+  }
+
+  private objectiveDeleteDescription(
+    objective: ObjectiveRow,
+    blockers: readonly FrameworkBlockerView[],
+  ): string {
+    const clauses = blockers.map((blocker) =>
+      blocker.count === 1
+        ? `used by 1 record in ${blocker.reason}`
+        : `used by ${blocker.count} records in ${blocker.reason}`,
+    );
+    return `Cannot delete ${objective.code}: ${clauses.join('; ')}. ${blockers
+      .map((blocker) => blocker.wayOut)
+      .join(' ')}`;
+  }
+
+  private async objectiveView(
+    portfolioId: number,
+    year: number,
+    id: number,
+  ): Promise<ObjectiveView> {
+    const rows = await this.read.listObjectives(portfolioId, year);
+    const row = rows.find((item) => item.id === id);
+    if (!row) throw notFound('Institutional objective not found', 'id');
+    return row;
+  }
+
   private async elementView(
     portfolioId: number,
     id: number,
@@ -937,4 +1422,77 @@ const asElement = (row: RawElement): ElementRow => ({
   code: row.code,
   name: row.name,
   description: row.description ?? null,
+});
+
+interface PortfolioRange {
+  id: number;
+  start_year: number;
+  end_year: number;
+}
+
+interface ObjectiveRow {
+  id: number;
+  portfolio_id: number;
+  year: number;
+  code: string;
+  statement: string;
+}
+
+interface ObjectiveLinkRow {
+  institutional_objective_id: number;
+  element_id: number;
+}
+
+interface LinkTarget {
+  id: number;
+  portfolio_id: number;
+  code: string;
+  is_indicator_level: number;
+}
+
+interface RawPortfolio {
+  id: number | string;
+  start_year: number | string;
+  end_year: number | string;
+}
+
+interface RawObjective {
+  id: number | string;
+  portfolio_id: number | string;
+  year: number | string;
+  code: string;
+  statement: string;
+}
+
+interface RawObjectiveLink {
+  institutional_objective_id: number | string;
+  element_id: number | string;
+}
+
+interface RawLinkTarget {
+  id: number | string;
+  portfolio_id: number | string;
+  code: string;
+  is_indicator_level: number | string | boolean;
+}
+
+const byCode = (left: string, right: string): number =>
+  left.localeCompare(right, undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+
+const asObjective = (row: RawObjective): ObjectiveRow => ({
+  id: asNumber(row.id),
+  portfolio_id: asNumber(row.portfolio_id),
+  year: asNumber(row.year),
+  code: row.code,
+  statement: row.statement,
+});
+
+const asLinkTarget = (row: RawLinkTarget): LinkTarget => ({
+  id: asNumber(row.id),
+  portfolio_id: asNumber(row.portfolio_id),
+  code: row.code,
+  is_indicator_level: isActiveFlag(row.is_indicator_level) ? 1 : 0,
 });

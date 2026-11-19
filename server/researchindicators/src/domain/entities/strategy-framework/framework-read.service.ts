@@ -469,6 +469,19 @@ export class FrameworkReadService {
       });
   }
 
+  /**
+   * IOB delete re-check (design 5.4 step 6, 5.6). Only a provider that
+   * implements `countByObjectiveIds` can block. An element-only provider
+   * is skipped by the registry.
+   */
+  async getObjectiveBlockers(
+    objectiveId: number,
+  ): Promise<FrameworkBlockerView[]> {
+    assertPositiveInt(objectiveId, 'id');
+    const usage = await this.usage.countObjectives([objectiveId]);
+    return objectiveBlockers(objectiveId, usage);
+  }
+
   private async requirePortfolio(
     portfolioId: number,
   ): Promise<PortfolioLookupRow> {

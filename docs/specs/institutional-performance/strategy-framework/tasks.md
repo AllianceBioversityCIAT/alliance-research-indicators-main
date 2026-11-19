@@ -149,7 +149,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ### T-06 — Institutional Objectives writes and carry forward
-- **Status:** todo · **Size:** M · **Depends:** T-05
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-06) · **Size:** M · **Depends:** T-05
 - **Requirements:** R-STF-009 (Details; AC.1; AC.2 "no owner or responsible field → 400"), R-STF-010 (Details; scenario BUT "must NOT change any 2026 IOB"; AC.1, AC.2), R-STF-006 (IOB blocked only by an IOB provider), R-STF-001 (IOB link to another portfolio's element → 400 naming the linked indicators)
 - **Design:** §4 A9–A11, §5.2 step 8, §5.5, §5.6; P-36 n/a (client)
 - **Scope:** service IOB half: list per year + years with `defaultYear`, create/update/delete (portfolio lock, year in range, indicator-level-only links, codes `IOB-n`, `portfolioId` on PATCH → `400`), carry forward (lock, re-check, copy, 1062 → `409`, `LoggerUtil` line); DTOs.

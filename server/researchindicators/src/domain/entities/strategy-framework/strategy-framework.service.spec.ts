@@ -1,9 +1,17 @@
 import 'reflect-metadata';
 import { HttpException, NotFoundException, Scope } from '@nestjs/common';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { CarryForwardObjectivesDto } from './dto/carry-forward-objectives.dto';
 import { CreateFrameworkElementDto } from './dto/create-framework-element.dto';
+import { CreateInstitutionalObjectiveDto } from './dto/create-institutional-objective.dto';
 import { UpdateFrameworkElementDto } from './dto/update-framework-element.dto';
-import { ElementBlockersView } from './framework-read.service';
+import { UpdateInstitutionalObjectiveDto } from './dto/update-institutional-objective.dto';
+import {
+  ElementBlockersView,
+  FrameworkReadService,
+  ObjectiveView,
+} from './framework-read.service';
+import { FrameworkUsageRegistry } from './framework-usage.registry';
 import { StrategyFrameworkService } from './strategy-framework.service';
 import { StrategyFrameworkModule } from './strategy-framework.module';
 
@@ -34,15 +42,34 @@ interface ElementRow {
   description: string | null;
 }
 
+interface ObjectiveRow {
+  id: number;
+  portfolio_id: number;
+  year: number;
+  code: string;
+  statement: string;
+}
+
+interface ObjectiveLinkRow {
+  institutional_objective_id: number;
+  element_id: number;
+}
+
 interface World {
   missingPortfolio: boolean;
+  portfolio: { start_year: number; end_year: number };
   levels: LevelRow[];
   elements: ElementRow[];
   staff: Array<{ carnet: string; is_active: number }>;
   responsibles: Array<{ element_id: number; staff_carnet: string }>;
   blockers: ElementBlockersView;
+  objectives: ObjectiveRow[];
+  links: ObjectiveLinkRow[];
+  listed: ObjectiveView[];
+  objectiveBlockers: Array<{ reason: string; count: number; wayOut: string }>;
   failInsert: Record<string, unknown>;
   deleteError: unknown;
+  objectiveDeleteError: unknown;
 }
 
 const emptyBlockers = (): ElementBlockersView => ({
@@ -109,10 +136,32 @@ const sqlKind = (sql: string): string => {
   }
   if (compact.startsWith('delete from framework_elements'))
     return 'delete-element';
-  if (compact.includes('from portfolios') && compact.includes('for update')) {
-    return 'lock-portfolio';
+  if (compact.startsWith('delete from institutional_objective_elements')) {
+    return 'delete-links';
   }
+  if (compact.startsWith('delete from institutional_objectives')) {
+    return 'delete-objective';
+  }
+  if (compact.includes('from portfolios') && compact.includes('for update')) {
+    return compact.includes('start_year')
+      ? 'lock-portfolio-range'
+      : 'lock-portfolio';
+  }
+  if (
+    compact.includes('from institutional_objectives') &&
+    compact.includes('for update')
+  ) {
+    return 'lock-objective';
+  }
+  if (compact.includes('from institutional_objectives')) return 'objectives';
+  if (compact.includes('from institutional_objective_elements')) return 'links';
   if (compact.includes('from framework_levels')) return 'levels';
+  if (
+    compact.includes('from framework_elements') &&
+    compact.includes('framework_levels')
+  ) {
+    return 'link-candidates';
+  }
   if (
     compact.includes('from framework_elements') &&
     compact.includes('for update')
@@ -127,16 +176,22 @@ const sqlKind = (sql: string): string => {
   return compact;
 };
 
-const harness = (setup?: (world: World) => void) => {
+const harness = (setup?: (world: World) => void, readOverride?: object) => {
   const world: World = {
     missingPortfolio: false,
+    portfolio: { start_year: 2026, end_year: 2030 },
     levels: LEVELS.map((row) => ({ ...row })),
     elements: TREE.map((row) => ({ ...row })),
     staff: [],
     responsibles: [],
     blockers: emptyBlockers(),
+    objectives: [],
+    links: [],
+    listed: [],
+    objectiveBlockers: [],
     failInsert: {},
     deleteError: undefined,
+    objectiveDeleteError: undefined,
   };
   setup?.(world);
   const queries: Array<{ sql: string; params: unknown[] }> = [];
@@ -149,6 +204,53 @@ const harness = (setup?: (world: World) => void) => {
       const kind = sqlKind(sql);
       if (kind === 'lock-portfolio') {
         return world.missingPortfolio ? [] : [{ id: params[0] }];
+      }
+      if (kind === 'lock-portfolio-range') {
+        return world.missingPortfolio
+          ? []
+          : [
+              {
+                id: params[0],
+                start_year: world.portfolio.start_year,
+                end_year: world.portfolio.end_year,
+              },
+            ];
+      }
+      if (kind === 'objectives') {
+        const portfolioId = Number(params[0]);
+        const year = Number(params[1]);
+        return world.objectives
+          .filter(
+            (row) => row.portfolio_id === portfolioId && row.year === year,
+          )
+          .sort((left, right) => left.id - right.id);
+      }
+      if (kind === 'lock-objective') {
+        const row = world.objectives.find(
+          (item) => item.id === Number(params[0]),
+        );
+        return row ? [row] : [];
+      }
+      if (kind === 'links') {
+        const ids = params.map((value) => Number(value));
+        return world.links.filter((row) =>
+          ids.includes(row.institutional_objective_id),
+        );
+      }
+      if (kind === 'link-candidates') {
+        return params
+          .map((value) =>
+            world.elements.find((item) => item.id === Number(value)),
+          )
+          .filter((item): item is ElementRow => !!item)
+          .map((item) => ({
+            id: item.id,
+            portfolio_id: item.portfolio_id,
+            code: item.code,
+            is_indicator_level:
+              world.levels.find((level) => level.id === item.level_id)
+                ?.is_indicator_level ?? 0,
+          }));
       }
       if (kind === 'levels') return world.levels;
       if (kind === 'elements') return world.elements;
@@ -174,6 +276,11 @@ const harness = (setup?: (world: World) => void) => {
         if (world.deleteError) throw world.deleteError;
         return [];
       }
+      if (kind === 'delete-links') return [];
+      if (kind === 'delete-objective') {
+        if (world.objectiveDeleteError) throw world.objectiveDeleteError;
+        return [];
+      }
       throw new Error(`unexpected sql: ${flat(sql)}`);
     }),
     insert: jest.fn(async (entity: { name: string }, values: unknown) => {
@@ -181,6 +288,13 @@ const harness = (setup?: (world: World) => void) => {
       inserts.push({ entity: name, values });
       if (world.failInsert[name]) throw world.failInsert[name];
       const list = Array.isArray(values) ? values : [values];
+      if (name === 'InstitutionalObjective') {
+        const id = 500 + ofEntity(inserts, name).length - 1;
+        return { identifiers: [{ id }] };
+      }
+      if (name === 'InstitutionalObjectiveElement') {
+        return { identifiers: list.map((_, index) => ({ id: index + 1 })) };
+      }
       if (name === 'FrameworkLevel') {
         world.levels = list.map((row, index) => ({
           id: index + 1,
@@ -209,7 +323,7 @@ const harness = (setup?: (world: World) => void) => {
       async (_sql: string, _params: unknown[] = []) => [] as unknown[],
     ),
   };
-  const read = {
+  const read = (readOverride ?? {
     getFramework: jest.fn(async (portfolioId: number) => ({
       portfolioId,
       configured: true,
@@ -224,6 +338,13 @@ const harness = (setup?: (world: World) => void) => {
       ],
     })),
     getElementBlockers: jest.fn(async () => world.blockers),
+    listObjectives: jest.fn(async () => world.listed),
+    getObjectiveBlockers: jest.fn(async () => world.objectiveBlockers),
+  }) as {
+    getFramework: jest.Mock;
+    getElementBlockers: jest.Mock;
+    listObjectives: jest.Mock;
+    getObjectiveBlockers: jest.Mock;
   };
   const service = new StrategyFrameworkService(
     dataSource as never,
@@ -1058,25 +1179,6 @@ describe('StrategyFrameworkService element writes (T-05)', () => {
       expect(payload(error).field).toBe('responsibleCarnets');
       expect(ofEntity(inserts, 'FrameworkElementResponsible')).toHaveLength(1);
     });
-
-    it('maps a link element_id 1452 to 400 elementIds', async () => {
-      const { service } = harness((world) => {
-        world.failInsert.FrameworkElement = {
-          errno: 1452,
-          sqlMessage:
-            'CONSTRAINT `FK_iob_elements_element_id` FOREIGN KEY (`element_id`)',
-        };
-      });
-      const error = await asHttp(
-        service.createElement({
-          portfolioId: 2,
-          name: 'Link race',
-          code: '8',
-        } as CreateFrameworkElementDto),
-      );
-      expect(error.getStatus()).toBe(400);
-      expect(payload(error).field).toBe('elementIds');
-    });
   });
 
   describe('staff search', () => {
@@ -1116,6 +1218,582 @@ describe('StrategyFrameworkService element writes (T-05)', () => {
       const { service, dataSource } = harness();
       await service.searchStaff('100%_');
       expect(dataSource.query.mock.calls[0][1][0]).toBe('%100\\%\\_%');
+    });
+  });
+});
+
+const objectiveView = (
+  id: number,
+  code: string,
+  statement: string,
+  year = 2026,
+): ObjectiveView => ({
+  id,
+  portfolioId: 2,
+  year,
+  code,
+  statement,
+  elements: [],
+  deletable: true,
+  blockers: [],
+});
+
+const sourceWrite = (
+  id: number,
+  updates: Array<{ criteria: unknown }>,
+  queries: Array<{ sql: string; params: unknown[] }>,
+): boolean =>
+  updates.some((row) => Number((row.criteria as { id?: unknown }).id) === id) ||
+  queries.some(
+    (query) =>
+      /^(delete|update)\b/i.test(flat(query.sql)) &&
+      query.params.some((param) => Number(param) === id),
+  );
+
+describe('StrategyFrameworkService institutional objectives (T-06)', () => {
+  let log: jest.SpyInstance;
+
+  beforeEach(() => {
+    log = jest
+      .spyOn(LoggerUtil.prototype, '_log')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    log.mockRestore();
+  });
+
+  describe('create and update (A10)', () => {
+    it('locks the portfolio, proposes IOB-4, and ignores another year', async () => {
+      const { service, inserts, queries } = harness((world) => {
+        world.objectives = [
+          {
+            id: 1,
+            portfolio_id: 2,
+            year: 2026,
+            code: 'IOB-1',
+            statement: 'A',
+          },
+          {
+            id: 2,
+            portfolio_id: 2,
+            year: 2026,
+            code: 'IOB-3',
+            statement: 'C',
+          },
+          {
+            id: 3,
+            portfolio_id: 2,
+            year: 2027,
+            code: 'IOB-9',
+            statement: 'Next year',
+          },
+        ];
+        world.listed = [objectiveView(500, 'IOB-4', 'Grow')];
+      });
+      const view = await service.createObjective({
+        portfolioId: 2,
+        year: 2026,
+        statement: 'Grow',
+      } as CreateInstitutionalObjectiveDto);
+      expect(view).toMatchObject({ id: 500, code: 'IOB-4' });
+      expect(flat(queries[0].sql)).toBe(
+        'SELECT id, start_year, end_year FROM portfolios WHERE id = ? FOR UPDATE',
+      );
+      expect(queries[0].params).toEqual([2]);
+      expect(
+        ofEntity(inserts, 'InstitutionalObjective')[0].values,
+      ).toMatchObject({
+        portfolio_id: 2,
+        year: 2026,
+        code: 'IOB-4',
+        statement: 'Grow',
+        created_by: 42,
+      });
+      expect(ofEntity(inserts, 'InstitutionalObjectiveElement')).toHaveLength(
+        0,
+      );
+    });
+
+    it('stores a link to an indicator of the same portfolio', async () => {
+      const { service, inserts } = harness((world) => {
+        world.listed = [objectiveView(500, 'IOB-1', 'Linked')];
+      });
+      await service.createObjective({
+        portfolioId: 2,
+        year: 2026,
+        statement: 'Linked',
+        elementIds: [22],
+      } as CreateInstitutionalObjectiveDto);
+      expect(
+        ofEntity(inserts, 'InstitutionalObjective')[0].values,
+      ).toMatchObject({ code: 'IOB-1' });
+      expect(
+        ofEntity(inserts, 'InstitutionalObjectiveElement')[0].values,
+      ).toMatchObject({
+        institutional_objective_id: 500,
+        element_id: 22,
+        created_by: 42,
+      });
+    });
+
+    it('rejects a duplicate code in the same year and stores nothing', async () => {
+      const { service, inserts } = harness((world) => {
+        world.objectives = [
+          {
+            id: 1,
+            portfolio_id: 2,
+            year: 2026,
+            code: 'IOB-1',
+            statement: 'A',
+          },
+        ];
+      });
+      const error = await asHttp(
+        service.createObjective({
+          portfolioId: 2,
+          year: 2026,
+          statement: 'Again',
+          code: 'iob-1',
+        } as CreateInstitutionalObjectiveDto),
+      );
+      expect(error.getStatus()).toBe(409);
+      expect(payload(error)).toEqual({
+        description: 'Code iob-1 is already used',
+        field: 'code',
+      });
+      expect(ofEntity(inserts, 'InstitutionalObjective')).toHaveLength(0);
+    });
+
+    it('accepts a code that exists only in another year', async () => {
+      const { service, inserts } = harness((world) => {
+        world.objectives = [
+          {
+            id: 1,
+            portfolio_id: 2,
+            year: 2027,
+            code: 'IOB-1',
+            statement: 'Next',
+          },
+          {
+            id: 9,
+            portfolio_id: 9,
+            year: 2026,
+            code: 'IOB-1',
+            statement: 'Elsewhere',
+          },
+        ];
+        world.listed = [objectiveView(500, 'IOB-1', 'Local')];
+      });
+      await service.createObjective({
+        portfolioId: 2,
+        year: 2026,
+        statement: 'Local',
+        code: 'IOB-1',
+      } as CreateInstitutionalObjectiveDto);
+      expect(
+        ofEntity(inserts, 'InstitutionalObjective')[0].values,
+      ).toMatchObject({ code: 'IOB-1', year: 2026, portfolio_id: 2 });
+    });
+
+    it('rejects a year outside the portfolio and stores nothing', async () => {
+      const { service, inserts } = harness();
+      const error = await asHttp(
+        service.createObjective({
+          portfolioId: 2,
+          year: 2025,
+          statement: 'Early',
+        } as CreateInstitutionalObjectiveDto),
+      );
+      expect(error.getStatus()).toBe(400);
+      expect(payload(error)).toEqual({
+        description: 'year must be between 2026 and 2030',
+        field: 'year',
+      });
+      expect(ofEntity(inserts, 'InstitutionalObjective')).toHaveLength(0);
+    });
+
+    it('rejects a link to a non-indicator element with its code and stores nothing', async () => {
+      const { service, inserts } = harness();
+      let thrown: unknown;
+      try {
+        await service.createObjective({
+          portfolioId: 2,
+          year: 2026,
+          statement: 'Dimension',
+          elementIds: [13],
+        } as CreateInstitutionalObjectiveDto);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(ofEntity(inserts, 'InstitutionalObjective')).toHaveLength(0);
+      expect(ofEntity(inserts, 'InstitutionalObjectiveElement')).toHaveLength(
+        0,
+      );
+      expect(thrown).toBeInstanceOf(HttpException);
+      const error = thrown as HttpException;
+      expect(error.getStatus()).toBe(400);
+      expect(payload(error)).toEqual({
+        description: 'linked indicators are not at the indicator level: 1.3',
+        field: 'elementIds',
+      });
+    });
+
+    it('rejects a link to another portfolio and names the indicator', async () => {
+      const { service, inserts } = harness((world) => {
+        world.elements.push(
+          element(91, 2, 3, 13, '1.1.1', 'Process efficiency'),
+        );
+      });
+      let thrown: unknown;
+      try {
+        await service.createObjective({
+          portfolioId: 9,
+          year: 2026,
+          statement: 'Cross',
+          elementIds: [91],
+        } as CreateInstitutionalObjectiveDto);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(ofEntity(inserts, 'InstitutionalObjective')).toHaveLength(0);
+      expect(ofEntity(inserts, 'InstitutionalObjectiveElement')).toHaveLength(
+        0,
+      );
+      expect(thrown).toBeInstanceOf(HttpException);
+      const error = thrown as HttpException;
+      expect(error.getStatus()).toBe(400);
+      expect(payload(error)).toEqual({
+        description: 'linked indicators belong to another portfolio: 1.1.1',
+        field: 'elementIds',
+      });
+    });
+
+    it('maps a link element_id 1452 on the link insert to 400 elementIds', async () => {
+      const { service, inserts } = harness((world) => {
+        world.failInsert.InstitutionalObjectiveElement = {
+          errno: 1452,
+          sqlMessage:
+            'CONSTRAINT `FK_iob_elements_element_id` FOREIGN KEY (`element_id`)',
+        };
+      });
+      const error = await asHttp(
+        service.createObjective({
+          portfolioId: 2,
+          year: 2026,
+          statement: 'Race',
+          code: 'IOB-8',
+          elementIds: [22],
+        } as CreateInstitutionalObjectiveDto),
+      );
+      expect(error.getStatus()).toBe(400);
+      expect(payload(error)).toEqual({
+        description: 'an element does not exist',
+        field: 'elementIds',
+      });
+      expect(ofEntity(inserts, 'InstitutionalObjectiveElement')).toHaveLength(
+        1,
+      );
+    });
+
+    it('updates the statement and leaves links when elementIds is omitted', async () => {
+      const { service, queries, updates } = harness((world) => {
+        world.objectives = [
+          {
+            id: 4,
+            portfolio_id: 2,
+            year: 2026,
+            code: 'IOB-2',
+            statement: 'Old',
+          },
+        ];
+        world.links = [{ institutional_objective_id: 4, element_id: 22 }];
+        world.listed = [objectiveView(4, 'IOB-2', 'New')];
+      });
+      await service.updateObjective(4, {
+        statement: 'New',
+      } as UpdateInstitutionalObjectiveDto);
+      expect(
+        queries.some(
+          (query) =>
+            flat(query.sql).includes('start_year') &&
+            flat(query.sql).includes('FOR UPDATE'),
+        ),
+      ).toBe(true);
+      expect(updates[0]).toMatchObject({
+        entity: 'InstitutionalObjective',
+        criteria: { id: 4 },
+      });
+      expect(updates[0].values).toMatchObject({
+        statement: 'New',
+        updated_by: 42,
+      });
+      expect(
+        queries.some((query) =>
+          flat(query.sql)
+            .toLowerCase()
+            .startsWith('delete from institutional_objective_elements'),
+        ),
+      ).toBe(false);
+    });
+
+    it('answers 404 when the objective is missing', async () => {
+      const { service, updates } = harness();
+      const error = await asHttp(
+        service.updateObjective(404, {
+          statement: 'Missing',
+        } as UpdateInstitutionalObjectiveDto),
+      );
+      expect(error.getStatus()).toBe(404);
+      expect(payload(error).field).toBe('id');
+      expect(updates).toEqual([]);
+    });
+  });
+
+  describe('delete (R-STF-006)', () => {
+    it('deletes a free objective and logs code, portfolio, year and user', async () => {
+      const { service, queries } = harness((world) => {
+        world.objectives = [
+          {
+            id: 6,
+            portfolio_id: 2,
+            year: 2026,
+            code: 'IOB-6',
+            statement: 'Gone',
+          },
+        ];
+      });
+      await expect(service.deleteObjective(6)).resolves.toEqual({ id: 6 });
+      expect(
+        queries.some((query) =>
+          flat(query.sql)
+            .toLowerCase()
+            .startsWith('delete from institutional_objectives'),
+        ),
+      ).toBe(true);
+      expect(log).toHaveBeenCalledWith(
+        'strategy_framework.delete objective id=6 code=IOB-6 portfolio=2 year=2026 user=42',
+      );
+    });
+
+    it('blocks an IOB delete when a provider counts the objective and issues no delete', async () => {
+      const registry = new FrameworkUsageRegistry();
+      const countByObjectiveIds = jest.fn(async (ids: number[]) =>
+        Object.fromEntries(ids.map((id) => [id, 1])),
+      );
+      const countByElementIds = jest.fn(async () => ({ 6: 4 }));
+      registry.register({
+        consumerName: 'notes',
+        label: 'Notes',
+        countByElementIds,
+      });
+      registry.register({
+        consumerName: 'KPIs',
+        label: 'KPIs',
+        countByObjectiveIds,
+      });
+      const read = new FrameworkReadService(
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        registry,
+      );
+      const { service, queries } = harness((world) => {
+        world.objectives = [
+          {
+            id: 6,
+            portfolio_id: 2,
+            year: 2026,
+            code: 'IOB-6',
+            statement: 'Held',
+          },
+        ];
+      }, read);
+      const error = await asHttp(service.deleteObjective(6));
+      expect(error.getStatus()).toBe(409);
+      expect(payload(error)).toEqual({
+        description:
+          'Cannot delete IOB-6: used by 1 record in KPIs. Remove its 1 record in KPIs first.',
+        blockers: [
+          {
+            reason: 'KPIs',
+            count: 1,
+            wayOut: 'Remove its 1 record in KPIs first.',
+          },
+        ],
+      });
+      expect(countByObjectiveIds).toHaveBeenCalledWith([6]);
+      expect(countByElementIds).not.toHaveBeenCalled();
+      expect(
+        queries.some((query) =>
+          flat(query.sql)
+            .toLowerCase()
+            .startsWith('delete from institutional_objectives'),
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe('carry forward (A11, R-STF-010)', () => {
+    const source = (
+      id: number,
+      code: string,
+      statement: string,
+      year = 2026,
+    ): ObjectiveRow => ({
+      id,
+      portfolio_id: 2,
+      year,
+      code,
+      statement,
+    });
+
+    it('rejects the last year with 400 and writes nothing', async () => {
+      const { service, inserts, updates } = harness((world) => {
+        world.objectives = [source(1, 'IOB-1', 'Last', 2030)];
+      });
+      const error = await asHttp(
+        service.carryForward({
+          portfolioId: 2,
+          fromYear: 2030,
+        } as CarryForwardObjectivesDto),
+      );
+      expect(error.getStatus()).toBe(400);
+      expect(payload(error)).toEqual({
+        description: 'the next year is outside the portfolio',
+        field: 'fromYear',
+      });
+      expect(inserts).toHaveLength(0);
+      expect(updates).toEqual([]);
+    });
+
+    it('rejects an empty year with 400 and writes nothing', async () => {
+      const { service, inserts, updates } = harness();
+      const error = await asHttp(
+        service.carryForward({
+          portfolioId: 2,
+          fromYear: 2026,
+        } as CarryForwardObjectivesDto),
+      );
+      expect(error.getStatus()).toBe(400);
+      expect(payload(error)).toEqual({
+        description: 'the year has no institutional objectives',
+        field: 'fromYear',
+      });
+      expect(inserts).toHaveLength(0);
+      expect(updates).toEqual([]);
+    });
+
+    it('rejects a target year that already has objectives and writes nothing', async () => {
+      const { service, inserts, updates, queries } = harness((world) => {
+        world.objectives = [
+          source(1, 'IOB-1', 'One'),
+          source(8, 'IOB-1', 'Already', 2027),
+        ];
+      });
+      let thrown: unknown;
+      try {
+        await service.carryForward({
+          portfolioId: 2,
+          fromYear: 2026,
+        } as CarryForwardObjectivesDto);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(inserts).toHaveLength(0);
+      expect(updates).toEqual([]);
+      expect(
+        queries.some((query) => /^(delete|update)\b/i.test(flat(query.sql))),
+      ).toBe(false);
+      expect(thrown).toBeInstanceOf(HttpException);
+      const error = thrown as HttpException;
+      expect(error.getStatus()).toBe(409);
+      expect(payload(error)).toEqual({
+        description: 'the target year already has institutional objectives',
+      });
+    });
+
+    it('copies codes and links and does not update or delete the source rows', async () => {
+      const { service, inserts, updates, queries } = harness((world) => {
+        world.objectives = [
+          source(1, 'IOB-1', 'One'),
+          source(2, 'IOB-6', 'Six'),
+        ];
+        world.links = [
+          { institutional_objective_id: 1, element_id: 22 },
+          { institutional_objective_id: 2, element_id: 22 },
+        ];
+      });
+      await expect(
+        service.carryForward({
+          portfolioId: 2,
+          fromYear: 2026,
+        } as CarryForwardObjectivesDto),
+      ).resolves.toEqual({ fromYear: 2026, toYear: 2027, copied: 2 });
+      expect(
+        ofEntity(inserts, 'InstitutionalObjective').map((row) => row.values),
+      ).toEqual([
+        expect.objectContaining({
+          portfolio_id: 2,
+          year: 2027,
+          code: 'IOB-1',
+          statement: 'One',
+          created_by: 42,
+        }),
+        expect.objectContaining({
+          portfolio_id: 2,
+          year: 2027,
+          code: 'IOB-6',
+          statement: 'Six',
+          created_by: 42,
+        }),
+      ]);
+      expect(
+        ofEntity(inserts, 'InstitutionalObjectiveElement').map(
+          (row) => row.values,
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          institutional_objective_id: 500,
+          element_id: 22,
+          created_by: 42,
+        }),
+        expect.objectContaining({
+          institutional_objective_id: 501,
+          element_id: 22,
+          created_by: 42,
+        }),
+      ]);
+      expect(sourceWrite(1, updates, queries)).toBe(false);
+      expect(sourceWrite(2, updates, queries)).toBe(false);
+      expect(log).toHaveBeenCalledWith(
+        'strategy_framework.carry_forward fromYear=2026 toYear=2027 copied=2 portfolio=2 user=42',
+      );
+    });
+
+    it('maps a 1062 during the copy to the same 409 and does not log', async () => {
+      const { service } = harness((world) => {
+        world.objectives = [source(1, 'IOB-1', 'One')];
+        world.failInsert.InstitutionalObjective = {
+          errno: 1062,
+          sqlMessage:
+            "Duplicate entry '2-2027-IOB-1' for key 'uq_iob_portfolio_year_code'",
+        };
+      });
+      const error = await asHttp(
+        service.carryForward({
+          portfolioId: 2,
+          fromYear: 2026,
+        } as CarryForwardObjectivesDto),
+      );
+      expect(error.getStatus()).toBe(409);
+      expect(payload(error)).toEqual({
+        description: 'the target year already has institutional objectives',
+      });
+      expect(log).not.toHaveBeenCalled();
     });
   });
 });
