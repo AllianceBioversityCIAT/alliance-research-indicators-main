@@ -9,6 +9,9 @@ import { formatPersonName } from '@shared/utils/person-name.util';
 import { PfmResultRowComponent } from '../pfm-result-row/pfm-result-row.component';
 
 
+/** Default sort of every queue table: Code, newest first (owner 2026-11-19). */
+export const PFM_GROUP_DEFAULT_SORT = { field: 'official_code', order: -1 } as const;
+
 /** Columns in their fixed order; `sort` is the row field p-table sorts on. No Action column: the title opens the result. */
 const COLUMNS: { header: string; sort: keyof PfmTableRow }[] = [
   { header: 'Code', sort: 'official_code' },
@@ -95,9 +98,9 @@ export class PfmProjectGroupComponent implements OnInit {
   readonly search = signal('');
   /** Index of the first row of the current page; back to 0 on every search / clear. */
   readonly first = signal(0);
-  /** Column the user sorted by (p-table row field) and its direction; null = server order. */
-  readonly sortField = signal<string | null>(null);
-  readonly sortOrder = signal<1 | -1>(1);
+  /** Column the table is sorted by (p-table row field) and its direction; Code descending by default. */
+  readonly sortField = signal<string | null>(PFM_GROUP_DEFAULT_SORT.field);
+  readonly sortOrder = signal<1 | -1>(PFM_GROUP_DEFAULT_SORT.order);
 
   /** Every change of page, page size, search or sort is kept in the store, so a return from a result restores it. */
   private readonly rememberView = effect(() => {
@@ -111,8 +114,8 @@ export class PfmProjectGroupComponent implements OnInit {
     if (!view) return;
     this.search.set(view.search ?? '');
     this.pageSize.set(view.rows || PFM_GROUP_PAGE_SIZE);
-    this.sortField.set(view.sortField ?? null);
-    this.sortOrder.set(view.sortOrder === -1 ? -1 : 1);
+    this.sortField.set(view.sortField ?? PFM_GROUP_DEFAULT_SORT.field);
+    this.sortOrder.set(view.sortField ? (view.sortOrder === -1 ? -1 : 1) : PFM_GROUP_DEFAULT_SORT.order);
     this.first.set(view.first ?? 0);
   }
 
@@ -140,13 +143,13 @@ export class PfmProjectGroupComponent implements OnInit {
     this.first.set(0);
   }
 
-  /** Clear = empty search, back to the server order, first page. */
+  /** Clear = empty search, back to the default sort (Code descending), first page. */
   clear(): void {
     this.search.set('');
     this.first.set(0);
-    this.sortField.set(null);
-    this.sortOrder.set(1);
     this.table()?.reset();
+    this.sortField.set(PFM_GROUP_DEFAULT_SORT.field);
+    this.sortOrder.set(PFM_GROUP_DEFAULT_SORT.order);
   }
 
   /**
