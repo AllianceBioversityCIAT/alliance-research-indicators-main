@@ -1,7 +1,6 @@
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmPrmsStatusEnum } from '../enum/pfm-prms-status.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
-import { PfmStarLabelEnum } from '../enum/pfm-star-label.enum';
 import type {
   PfmContributingProjectRow,
   PfmProjectDelegate,
@@ -203,9 +202,17 @@ export const buildPortfolioProjects = (
  */
 export interface PfmJourney {
   projects: { total: number; with_results: number; without_results: number };
-  /** Draft includes Returned; Submitted includes Under review. */
-  star: { draft: number; submitted: number; approved: number };
-  /** Approved results only. */
+  /**
+   * Draft includes Returned; Submitted includes Under review. `approved` is STAR only;
+   * `completed_in_tip` is the TIP Knowledge Products, final in TIP (DD-PFM-40). Both move on.
+   */
+  star: {
+    draft: number;
+    submitted: number;
+    approved: number;
+    completed_in_tip: number;
+  };
+  /** Approved (or Completed in TIP) results only. */
   answer: { not_answered: number; contributes: number; no_sp: number };
   /** Approved results that contribute. */
   mapping: { incomplete: number; complete: number };
@@ -223,44 +230,20 @@ export const buildJourney = (
       with_results: projects.filter((p) => p.results > 0).length,
       without_results: projects.filter((p) => p.results === 0).length,
     },
-    star: { draft: 0, submitted: 0, approved: 0 },
+    star: { draft: 0, submitted: 0, approved: 0, completed_in_tip: 0 },
     answer: { not_answered: 0, contributes: 0, no_sp: 0 },
     mapping: { incomplete: 0, complete: 0 },
     sync: { ready: 0, synced: 0, rejected: 0 },
   };
-  for (const { row, d } of rows) {
-    // *Completed in TIP* is final in TIP, so a TIP row starts at step 3 (DD-PFM-40).
-    if (d.isApproved) {
-      j.star.approved += 1;
-    } else if (
-      d.starLabel === PfmStarLabelEnum.SUBMITTED ||
-      d.starLabel === PfmStarLabelEnum.UNDER_REVIEW
-    ) {
-      j.star.submitted += 1;
-      continue;
-    } else {
-      j.star.draft += 1;
-      continue;
-    }
-    if (!row.has_alignment || row.has_contribution == null) {
-      j.answer.not_answered += 1;
-      continue;
-    }
-    if (!row.has_contribution) {
-      j.answer.no_sp += 1;
-      continue;
-    }
-    j.answer.contributes += 1;
-    if (!row.mapping_complete) {
-      j.mapping.incomplete += 1;
-      continue;
-    }
-    j.mapping.complete += 1;
-    if (d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT) {
-      j.sync.ready += 1;
-    } else {
-      j.sync.synced += 1;
-      if (d.prmsStatus === PfmPrmsStatusEnum.REJECTED) j.sync.rejected += 1;
+  // One path per result (deriveJourneyPath): the cards count it, the journey views list it.
+  for (const { d } of rows) {
+    const p = d.journey;
+    j.star[p.star] += 1;
+    if (p.answer) j.answer[p.answer] += 1;
+    if (p.mapping) j.mapping[p.mapping] += 1;
+    if (p.sync) j.sync[p.sync] += 1;
+    if (p.sync === 'synced' && d.prmsStatus === PfmPrmsStatusEnum.REJECTED) {
+      j.sync.rejected += 1;
     }
   }
   return j;
@@ -491,8 +474,11 @@ export const PFM_CHIP_COUNT_KEYS = {
   [PfmChipEnum.MANAGED_IN_TIP]: 'managed_in_tip',
 } as const;
 
+/** Chips with a count in `chip_counts` (every chip but the journey views). */
+export type PfmCountedChip = keyof typeof PFM_CHIP_COUNT_KEYS;
+
 export type PfmChipCounts = Record<
-  (typeof PFM_CHIP_COUNT_KEYS)[PfmChipEnum],
+  (typeof PFM_CHIP_COUNT_KEYS)[PfmCountedChip],
   number
 >;
 
@@ -520,7 +506,8 @@ export const countPfmChips = (
   rows: PfmDerivedMonitoredRow[],
 ): PfmChipCounts => {
   const out = {} as PfmChipCounts;
-  for (const chip of Object.values(PfmChipEnum)) {
+  // Journey views are not counted here: the journey has its own numbers (DD-PFM-42).
+  for (const chip of Object.keys(PFM_CHIP_COUNT_KEYS) as PfmCountedChip[]) {
     out[PFM_CHIP_COUNT_KEYS[chip]] = rows.filter(({ d }) =>
       matchesChip(d, chip),
     ).length;
