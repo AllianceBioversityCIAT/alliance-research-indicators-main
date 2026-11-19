@@ -179,7 +179,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `tdd`
 
 ### T-08 — Controller, guards, Swagger, module wiring
-- **Status:** todo · **Size:** M · **Depends:** T-05, T-06, T-07
+- **Status:** done (2026-11-19, PASS attempt 2 — `execution.md` § T-08) · **Size:** M · **Depends:** T-05, T-06, T-07
 - **Requirements:** R-STF-014 (writes and admin reads ODS + System Admin; Center Admin `403`; writes reject machine tokens; consumer reads any authenticated user; AC.1), R-STF-013 AC.2 (`403` on another `@Roles`-guarded admin area for roles `[11]`), NFR-STF-003, NFR-STF-005
 - **Design:** §4 (all routes; literal before `:id`), §8; D-STF-20; P-4, P-6
 - **Scope:** `strategy-framework.controller.ts` (class `RolesGuard`, `SetUpInterceptor`, `@ApiTags`, `@ApiBearerAuth`; per handler `@ApiOperation` + params; writes `@UseGuards(HumanCredentialGuard)`), `main.routes.ts` node **and** `entities.module.ts` import (KZ-017), `strategy-framework.global-exceptions.spec.ts`.

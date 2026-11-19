@@ -6,6 +6,7 @@ import { ResultInnovationUseModule } from './result-innovation-use/result-innova
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 import { ControlListsModule } from './control-lists/control-lists.module';
 import { OrganizationalStructureModule } from './organizational-structure/organizational-structure.module';
+import { StrategyFrameworkModule } from './strategy-framework/strategy-framework.module';
 import { PrmsWebhookModule } from './prms-webhook/prms-webhook.module';
 
 /**
@@ -166,5 +167,20 @@ describe('EntitiesModule — organizational-structure registration (T-01)', () =
     const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
 
     expect(imports).toContain(OrganizationalStructureModule);
+  });
+});
+
+/**
+ * T-08 (docs/specs/institutional-performance/strategy-framework), KZ-017.
+ * A route node in `main.routes.ts` is not registration: drop this import and
+ * every strategy-framework handler is a silent 404. This assertion cannot
+ * see HTTP reachability (that is an app boot, T-10) and cannot see the route
+ * node (a present node with a missing import still fails here).
+ */
+describe('EntitiesModule — strategy-framework registration (T-08)', () => {
+  it('lists StrategyFrameworkModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(StrategyFrameworkModule);
   });
 });

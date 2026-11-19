@@ -76,6 +76,7 @@ import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { ControlListsModule } from '../entities/control-lists/control-lists.module';
 import { OrganizationalStructureModule } from '../entities/organizational-structure/organizational-structure.module';
+import { StrategyFrameworkModule } from '../entities/strategy-framework/strategy-framework.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 import { PiDelegatesModule } from '../entities/pi-delegates/pi-delegates.module';
@@ -279,6 +280,10 @@ const children: Routes = [
   {
     path: 'organizational-structure',
     module: OrganizationalStructureModule,
+  },
+  {
+    path: 'strategy-framework',
+    module: StrategyFrameworkModule,
   },
   {
     path: 'configuration',
