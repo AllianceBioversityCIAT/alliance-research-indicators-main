@@ -190,10 +190,10 @@ describe('PfmJourneyCardComponent', () => {
     const WITH_TIP: PfmJourney = { ...JOURNEY, star: { ...JOURNEY.star, completed_in_tip: 100 } };
 
     it.each([
-      [1, ['journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip']],
+      [1, ['awaiting_pi', 'awaiting_pi', 'journey_approved', 'journey_completed_in_tip']],
       // A card whose concept is a quick view opens that quick view, not a look-alike.
-      [2, ['mapping_incomplete', 'journey_contributes', 'journey_no_sp']],
-      [3, ['mapping_incomplete', 'journey_mapping_complete']],
+      [2, ['mapping_incomplete', 'journey_contributes', 'no_sp_contribution']],
+      [3, ['mapping_incomplete', 'ready_to_sync']],
       [4, ['ready_to_sync', 'synced']]
     ])('stage %i cards open their queue view', (stage, chips) => {
       const { fixture, el } = render(stage as number, 'all', WITH_TIP);
