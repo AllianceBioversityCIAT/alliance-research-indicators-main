@@ -252,3 +252,6 @@ No owed item and no blocker, so no continuation is needed.
 - **Tripwire fired again, on production LOC.** About 363 production lines against an estimate of about 300. The owner's decision after T-02 raised only the test budget, so this overrun stops the run for the owner, per `/akili-execute` §2.4. This stop is not logged `auto-approved`.
   - **Cause:** T-02 (about 101 lines) and T-03 (about 99 lines) each needed more DTO, Swagger and parsing code than the per-task share. T-03 also widened `RESULT_STATUS_SQL` and added `parsePushYear`.
   - **Projection:** T-04 and T-05 are client tasks: an API method, an interface, the version-selector flow, and the sidebar state and tooltip. They will likely add about 150–250 production lines, for a total of about 510–610.
+- **Owner decision (2026-11-19, after T-03):** continue to T-04 and T-05.
+  - The production budget is raised as well.
+  - Client code is not committed until the owner has seen it working on Dev (T-05 HITL).
