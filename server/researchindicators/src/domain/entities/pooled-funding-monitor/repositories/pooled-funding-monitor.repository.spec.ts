@@ -158,6 +158,18 @@ describe('mapMonitoredRow', () => {
     });
   });
 
+  it('DD-PFM-45: synced months are distinct, sorted, and empty when there is none', () => {
+    expect(
+      mapMonitoredRow({
+        ...base,
+        synced_months: '["2026-09","2026-05","2026-09"]',
+      }).synced_months,
+    ).toEqual(['2026-05', '2026-09']);
+    expect(
+      mapMonitoredRow({ ...base, synced_months: null }).synced_months,
+    ).toEqual([]);
+  });
+
   it('keeps null dates null and parses a JSON string payload', () => {
     const row = mapMonitoredRow({
       ...base,

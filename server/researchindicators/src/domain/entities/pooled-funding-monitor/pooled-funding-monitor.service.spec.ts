@@ -39,6 +39,7 @@ const row = (o: Partial<PfmMonitoredRow> = {}): PfmMonitoredRow =>
     prms_history_status: null,
     prms_justification: null,
     creator: 'Ana Perez',
+    synced_months: [],
     ...o,
   }) as PfmMonitoredRow;
 
@@ -91,6 +92,12 @@ describe('PooledFundingMonitorService', () => {
         expect.any(Date),
       );
       expect(repo.isPiOfAnyContributingProject).toHaveBeenCalledWith(77);
+    });
+
+    it('reports the configured report year in the summary', async () => {
+      expect((await service.getSummary(77, PfmScopeEnum.ALL)).report_year).toBe(
+        2031,
+      );
     });
 
     it('scope=all uses the portfolio and still reports is_pi_of_any for the user', async () => {
@@ -164,6 +171,24 @@ describe('PooledFundingMonitorService', () => {
   });
 
   describe('queue', () => {
+    it('DD-PFM-45: a synced month keeps only the results synced that month', async () => {
+      repo.findMonitoredResults.mockResolvedValueOnce([
+        row({ synced_months: ['2026-05', '2026-09'] }),
+        row({
+          result_id: 2,
+          result_official_code: 1002,
+          project_code: 'P-B',
+          synced_months: ['2026-06'],
+        }),
+      ]);
+      const q = await service.getQueue(77, {
+        scope: PfmScopeEnum.ALL,
+        synced_month: '2026-09',
+      });
+      expect(q.totals.results).toBe(1);
+      expect(q.groups.map((g) => g.code)).toEqual(['P-A']);
+    });
+
     it('adds filter_options from the repository and applies the chip after counting', async () => {
       // Ready to sync = mapping complete, so P-B's row needs an incomplete mapping here.
       repo.findMonitoredResults.mockResolvedValueOnce([

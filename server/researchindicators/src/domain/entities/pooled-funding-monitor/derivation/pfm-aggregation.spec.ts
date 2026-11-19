@@ -5,6 +5,7 @@ import {
   PfmSpRef,
 } from '../repositories/pooled-funding-monitor.repository';
 import {
+  applyPfmFilters,
   assignPfmStage,
   buildMonthlySeries,
   buildPfmGroups,
@@ -68,6 +69,7 @@ const mk = (
   prms_justification: null,
   creator: null,
   updated_at: new Date('2026-04-09T08:07:00Z'),
+  synced_months: [],
   ...o,
 });
 
@@ -814,5 +816,28 @@ describe('DD-PFM-42: each journey card opens exactly the results it counts', () 
     expect(Object.keys(counts).some((k) => k.startsWith('journey'))).toBe(
       false,
     );
+  });
+});
+
+describe('DD-PFM-45: a Sync activity month opens exactly the results it counts', () => {
+  const rows = deriveMonitoredRows([
+    mk(1, 'P-A', { ...SYNCED, synced_months: ['2026-05', '2026-09'] }),
+    mk(2, 'P-A', { ...SYNCED, synced_months: ['2026-09'] }),
+    mk(3, 'P-B', { synced_months: [] }),
+  ]);
+
+  it.each([
+    ['2026-09', 2],
+    ['2026-05', 1],
+    ['2026-07', 0],
+  ])('month %s lists %i results', (month, n) => {
+    expect(applyPfmFilters(rows, { synced_month: month })).toHaveLength(n);
+    expect(buildPfmQueue(rows, { synced_month: month }).totals.results).toBe(n);
+  });
+
+  it('combines with the other filters (AND)', () => {
+    expect(
+      applyPfmFilters(rows, { synced_month: '2026-09', project: 'P-B' }),
+    ).toHaveLength(0);
   });
 });
