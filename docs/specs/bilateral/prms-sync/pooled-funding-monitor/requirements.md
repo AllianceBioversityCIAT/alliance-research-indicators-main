@@ -126,7 +126,7 @@ The page SHALL offer a segmented toggle with **Only my results as PI** (default)
 ### R-PFM-003 — Monitored result set
 
 A result SHALL be monitored iff **all** of the following hold:
-1. It is the **current** (non-snapshot), active, non-deleted version **and its platform is STAR**. Results imported from TIP or AICCRA are excluded, because only STAR results are synced to PRMS.
+1. It is the **current** (non-snapshot), active, non-deleted version, **and** either its platform is STAR, **or** its platform is TIP and its type is Knowledge Product (DD-PFM-40). AICCRA results, and TIP results of any other type, are excluded.
 2. Its **primary** contract is a contributing project.
 3. Its type is one of the five PRMS result types: Knowledge Product, Innovation Development, Innovation Use, Capacity Sharing for Development, Policy Change.
 4. Its report year (`results.report_year_id`) is the monitored report year, currently **2026** (DD-PFM-18; to be read from `app_config` later).
@@ -140,8 +140,20 @@ A result SHALL be monitored iff **all** of the following hold:
 - THEN it appears in no count, chart, chip, row, filter option or monthly series
 
 #### Scenario: Results from other platforms
-- GIVEN a TIP or AICCRA result (e.g. status *Completed in TIP*) whose primary contract is a contributing project
-- THEN it is not monitored. Measured on the local DB, 2026-10-08: 750 of the 906 candidate rows were TIP/AICCRA; including them would swamp the page with results that can never reach PRMS.
+- GIVEN an AICCRA result, or a TIP result that is not a Knowledge Product, whose primary contract is a contributing project
+- THEN it is not monitored
+
+#### Scenario: TIP knowledge products (DD-PFM-40)
+- GIVEN a 2026 TIP Knowledge Product (status *Completed in TIP*) whose primary contract is a contributing project
+- THEN it is monitored, in every count, chart, step and row, with its real mapping and PRMS state
+- AND *Completed in TIP* counts as approved: it is final in TIP, so it is neither *Draft* nor *Awaiting PI*
+- AND it needs no action in STAR: it is never in *Need attention*, *Mapping incomplete*, *Ready to sync* or *Awaiting PI*; while it is in PRMS scope and not in PRMS yet it is in *Managed in TIP*
+- AND its row is marked *From TIP*, with a tooltip saying it is managed in TIP and needs no action in STAR
+- BUT a TIP Knowledge Product of another report year is not monitored (R-PFM-003 item 4 applies to every platform)
+
+#### Scenario: Same code on two platforms
+- GIVEN STAR result 123 and TIP result 123 of the same year
+- THEN each row reads only its own platform's PRMS history and sync log
 
 #### Scenario: Non-primary contract
 - GIVEN a result linked to a contributing project only as a **non-primary** contract
