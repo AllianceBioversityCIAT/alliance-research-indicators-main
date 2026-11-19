@@ -226,7 +226,49 @@ describe('PooledFundingMonitorRepository scope guard', () => {
     (dataSource.query as jest.Mock).mockResolvedValue([]);
     await repository.findMonitoredResults({ scope: PfmScopeEnum.ALL });
     const [, params] = (dataSource.query as jest.Mock).mock.calls[0];
-    expect(params).toEqual([6, 'STAR', 2026]);
+    expect(params).toEqual([6, 'STAR', 'TIP', 3, 2026]);
+  });
+
+  describe('DD-PFM-40: TIP knowledge products', () => {
+    const scope = { scope: PfmScopeEnum.ALL } as const;
+    const allCalls = async () => {
+      (dataSource.query as jest.Mock).mockResolvedValue([]);
+      await repository.findMonitoredResults(scope);
+      await repository.findMonthlySyncs(scope);
+      await repository.countSyncedThisYear(scope);
+      await repository.findFilterOptions(scope);
+      return (dataSource.query as jest.Mock).mock.calls as [
+        string,
+        unknown[],
+      ][];
+    };
+
+    it('admits STAR, or TIP only as a Knowledge Product, as ONE parenthesised unit', async () => {
+      for (const [sql, params] of await allCalls()) {
+        expect(sql).toContain(
+          '(r.platform_code = ? OR (r.platform_code = ? AND r.indicator_id = ?))',
+        );
+        expect(params).toEqual(expect.arrayContaining(['STAR', 'TIP', 3]));
+        expect(sql).not.toContain('AICCRA');
+      }
+    });
+
+    it('reads PRMS history and the sync log of the row platform only', async () => {
+      const calls = await allCalls();
+      const [monitored] = calls[0];
+      expect(monitored).toMatch(
+        /h\.platform_code = \(r\.platform_code COLLATE utf8mb4_unicode_520_ci\)/,
+      );
+      for (const [sql] of [calls[1], calls[2]]) {
+        expect(sql).toMatch(
+          /l\.platform_code = \(r\.platform_code COLLATE utf8mb4_unicode_520_ci\)/,
+        );
+        // STAR keeps the bare code; any other platform is `<platform>-<code>` (prmsRef).
+        expect(sql).toContain(
+          "IF(r.platform_code = 'STAR', r.result_official_code, CONCAT(r.platform_code, '-', r.result_official_code))",
+        );
+      }
+    });
   });
 
   describe('HITL 21: report year 2026 and no OICR in every monitored query', () => {
