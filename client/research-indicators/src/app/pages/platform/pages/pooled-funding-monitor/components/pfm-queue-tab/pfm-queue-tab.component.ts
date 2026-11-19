@@ -66,6 +66,14 @@ export class PfmQueueTabComponent {
     return HIDDEN_CHIP_LABELS[key] ? { key, label: HIDDEN_CHIP_LABELS[key] } : null;
   });
 
+  /** 'Jun 2026' for the Sync activity month the queue is narrowed to, if any. */
+  readonly syncedMonthLabel = computed(() => {
+    const m = this.store.filters().synced_month;
+    if (!m) return null;
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${MONTHS[Number(m.slice(5, 7)) - 1] ?? m.slice(5, 7)} ${m.slice(0, 4)}`;
+  });
+
   /** Last loaded queue: stays rendered (filters included) while a refetch is in flight. */
   readonly queue = computed(() => this.store.queue());
   /** The held queue belongs to a previous query while a refetch runs or has failed: show none of its numbers (NFR-PFM-006). */
