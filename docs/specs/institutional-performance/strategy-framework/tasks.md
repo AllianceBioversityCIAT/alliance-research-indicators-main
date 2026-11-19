@@ -116,7 +116,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`
 
 ### T-04 — Pure utilities: tree, codes, errors, constants
-- **Status:** todo · **Size:** M · **Depends:** T-03
+- **Status:** done (2026-11-19, PASS attempt 1 — `execution.md` § T-04) · **Size:** M · **Depends:** T-03
 - **Requirements:** R-STF-003 (depth rules, move same depth, cycles — util-level per AC.2), R-STF-005 (root and child proposal portfolio-wide; gap; moved element; non-numeric parent; IOB-n; 30-char limit), R-STF-002 AC.1 (four-level fixture), R-STF-006 (blocked message with way-out)
 - **Design:** §5.2 steps 2–3, §5.3, §5.4 step 2, `framework-errors.ts`, `strategy-framework.constants.ts`; D-STF-16
 - **Scope:** `framework-tree.util.ts`, `framework-code.util.ts`, `framework-errors.ts`, `strategy-framework.constants.ts` (+ specs).
