@@ -30,6 +30,20 @@ export interface PfmRawRow {
   updated_at: Date | null;
 }
 
+/**
+ * Where a result is on the coverage journey (stages 2-5). Each stage is a subset of the one
+ * before: only an approved (or Completed in TIP) result has an answer, only a contributing one
+ * a mapping, only a mapped one a sync state. The journey counts and the journey views of the
+ * queue both read this, so a card and the list it opens always agree (DD-PFM-42).
+ */
+export interface PfmJourneyPath {
+  /** Draft includes Returned; Submitted includes Under review. */
+  star: 'draft' | 'submitted' | 'approved' | 'completed_in_tip';
+  answer: 'not_answered' | 'contributes' | 'no_sp' | null;
+  mapping: 'incomplete' | 'complete' | null;
+  sync: 'ready' | 'synced' | null;
+}
+
 export interface PfmDerivedRow {
   /** One of PfmStarLabelEnum, or the STAR status name for any other id. */
   starLabel: string;
@@ -50,6 +64,7 @@ export interface PfmDerivedRow {
   isExternal: boolean;
   /** Approved in STAR, or final in TIP (*Completed in TIP*). */
   isApproved: boolean;
+  journey: PfmJourneyPath;
 }
 
 /** The subset of derived state the filter / chip / rank predicates read. */
@@ -63,6 +78,7 @@ export type PfmDerivedState = Pick<
   | 'needsAttention'
   | 'isExternal'
   | 'isApproved'
+  | 'journey'
 >;
 
 const MONTHS = [
@@ -244,6 +260,39 @@ export const derivePrmsHint = (
   return `PRMS: ${status}`;
 };
 
+export const deriveJourneyPath = (
+  row: Pick<
+    PfmRawRow,
+    'has_alignment' | 'has_contribution' | 'mapping_complete'
+  >,
+  starLabel: string,
+  isApproved: boolean,
+  isExternal: boolean,
+  prmsStatus: PfmPrmsStatusEnum,
+): PfmJourneyPath => {
+  const none = { answer: null, mapping: null, sync: null };
+  if (!isApproved) {
+    const submitted =
+      starLabel === PfmStarLabelEnum.SUBMITTED ||
+      starLabel === PfmStarLabelEnum.UNDER_REVIEW;
+    return { star: submitted ? 'submitted' : 'draft', ...none };
+  }
+  const star = isExternal ? 'completed_in_tip' : 'approved';
+  if (!row.has_alignment || row.has_contribution == null) {
+    return { ...none, star, answer: 'not_answered' };
+  }
+  if (!row.has_contribution) return { ...none, star, answer: 'no_sp' };
+  if (!row.mapping_complete) {
+    return { star, answer: 'contributes', mapping: 'incomplete', sync: null };
+  }
+  return {
+    star,
+    answer: 'contributes',
+    mapping: 'complete',
+    sync: prmsStatus === PfmPrmsStatusEnum.NOT_SENT ? 'ready' : 'synced',
+  };
+};
+
 export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
   const starLabel = deriveStarLabel(
     row.result_status_id,
@@ -254,6 +303,9 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
   const isOutOfScope = mappingState === PfmMappingStateEnum.NO_SP_CONTRIBUTION;
   const notSent = prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
   const isExternal = isExternalPlatform(row.platform_code);
+  const isApproved =
+    starLabel === PfmStarLabelEnum.APPROVED ||
+    (isExternal && row.result_status_id === PFM_COMPLETED_IN_TIP_STATUS_ID);
   return {
     starLabel,
     piLine: derivePiLine(starLabel, row.approved_at),
@@ -279,9 +331,14 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     // A TIP row is never on us: nothing can be done about it in STAR (DD-PFM-40).
     needsAttention: !isOutOfScope && notSent && !isExternal,
     isExternal,
-    isApproved:
-      starLabel === PfmStarLabelEnum.APPROVED ||
-      (isExternal && row.result_status_id === PFM_COMPLETED_IN_TIP_STATUS_ID),
+    isApproved,
+    journey: deriveJourneyPath(
+      row,
+      starLabel,
+      isApproved,
+      isExternal,
+      prmsStatus,
+    ),
   };
 };
 
@@ -330,6 +387,29 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
       return d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW;
     case PfmChipEnum.PRMS_APPROVED:
       return d.prmsStatus === PfmPrmsStatusEnum.APPROVED;
+    // Journey views: exactly the results a journey card counts (DD-PFM-42).
+    case PfmChipEnum.JOURNEY_DRAFT:
+      return d.journey.star === 'draft';
+    case PfmChipEnum.JOURNEY_SUBMITTED:
+      return d.journey.star === 'submitted';
+    case PfmChipEnum.JOURNEY_APPROVED:
+      return d.journey.star === 'approved';
+    case PfmChipEnum.JOURNEY_COMPLETED_IN_TIP:
+      return d.journey.star === 'completed_in_tip';
+    case PfmChipEnum.JOURNEY_NOT_ANSWERED:
+      return d.journey.answer === 'not_answered';
+    case PfmChipEnum.JOURNEY_CONTRIBUTES:
+      return d.journey.answer === 'contributes';
+    case PfmChipEnum.JOURNEY_NO_SP:
+      return d.journey.answer === 'no_sp';
+    case PfmChipEnum.JOURNEY_MAPPING_INCOMPLETE:
+      return d.journey.mapping === 'incomplete';
+    case PfmChipEnum.JOURNEY_MAPPING_COMPLETE:
+      return d.journey.mapping === 'complete';
+    case PfmChipEnum.JOURNEY_READY:
+      return d.journey.sync === 'ready';
+    case PfmChipEnum.JOURNEY_SYNCED:
+      return d.journey.sync === 'synced';
     default:
       return true;
   }
