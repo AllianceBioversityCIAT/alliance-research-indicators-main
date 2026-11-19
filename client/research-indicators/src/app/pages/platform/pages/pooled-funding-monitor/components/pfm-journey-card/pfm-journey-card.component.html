@@ -109,9 +109,14 @@
 
       <ul class="m-0 mt-4 flex list-none flex-col gap-2 p-0">
         @for (p of c.parts; track p.label) {
-          <li
-            class="grid grid-cols-[12px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[9px] border border-solid border-[color:var(--ac-pfm-surface-border)] px-3.5 py-2.5"
-            data-testid="pfm-journey-part">
+          <!-- Every card opens exactly the results (or projects) it counts -->
+          <li>
+          <button
+            type="button"
+            class="grid w-full cursor-pointer grid-cols-[12px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[9px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] px-3.5 py-2.5 text-left font-[inherit] transition-colors duration-200 hover:border-[color:var(--ac-pfm-info-fg)] hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)]"
+            data-testid="pfm-journey-part"
+            [attr.aria-label]="'Open ' + p.label + ': ' + p.value + (p.target === 'projects_with' || p.target === 'projects_without' ? ' projects' : ' results')"
+            (click)="openPart(p.target)">
             <span class="h-3 w-3 rounded-[3px]" [style.background-color]="p.color" aria-hidden="true"></span>
             <div class="min-w-0">
               <p class="m-0 text-[13.5px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-part-label">{{ p.label }}</p>
@@ -130,6 +135,7 @@
                     : 'border-[color:var(--ac-pfm-info-bg)] bg-[var(--ac-pfm-info-bg)] text-[var(--ac-pfm-info-fg)]'
               }}"
               data-testid="pfm-journey-part-tag">{{ p.tag }}</span>
+          </button>
           </li>
         }
       </ul>

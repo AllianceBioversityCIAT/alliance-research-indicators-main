@@ -7,7 +7,8 @@
       [stage]="stage()"
       (stageChange)="stage.set($event)"
       (openQueue)="openQueue.emit({ chip: $event })"
-      (showProjectsWithoutResults)="projectsFilter.set('without')" />
+      (showProjectsWithoutResults)="projectsFilter.set('without')"
+      (showProjectsWithResults)="projectsFilter.set('with')" />
     @if (stage() === 0) {
       <app-pfm-portfolio-projects [projects]="summary().portfolio_projects ?? []" [(filter)]="projectsFilter" />
     }
