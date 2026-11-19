@@ -3,7 +3,8 @@ import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import {
   mapMonitoredRow,
   PFM_MONITORED_INDICATOR_IDS,
-  PFM_REPORT_YEAR,
+  PFM_REPORT_YEAR_CONFIG_KEY,
+  PfmRepositoryScope,
   PooledFundingMonitorRepository,
   splitSciencePrograms,
 } from './pooled-funding-monitor.repository';
@@ -195,8 +196,39 @@ describe('mapMonitoredRow', () => {
 describe('PooledFundingMonitorRepository scope guard', () => {
   const dataSource = { query: jest.fn() } as unknown as DataSource;
   const repository = new PooledFundingMonitorRepository(dataSource);
+  /** Deliberately not 2026: the year must come from the scope, never from code. */
+  const YEAR = 2031;
 
   beforeEach(() => (dataSource.query as jest.Mock).mockReset());
+
+  describe('findReportYear (OICR.REPORTING_YEAR)', () => {
+    it('reads the active app_config value of the key, bound as a parameter', async () => {
+      (dataSource.query as jest.Mock).mockResolvedValue([
+        { simple_value: ' 2027 ' },
+      ]);
+      expect(await repository.findReportYear()).toBe(2027);
+      const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+      expect(PFM_REPORT_YEAR_CONFIG_KEY).toBe('OICR.REPORTING_YEAR');
+      expect(sql).toContain('FROM app_config WHERE `key` = ?');
+      expect(sql).toContain('is_active = TRUE');
+      expect(params).toEqual(['OICR.REPORTING_YEAR']);
+    });
+
+    it.each([
+      [[]],
+      [[{ simple_value: null }]],
+      [[{ simple_value: 'abc' }]],
+      [[{ simple_value: '26' }]],
+    ])(
+      'falls back to the current UTC year when the value is missing or not a year (%p)',
+      async (rows) => {
+        (dataSource.query as jest.Mock).mockResolvedValue(rows);
+        expect(
+          await repository.findReportYear(new Date('2033-01-01T02:00:00Z')),
+        ).toBe(2033);
+      },
+    );
+  });
 
   it.each([undefined, null, NaN, '7' as unknown as number, 1.5])(
     'refuses the PI scope without an integer user id (%p) instead of falling back to the portfolio',
@@ -205,6 +237,7 @@ describe('PooledFundingMonitorRepository scope guard', () => {
         repository.findMonitoredResults({
           scope: PfmScopeEnum.MINE,
           userId,
+          reportYear: YEAR,
         }),
       ).rejects.toThrow('PI scope requires the authenticated sec_user_id');
       expect(dataSource.query).not.toHaveBeenCalled();
@@ -216,6 +249,7 @@ describe('PooledFundingMonitorRepository scope guard', () => {
     await repository.findMonitoredResults({
       scope: PfmScopeEnum.MINE,
       userId: 4242,
+      reportYear: YEAR,
     });
     const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
     expect(params.filter((p: unknown) => p === 4242)).toHaveLength(2);
@@ -224,13 +258,16 @@ describe('PooledFundingMonitorRepository scope guard', () => {
 
   it('adds no user binding for the portfolio scope', async () => {
     (dataSource.query as jest.Mock).mockResolvedValue([]);
-    await repository.findMonitoredResults({ scope: PfmScopeEnum.ALL });
+    await repository.findMonitoredResults({
+      scope: PfmScopeEnum.ALL,
+      reportYear: YEAR,
+    });
     const [, params] = (dataSource.query as jest.Mock).mock.calls[0];
-    expect(params).toEqual([6, 'STAR', 'TIP', 3, 2026]);
+    expect(params).toEqual([6, 'STAR', 'TIP', 3, YEAR]);
   });
 
   describe('DD-PFM-40: TIP knowledge products', () => {
-    const scope = { scope: PfmScopeEnum.ALL } as const;
+    const scope = { scope: PfmScopeEnum.ALL, reportYear: YEAR } as const;
     const allCalls = async () => {
       (dataSource.query as jest.Mock).mockResolvedValue([]);
       await repository.findMonitoredResults(scope);
@@ -271,8 +308,8 @@ describe('PooledFundingMonitorRepository scope guard', () => {
     });
   });
 
-  describe('HITL 21: report year 2026 and no OICR in every monitored query', () => {
-    const scope = { scope: PfmScopeEnum.ALL } as const;
+  describe('HITL 21: one report year (from app_config) and no OICR in every monitored query', () => {
+    const scope = { scope: PfmScopeEnum.ALL, reportYear: YEAR } as const;
     const calls = async () => {
       (dataSource.query as jest.Mock).mockResolvedValue([]);
       await repository.findMonitoredResults(scope);
@@ -285,18 +322,25 @@ describe('PooledFundingMonitorRepository scope guard', () => {
       ][];
     };
 
-    it('PFM_REPORT_YEAR is 2026', () => {
-      expect(PFM_REPORT_YEAR).toBe(2026);
-    });
-
-    it('binds the year (never interpolates it) in every query that selects results', async () => {
+    it('binds the scope year (never interpolates it) in every query that selects results', async () => {
       const all = await calls();
       expect(all).toHaveLength(6); // base, monthly, synced-this-year, 3 filter-option queries
       for (const [sql, params] of all) {
         expect(sql).toContain('r.report_year_id = ?');
-        expect(params).toContain(2026);
+        expect(params).toContain(YEAR);
+        expect(params).not.toContain(2026);
+        expect(sql).not.toContain(String(YEAR));
         expect(sql).not.toContain('2026');
       }
+    });
+
+    it('refuses a scope without a report year instead of counting every year', async () => {
+      await expect(
+        repository.findMonitoredResults({
+          scope: PfmScopeEnum.ALL,
+        } as unknown as PfmRepositoryScope),
+      ).rejects.toThrow('The monitor scope requires the report year');
+      expect(dataSource.query).not.toHaveBeenCalled();
     });
 
     it('excludes OICR (indicator 5) in every query that selects results', async () => {
@@ -320,7 +364,7 @@ describe('PooledFundingMonitorRepository scope guard', () => {
       { month: '2026-05', synced: '2' },
     ]);
     const out = await repository.findMonthlySyncs(
-      { scope: PfmScopeEnum.ALL },
+      { scope: PfmScopeEnum.ALL, reportYear: YEAR },
       new Date('2026-10-08T12:00:00Z'),
     );
     expect(out).toEqual([{ month: '2026-05', synced: 2 }]);
@@ -332,7 +376,7 @@ describe('PooledFundingMonitorRepository scope guard', () => {
   it('counts synced-this-year over the UTC calendar year of `now`, bound as epochs', async () => {
     (dataSource.query as jest.Mock).mockResolvedValue([{ synced: '3' }]);
     const out = await repository.countSyncedThisYear(
-      { scope: PfmScopeEnum.MINE, userId: 4242 },
+      { scope: PfmScopeEnum.MINE, userId: 4242, reportYear: YEAR },
       new Date('2026-10-08T12:00:00Z'),
     );
     expect(out).toBe(3);
@@ -387,6 +431,7 @@ describe('PooledFundingMonitorRepository.findContributingProjects delegates', ()
     ]);
     const rows = await repository.findContributingProjects({
       scope: PfmScopeEnum.ALL,
+      reportYear: 2026,
     });
     expect(rows[0].delegates).toEqual([
       { name: 'Manuel Almanzar', email: 'm.a@cgiar.org', is_active: false },
@@ -408,6 +453,7 @@ describe('PooledFundingMonitorRepository.findContributingProjects delegates', ()
     ]);
     const rows = await repository.findContributingProjects({
       scope: PfmScopeEnum.ALL,
+      reportYear: 2026,
     });
     expect(rows.map((r) => [r.lead_pi, r.status])).toEqual([
       ['Jacob Van Etten', 'Completed'],

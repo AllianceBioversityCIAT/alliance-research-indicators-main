@@ -60,6 +60,7 @@ describe('PooledFundingMonitorService', () => {
           updated_at: null,
         }),
       ]),
+      findReportYear: jest.fn().mockResolvedValue(2031),
       countContributingProjects: jest.fn().mockResolvedValue(9),
       findContributingProjects: jest.fn().mockResolvedValue([]),
       findMonthlySyncs: jest.fn().mockResolvedValue([]),
@@ -79,7 +80,7 @@ describe('PooledFundingMonitorService', () => {
     it('defaults to mine and hands the AUTHENTICATED user id to every scoped read', async () => {
       const summary = await service.getSummary(77);
       expect(summary.scope).toBe(PfmScopeEnum.MINE);
-      const mine = { scope: PfmScopeEnum.MINE, userId: 77 };
+      const mine = { scope: PfmScopeEnum.MINE, userId: 77, reportYear: 2031 };
       expect(repo.findMonitoredResults).toHaveBeenCalledWith(mine);
       expect(repo.findMonthlySyncs).toHaveBeenCalledWith(
         mine,
@@ -97,10 +98,28 @@ describe('PooledFundingMonitorService', () => {
       const summary = await service.getSummary(77, PfmScopeEnum.ALL);
       expect(repo.findMonitoredResults).toHaveBeenCalledWith({
         scope: PfmScopeEnum.ALL,
+        reportYear: 2031,
       });
       expect(summary.is_pi_of_any).toBe(false);
       expect(summary.synced_this_year).toBe(4);
       expect(summary.kpis.projects_total).toBe(9);
+    });
+
+    it('reads the report year once per request and gives every scoped read the same one', async () => {
+      await service.getSummary(77, PfmScopeEnum.ALL);
+      expect(repo.findReportYear).toHaveBeenCalledTimes(1);
+      const years = [
+        repo.findMonitoredResults.mock.calls[0][0],
+        repo.findMonthlySyncs.mock.calls[0][0],
+        repo.countSyncedThisYear.mock.calls[0][0],
+        repo.findContributingProjects.mock.calls[0][0],
+      ].map((scope) => scope.reportYear);
+      expect(years).toEqual([2031, 2031, 2031, 2031]);
+
+      repo.findReportYear.mockClear();
+      await service.getQueue(77, { scope: PfmScopeEnum.ALL });
+      expect(repo.findReportYear).toHaveBeenCalledTimes(1);
+      expect(repo.findFilterOptions.mock.calls[0][0].reportYear).toBe(2031);
     });
 
     // The m.lundy case: PI of many projects, none contributing. The page must
