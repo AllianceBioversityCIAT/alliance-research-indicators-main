@@ -129,22 +129,28 @@ A result SHALL be monitored iff **all** of the following hold:
 1. It is the **current** (non-snapshot), active, non-deleted version, **and** either its platform is STAR, **or** its platform is TIP and its type is Knowledge Product (DD-PFM-40). AICCRA results, and TIP results of any other type, are excluded.
 2. Its **primary** contract is a contributing project.
 3. Its type is one of the five PRMS result types: Knowledge Product, Innovation Development, Innovation Use, Capacity Sharing for Development, Policy Change.
-4. Its report year (`results.report_year_id`) is the monitored report year, currently **2026** (DD-PFM-18; to be read from `app_config` later).
+4. Its report year (`results.report_year_id`) is the monitored report year: the active `app_config` value of **`OICR.REPORTING_YEAR`** (DD-PFM-41), 2026 at the time of writing. No year is written in code.
 
 #### Scenario: OICR excluded
 - GIVEN an OICR whose primary contract is a contributing project
 - THEN it appears in no count, chart, chip or row
 
 #### Scenario: Other report years
-- GIVEN a result that meets 1–3 but whose report year is not 2026
+- GIVEN a result that meets 1–3 but whose report year is not the monitored report year
 - THEN it appears in no count, chart, chip, row, filter option or monthly series
+
+#### Scenario: The report year comes from configuration (DD-PFM-41)
+- GIVEN an admin changes `OICR.REPORTING_YEAR` to 2027
+- THEN on the next load every count, chart, step, chip, row and filter option of the monitor uses 2027, with no code change
+- AND one response never mixes two years: the value is read once per request
+- BUT when the key is missing or not a four-digit year, the monitor uses the current UTC calendar year and logs a warning
 
 #### Scenario: Results from other platforms
 - GIVEN an AICCRA result, or a TIP result that is not a Knowledge Product, whose primary contract is a contributing project
 - THEN it is not monitored
 
 #### Scenario: TIP knowledge products (DD-PFM-40)
-- GIVEN a 2026 TIP Knowledge Product (status *Completed in TIP*) whose primary contract is a contributing project
+- GIVEN a TIP Knowledge Product of the monitored report year (status *Completed in TIP*) whose primary contract is a contributing project
 - THEN it is monitored, in every count, chart, step and row, with its real mapping and PRMS state
 - AND *Completed in TIP* counts as approved: it is final in TIP, so it is neither *Draft* nor *Awaiting PI*
 - AND it needs no action in STAR: it is never in *Need attention*, *Mapping incomplete*, *Ready to sync* or *Awaiting PI*; while it is in PRMS scope and not in PRMS yet it is in *Managed in TIP*
