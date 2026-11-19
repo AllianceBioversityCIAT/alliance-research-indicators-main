@@ -330,7 +330,7 @@ describe('pfm-aggregation', () => {
       expect(buildJourney(derived, projects)).toEqual({
         projects: { total: 5, with_results: 4, without_results: 1 },
         // Draft includes Returned (r10); Submitted includes Under review (r9)
-        star: { draft: 2, submitted: 2, approved: 9 },
+        star: { draft: 2, submitted: 2, approved: 9, completed_in_tip: 0 },
         answer: { not_answered: 0, contributes: 7, no_sp: 2 },
         mapping: { incomplete: 2, complete: 5 },
         sync: { ready: 1, synced: 4, rejected: 1 },
@@ -381,7 +381,12 @@ describe('pfm-aggregation', () => {
         with_results: 0,
         without_results: 1,
       });
-      expect(s.journey.star).toEqual({ draft: 2, submitted: 2, approved: 9 });
+      expect(s.journey.star).toEqual({
+        draft: 2,
+        submitted: 2,
+        approved: 9,
+        completed_in_tip: 0,
+      });
     });
   });
 
@@ -735,7 +740,13 @@ describe('DD-PFM-40: TIP knowledge products in the aggregates', () => {
 
   it('runs TIP rows through the journey from step 3: Completed in TIP is approved', () => {
     const j = buildJourney(rows, buildPortfolioProjects([], rows));
-    expect(j.star).toEqual({ draft: 0, submitted: 0, approved: 5 });
+    // STAR approved apart from Completed in TIP; both move on to step 3.
+    expect(j.star).toEqual({
+      draft: 0,
+      submitted: 0,
+      approved: 1,
+      completed_in_tip: 4,
+    });
     expect(j.answer).toEqual({ not_answered: 1, contributes: 3, no_sp: 1 });
     expect(j.mapping).toEqual({ incomplete: 0, complete: 3 });
     expect(j.sync).toEqual({ ready: 2, synced: 1, rejected: 0 });
@@ -749,5 +760,70 @@ describe('DD-PFM-40: TIP knowledge products in the aggregates', () => {
     expect(stage(PfmStageKeyEnum.MAPPING_NOT_STARTED)).toBe(1);
     expect(stage(PfmStageKeyEnum.PENDING_REVIEW)).toBe(1);
     expect(stage(PfmStageKeyEnum.NO_SP_CONTRIBUTION)).toBe(1);
+  });
+});
+
+describe('DD-PFM-42: each journey card opens exactly the results it counts', () => {
+  const TIP: Partial<PfmMonitoredRow> = {
+    platform_code: 'TIP',
+    indicator_id: 3,
+    result_status_id: 20,
+    result_status_name: 'Completed in TIP',
+    approved_at: null,
+  };
+  // STAR and TIP rows in every journey bucket.
+  const rows = deriveMonitoredRows([
+    mk(1, 'P-A', { result_status_id: 4, result_status_name: 'Draft' }),
+    mk(2, 'P-A', { result_status_id: 5, result_status_name: 'Revised' }),
+    mk(3, 'P-A', { result_status_id: 2, result_status_name: 'Submitted' }),
+    mk(4, 'P-A', { result_status_id: 3, result_status_name: 'Accepted' }),
+    mk(5, 'P-A', NO_ALIGN),
+    mk(6, 'P-A', { has_contribution: false }),
+    mk(7, 'P-A', { mapping_complete: false }),
+    mk(8, 'P-A'),
+    mk(9, 'P-A', { ...SYNCED, prms_history_status: 'REJECTED' }),
+    mk(10, 'P-B', { ...TIP }),
+    mk(11, 'P-B', { ...TIP, ...NO_ALIGN }),
+    mk(12, 'P-B', { ...TIP, ...SYNCED }),
+    mk(13, 'P-B', { ...TIP, has_contribution: false }),
+  ]);
+  const j = buildJourney(rows, []);
+  const listed = (chip: PfmChipEnum) =>
+    buildPfmQueue(rows, { chip }).totals.results;
+
+  it.each([
+    [PfmChipEnum.JOURNEY_DRAFT, () => j.star.draft],
+    [PfmChipEnum.JOURNEY_SUBMITTED, () => j.star.submitted],
+    [PfmChipEnum.JOURNEY_APPROVED, () => j.star.approved],
+    [PfmChipEnum.JOURNEY_COMPLETED_IN_TIP, () => j.star.completed_in_tip],
+    [PfmChipEnum.JOURNEY_NOT_ANSWERED, () => j.answer.not_answered],
+    [PfmChipEnum.JOURNEY_CONTRIBUTES, () => j.answer.contributes],
+    [PfmChipEnum.JOURNEY_NO_SP, () => j.answer.no_sp],
+    [PfmChipEnum.JOURNEY_MAPPING_INCOMPLETE, () => j.mapping.incomplete],
+    [PfmChipEnum.JOURNEY_MAPPING_COMPLETE, () => j.mapping.complete],
+    [PfmChipEnum.JOURNEY_READY, () => j.sync.ready],
+    [PfmChipEnum.JOURNEY_SYNCED, () => j.sync.synced],
+  ])('%s lists as many results as its card counts', (chip, card) => {
+    expect(listed(chip)).toBe(card());
+    expect(card()).toBeGreaterThan(0);
+  });
+
+  it('splits STAR approved from Completed in TIP, by hand', () => {
+    expect(j.star).toEqual({
+      draft: 2, // Draft + Revised
+      submitted: 2, // Submitted + Accepted (under review)
+      approved: 5,
+      completed_in_tip: 4,
+    });
+  });
+
+  it('journey views are not counted in chip_counts', () => {
+    const counts = buildPfmQueue(rows, {}).chip_counts as Record<
+      string,
+      number
+    >;
+    expect(Object.keys(counts).some((k) => k.startsWith('journey'))).toBe(
+      false,
+    );
   });
 });
