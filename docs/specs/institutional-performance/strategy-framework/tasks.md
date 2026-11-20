@@ -213,7 +213,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `nestjs-expert`, `anthropic-skills:xlsx`
 
 ### T-10 — Integration suites (schema, CRUD, levels, carry forward, seed, role, wiring, performance)
-- **Status:** todo · **Size:** L · **Depends:** T-08, T-09
+- **Status:** done (2026-11-20, PASS attempt 2 — `execution.md` § T-10) · **Size:** L · **Depends:** T-08, T-09
 - **Requirements:** R-STF-002 AC.1 (fourth level via fixture appears with no code change), R-STF-003 AC.1/AC.2, R-STF-006 AC.1/AC.2 (RESTRICT backstop), R-STF-010 AC.1/AC.2 (injected failure, concurrent calls), R-STF-011 AC.1–AC.3, R-STF-013 AC.1, NFR-STF-001, NFR-STF-002
 - **Design:** §10 Integration row; P-26, P-27, P-32
 - **Scope:** `test/strategy-framework-{schema,crud,levels,carry-forward,seed,role,module-wiring,performance}.integration-spec.ts`.
