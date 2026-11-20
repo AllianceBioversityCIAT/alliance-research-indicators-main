@@ -20,6 +20,9 @@ import { CurrentResultService } from '@shared/services/cache/current-result.serv
 import { BilateralService } from '@shared/services/bilateral.service';
 import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { AlignmentResponse } from '@interfaces/bilateral/pool-funding-alignment.interface';
+import { By } from '@angular/platform-browser';
+import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
+import { GetMetadata } from '@shared/interfaces/get-metadata.interface';
 
 describe('ResultSidebarComponent', () => {
   let component: ResultSidebarComponent;
@@ -62,7 +65,8 @@ describe('ResultSidebarComponent', () => {
       allGreenChecksAreTrue: signal(true),
       projectResultsSearchValue: signal(''),
       isSidebarCollapsed: jest.fn().mockReturnValue(false),
-      isExternalResult: signal(false)
+      isExternalResult: signal(false),
+      getCurrentPlatformCode: signal('TIP')
     };
 
     actionsService = {
@@ -205,6 +209,50 @@ describe('ResultSidebarComponent', () => {
       const host: HTMLElement = fixture.nativeElement;
       expect(host.querySelector('app-status-dropdown')).toBeNull();
       expect(host.querySelector('app-custom-tag')).not.toBeNull();
+    });
+  });
+
+  describe('status tag and read-only notice', () => {
+    const tip: GetMetadata = {
+      indicator_id: 2,
+      status_id: 20,
+      status_name: 'Completed in TIP',
+      result_title: 'Test Result Title',
+      result_status: {
+        result_status_id: 20,
+        name: 'Completed in TIP',
+        description: 'The Knowledge Product has been finalized.',
+        config: { icon: { name: 'pi pi-exclamation-circle', color: '#358540' }, color: { text: '#358540', border: '#7CB580', background: null } }
+      }
+    };
+    const host = (): HTMLElement => fixture.nativeElement;
+
+    it('the status tag carries the status icon and its description as tooltip', () => {
+      cacheService.currentMetadata?.set(tip);
+      fixture.detectChanges();
+      const tag = fixture.debugElement.query(By.css('[data-testid="sidebar-status-tag"]')).componentInstance as CustomTagComponent;
+      expect(tag.icon).toBe(true);
+      expect(tag.iconName).toBe('pi pi-exclamation-circle');
+      expect(tag.iconColor).toBe('#358540');
+      expect(tag.iconTooltip()).toBe('The Knowledge Product has been finalized.');
+      expect(host().querySelector('[data-testid="sidebar-status-tag"] i.pi-exclamation-circle')).not.toBeNull();
+    });
+
+    it('an external result says it is read-only in STAR and names its platform', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
+      cacheService.currentMetadata?.set(tip);
+      fixture.detectChanges();
+      const note = host().querySelector('[data-testid="sidebar-external-readonly"]');
+      expect(note?.getAttribute('role')).toBe('note');
+      expect(note?.textContent).toContain('Managed in TIP');
+      expect(note?.textContent).toContain('read-only in STAR');
+    });
+
+    it('a STAR result shows no read-only notice', () => {
+      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(false);
+      cacheService.currentMetadata?.set(tip);
+      fixture.detectChanges();
+      expect(host().querySelector('[data-testid="sidebar-external-readonly"]')).toBeNull();
     });
   });
 
