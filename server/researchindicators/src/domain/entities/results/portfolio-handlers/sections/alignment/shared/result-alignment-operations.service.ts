@@ -398,6 +398,6 @@ export class ResultAlignmentOperationsService {
 
   private actingUserId(): number | null {
     const userId = this.currentUser?.user_id;
-    return userId == null ? null : userId;
+    return userId ?? null;
   }
 }

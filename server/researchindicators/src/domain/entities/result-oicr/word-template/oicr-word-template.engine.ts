@@ -15,6 +15,10 @@ const LEAF = OICR_WORD_TEMPLATE_LEAF_IDS;
 const CONTACT_PERSON = 'Contact Person';
 const PARA_ID_LIMIT = 0x80000000;
 const DOCUMENT_PART = 'word/document.xml';
+/** Own bundled .docx only. Rejects a zip bomb before the document is parsed. */
+const MAX_TEMPLATE_BYTES = 20 * 1024 * 1024;
+const MAX_ZIP_ENTRIES = 1000;
+const MAX_DOCUMENT_XML_CHARS = 20 * 1024 * 1024;
 
 const REPEATING_SECTIONS: readonly OicrWordTemplateTargetName[] = [
   'raPrimarySection',
@@ -138,6 +142,24 @@ function isNone(
   return value === null || value === undefined || value === '';
 }
 
+/** xmldom NodeList/LiveNodeList are array-like and have no iterator. */
+function listed<T extends XmlNode>(nodes: ArrayLike<T>): T[] {
+  return Array.from(nodes);
+}
+
+function parserMessage(msg: unknown): string {
+  if (typeof msg === 'string') return msg;
+  if (
+    typeof msg === 'number' ||
+    typeof msg === 'boolean' ||
+    typeof msg === 'bigint'
+  ) {
+    return String(msg);
+  }
+  if (msg instanceof Error) return msg.message;
+  return 'unreadable parser error';
+}
+
 function parser(): DOMParser {
   return new DOMParser({
     errorHandler: {
@@ -147,7 +169,7 @@ function parser(): DOMParser {
         throw new OicrWordTemplateUnexpectedStructureError(
           DOCUMENT_PART,
           DOCUMENT_PART,
-          `XML parse error: ${String(msg)}`,
+          `XML parse error: ${parserMessage(msg)}`,
         );
       },
     },
@@ -161,8 +183,8 @@ function parseXml(xml: string): XmlDoc {
 function firstChild(node: XmlNode, name: string): XmlEl | null {
   const children = node.childNodes;
   if (!children) return null;
-  for (let i = 0; i < children.length; i++) {
-    if (children[i].nodeName === name) return children[i] as XmlEl;
+  for (const child of listed(children)) {
+    if (child.nodeName === name) return child as XmlEl;
   }
   return null;
 }
@@ -171,8 +193,8 @@ function childElements(node: XmlNode, name: string): XmlEl[] {
   const found: XmlEl[] = [];
   const children = node.childNodes;
   if (!children) return found;
-  for (let i = 0; i < children.length; i++) {
-    if (children[i].nodeName === name) found.push(children[i] as XmlEl);
+  for (const child of listed(children)) {
+    if (child.nodeName === name) found.push(child as XmlEl);
   }
   return found;
 }
@@ -181,19 +203,19 @@ function walk(node: XmlNode, visit: (el: XmlEl) => void): void {
   if (node.nodeType === 1) visit(node as XmlEl);
   const children = node.childNodes;
   if (!children) return;
-  for (let i = 0; i < children.length; i++) walk(children[i], visit);
+  for (const child of listed(children)) walk(child, visit);
 }
 
 function idOf(sdt: XmlEl): string {
   const pr = firstChild(sdt, 'w:sdtPr');
-  const id = pr && firstChild(pr, 'w:id');
-  return (id && id.getAttribute('w:val')) || '';
+  if (!pr) return '';
+  return firstChild(pr, 'w:id')?.getAttribute('w:val') || '';
 }
 
 function sdtById(doc: XmlDoc, wId: string): XmlEl | null {
   const all = doc.getElementsByTagName('w:sdt');
-  for (let i = 0; i < all.length; i++) {
-    if (idOf(all[i] as XmlEl) === wId) return all[i] as XmlEl;
+  for (const sdt of listed(all)) {
+    if (idOf(sdt) === wId) return sdt;
   }
   return null;
 }
@@ -214,8 +236,7 @@ function outermostItems(section: XmlEl): XmlEl[] {
   if (!content) return [];
   const items: XmlEl[] = [];
   const nested = content.getElementsByTagName('w:sdt');
-  for (let i = 0; i < nested.length; i++) {
-    const sdt = nested[i] as XmlEl;
+  for (const sdt of listed(nested)) {
     if (!isRepeatingItem(sdt)) continue;
     let insideAnother = false;
     for (
@@ -236,8 +257,7 @@ function outermostItems(section: XmlEl): XmlEl[] {
 function findPinned(item: XmlEl, pinnedId: string): XmlEl | null {
   if (item.nodeName === 'w:sdt' && idOf(item) === pinnedId) return item;
   const nested = item.getElementsByTagName('w:sdt');
-  for (let i = 0; i < nested.length; i++) {
-    const sdt = nested[i] as XmlEl;
+  for (const sdt of listed(nested)) {
     if (idOf(sdt) === pinnedId) return sdt;
   }
   return null;
@@ -251,7 +271,7 @@ function indexLeaves(item: XmlEl): Map<string, XmlEl> {
   };
   if (item.nodeName === 'w:sdt') consider(item);
   const nested = item.getElementsByTagName('w:sdt');
-  for (let i = 0; i < nested.length; i++) consider(nested[i] as XmlEl);
+  for (const sdt of listed(nested)) consider(sdt);
   return leaves;
 }
 
@@ -286,8 +306,8 @@ function idFactory(doc: XmlDoc): IdFactory {
   const usedSdt = new Set<string>();
   const usedPara = new Set<string>();
   const ids = doc.getElementsByTagName('w:id');
-  for (let i = 0; i < ids.length; i++) {
-    const value = (ids[i] as XmlEl).getAttribute('w:val');
+  for (const idNode of listed(ids)) {
+    const value = idNode.getAttribute('w:val');
     if (value) usedSdt.add(value);
   }
   walk(doc, (el) => {
@@ -427,11 +447,12 @@ export function setText(
   if (placeholder) pr.removeChild(placeholder);
 
   const runs = content.getElementsByTagName('w:r');
-  const rPr = cleanedRPr(runs.length ? (runs[0] as XmlEl) : null);
+  const rPr = cleanedRPr(runs.length ? runs[0] : null);
   const paragraphs = content.getElementsByTagName('w:p');
-  const host: XmlEl = paragraphs.length ? (paragraphs[0] as XmlEl) : content;
+  const host: XmlEl = paragraphs.length ? paragraphs[0] : content;
+  // Live collection: index walks backward while nodes are removed.
   for (let i = paragraphs.length - 1; i >= 1; i--) {
-    const extra = paragraphs[i] as XmlEl;
+    const extra = paragraphs[i];
     extra.parentNode.removeChild(extra);
   }
   for (const child of Array.from(host.childNodes)) {
@@ -785,7 +806,21 @@ export async function build(
   template: Buffer,
   fields: OicrWordTemplateFields = {},
 ): Promise<Buffer> {
+  if (template.length > MAX_TEMPLATE_BYTES) {
+    throw new OicrWordTemplateUnexpectedStructureError(
+      DOCUMENT_PART,
+      DOCUMENT_PART,
+      'template exceeds size limit',
+    );
+  }
   const zip = await JSZip.loadAsync(template);
+  if (Object.keys(zip.files).length > MAX_ZIP_ENTRIES) {
+    throw new OicrWordTemplateUnexpectedStructureError(
+      DOCUMENT_PART,
+      DOCUMENT_PART,
+      'template exceeds entry limit',
+    );
+  }
   const entry = zip.file(DOCUMENT_PART);
   if (!entry) {
     throw new OicrWordTemplateUnexpectedStructureError(
@@ -795,6 +830,13 @@ export async function build(
     );
   }
   const original = await entry.async('string');
+  if (original.length > MAX_DOCUMENT_XML_CHARS) {
+    throw new OicrWordTemplateUnexpectedStructureError(
+      DOCUMENT_PART,
+      DOCUMENT_PART,
+      'template exceeds size limit',
+    );
+  }
   const marker = '<w:document';
   const markerAt = original.indexOf(marker);
   if (markerAt < 0) {
