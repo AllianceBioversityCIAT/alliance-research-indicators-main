@@ -30,7 +30,7 @@ const HEADERS = [
   'Source',
   'Status',
   'Reporting year',
-  'Justification',
+  'Status change justification',
   'Notes',
   'Status changed by',
   'Status change date',

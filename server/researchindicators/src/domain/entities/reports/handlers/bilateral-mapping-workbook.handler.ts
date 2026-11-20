@@ -68,7 +68,7 @@ const COLUMNS: ExcelColumnSpec[] = [
     width: 16,
     cellDataType: 'integer',
   },
-  { key: 'justification', header: 'Justification', width: 36 },
+  { key: 'justification', header: 'Status change justification', width: 36 },
   { key: 'notes', header: 'Notes', width: 28 },
   { key: 'statusChangedBy', header: 'Status changed by', width: 24 },
   {

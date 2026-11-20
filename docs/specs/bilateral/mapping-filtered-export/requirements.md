@@ -184,7 +184,7 @@ The workbook SHALL hold these columns, in this order:
 | 5 | Source | The label shown on screen |
 | 6 | Status | Mapped, Inactive or Pending |
 | 7 | Reporting year | The row's year |
-| 8 | Justification | The last recorded justification. On a row reactivated with no justification, it is the earlier inactivation reason |
+| 8 | Status change justification | The last recorded justification. On a row reactivated with no justification, it is the earlier inactivation reason |
 | 9 | Notes | The mapping notes |
 | 10 | Status changed by | The user's name |
 | 11 | Status change date | The date of the last status change |

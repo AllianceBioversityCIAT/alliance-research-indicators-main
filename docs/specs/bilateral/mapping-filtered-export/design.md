@@ -128,7 +128,7 @@ History rows are not touched: no history is kept (R-MFE-007 AC.3).
 | Source | Screen label: Manual, Derived, AI Suggested, AI Auto | Unmapped |
 | Status | Mapped or Inactive, from `is_active` | Pending |
 | Reporting year | Row value | Year from the preview |
-| Justification | `status_justification`, the last recorded text (requirements §9, deviation 3) | Blank |
+| Status change justification | `status_justification`, the last recorded text (requirements §9, deviation 3) | Blank |
 | Notes | `notes` | Blank |
 | Status changed by | Non-blank parts of first and last name, blank when none | Blank |
 | Status change date | `status_changed_at`, date cell | Blank |
