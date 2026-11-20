@@ -222,5 +222,13 @@
         </span>
       }
     </div>
+  } @else if (showPrmsCodeOnly()) {
+    <div class="flex flex-col mx-[25px] mt-2 mb-6">
+      <span
+        class="text-[#a9adb2] text-[13px] !font-[space_grotesk] tracking-[2.5px] !font-[200] mt-2 text-center"
+        data-testid="sidebar-prms-result-code">
+        PRMS code <span class="!font-[200] !font-[space_grotesk]"> #{{ prmsResultCode() }}</span>
+      </span>
+    </div>
   }
 </div>

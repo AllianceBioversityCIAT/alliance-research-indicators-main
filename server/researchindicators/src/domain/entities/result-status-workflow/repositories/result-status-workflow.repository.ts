@@ -51,7 +51,7 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
     this.setCustomGeneralData(generalData, resultData);
     generalData.customData.oicr_internal_code = resultData?.oicr_internal_code;
     generalData.customData.sharepoint_url = resultData?.sharepoint_link;
-    generalData.customData.download_url = `${this.appConfig.ARI_CLIENT_HOST}/oicr/download?resultCode=${resultData.result_official_code}`;
+    generalData.customData.download_url = `${this.appConfig.ARI_CLIENT_HOST}/oicr/download/${resultData.result_official_code}`;
     generalData.customData.regional_expert = {
       name: `${cleanName(resultData.mel_regional_expert_first_name)} ${cleanName(resultData.mel_regional_expert_last_name)}`,
       email: cleanText(resultData.mel_regional_expert_email),

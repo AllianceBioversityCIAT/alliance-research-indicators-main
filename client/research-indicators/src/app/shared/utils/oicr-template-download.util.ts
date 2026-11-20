@@ -1,8 +1,6 @@
-/** Portfolio 2 — the one whose OICR template is not available yet. */
+/** Portfolio 1 uses the legacy download; Portfolio 2 uses the server download. Both show the button. */
+export const PORTFOLIO_1_ID = 1;
 export const PORTFOLIO_2_ID = 2;
-
-/** Re-enable when an OICR template exists for Portfolio 2. */
-export const OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED = false;
 
 /**
  * The metadata shapes the portfolio can arrive in. `GET .../metadata` returns
@@ -22,10 +20,10 @@ export function resolvePortfolioId(source: OicrTemplatePortfolioSource | null | 
 }
 
 /**
- * Hides "Download OICR Template" for Portfolio 2 results only. An unknown portfolio
- * keeps the button — the download is the long-standing behaviour, so it is what an
- * unresolved metadata payload falls back to.
+ * Hides "Download OICR Template" unless the portfolio resolves to 1 or 2.
+ * An unknown portfolio, or any portfolio other than 1 and 2, hides the button.
  */
 export function isOicrTemplateDownloadHidden(source: OicrTemplatePortfolioSource | null | undefined): boolean {
-  return !OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED && resolvePortfolioId(source) === PORTFOLIO_2_ID;
+  const portfolioId = resolvePortfolioId(source);
+  return portfolioId !== PORTFOLIO_1_ID && portfolioId !== PORTFOLIO_2_ID;
 }

@@ -172,6 +172,7 @@ describe('CommonFieldsBuilder', () => {
           {
             link: 'https://example.org/cs-evidence',
             description: 'Public capacity-sharing evidence',
+            is_public: true,
           },
         ],
         contributing_bilateral_projects: [
@@ -439,6 +440,12 @@ describe('CommonFieldsBuilder', () => {
           {
             link: 'https://example.org/policy-public',
             description: 'Public policy evidence',
+            is_public: true,
+          },
+          {
+            link: 'https://intranet.example.org/secret',
+            description: 'Confidential',
+            is_public: false,
           },
         ],
         contributing_bilateral_projects: [

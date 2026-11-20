@@ -296,6 +296,11 @@ describe('PayloadBuilder', () => {
               description: 'Handled',
               is_private: false,
             },
+            {
+              link: 'https://intranet.example.org/secret',
+              description: 'Confidential',
+              is_private: true,
+            },
           ],
         }),
       );
@@ -304,6 +309,23 @@ describe('PayloadBuilder', () => {
 
       expect(row.type).toBe('knowledge_product');
       expect(data).toHaveProperty('knowledge_product');
+      expect(data.evidence).toEqual([
+        {
+          link: 'https://doi.org/10.1007/s10668-024-05173-5',
+          is_public: true,
+          description: 'DOI',
+        },
+        {
+          link: 'https://hdl.handle.net/10568/148990',
+          is_public: true,
+          description: 'Handled',
+        },
+        {
+          link: 'https://intranet.example.org/secret',
+          is_public: false,
+          description: 'Confidential',
+        },
+      ]);
       expect(block).toEqual({
         handle: 'https://hdl.handle.net/10568/148990',
       });
@@ -332,6 +354,13 @@ describe('PayloadBuilder', () => {
 
       expect(row.type).toBe('knowledge_product');
       expect(data.external_reference).toBe('TIP-19191');
+      expect(data.evidence).toEqual([
+        {
+          link: 'https://hdl.handle.net/10568/148990',
+          is_public: true,
+          description: 'Handled',
+        },
+      ]);
       expect(block.handle).toBe('https://hdl.handle.net/10568/148990');
     });
 
@@ -366,6 +395,13 @@ describe('PayloadBuilder', () => {
       const results = envelope.results as Array<Record<string, unknown>>;
       const data = results[0].data as Record<string, unknown>;
 
+      expect(data.evidence).toEqual([
+        {
+          link: 'https://hdl.handle.net/10568/148990',
+          is_public: true,
+          description: 'Handled',
+        },
+      ]);
       expect(data.toc_mapping).toEqual({
         science_program_id: 'SP02',
         aow_compose_code: 'SP02-AOW01',

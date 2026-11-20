@@ -2,15 +2,21 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { ResultOicrController } from './result-oicr.controller';
 import { ResultOicrService } from './result-oicr.service';
+import { OicrWordTemplateService } from './word-template/oicr-word-template.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
-import { HttpStatus } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  StreamableFile,
+} from '@nestjs/common';
 
 describe('ResultOicrController', () => {
   let controller: ResultOicrController;
   let mockResultOicrService: jest.Mocked<ResultOicrService>;
   let mockResultUtil: jest.Mocked<ResultsUtil>;
+  let mockWordTemplateService: { download: jest.Mock };
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -22,13 +28,23 @@ describe('ResultOicrController', () => {
 
     mockResultUtil = {
       resultId: 123,
+      indicatorId: 5,
+      resultCode: 554,
     } as any;
+
+    mockWordTemplateService = {
+      download: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultOicrController],
       providers: [
         { provide: ResultOicrService, useValue: mockResultOicrService },
         { provide: ResultsUtil, useValue: mockResultUtil },
+        {
+          provide: OicrWordTemplateService,
+          useValue: mockWordTemplateService,
+        },
         mockPortfolioUtilProvider,
       ],
     }).compile();
@@ -401,6 +417,50 @@ describe('ResultOicrController', () => {
       expect(result.data).toEqual(serviceResult);
       expect(result.description).toBe('Result OICR updated successfully');
       expect(result.status).toBe(HttpStatus.OK);
+    });
+  });
+
+  describe('downloadWordTemplate', () => {
+    it('returns a StreamableFile whose type and disposition match STAR_OICR_<code>_<yyyyMMdd>_<HHmm>.docx', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 9, 23, 14, 5, 0));
+      try {
+        mockWordTemplateService.download.mockResolvedValue(
+          Buffer.from('docx-bytes'),
+        );
+
+        const file = await controller.downloadWordTemplate();
+
+        expect(file).toBeInstanceOf(StreamableFile);
+        expect(file.getHeaders().type).toBe(
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        );
+        expect(file.getHeaders().disposition).toBe(
+          'attachment; filename="STAR_OICR_554_20261023_1405.docx"',
+        );
+        expect(mockWordTemplateService.download).toHaveBeenCalledWith(
+          123,
+          5,
+          554,
+        );
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('missing result → 400 Result not found with no service call', async () => {
+      Object.defineProperty(mockResultUtil, 'resultId', {
+        configurable: true,
+        get() {
+          throw new BadRequestException('Result not found');
+        },
+      });
+
+      await expect(controller.downloadWordTemplate()).rejects.toMatchObject({
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Result not found',
+      });
+      expect(mockWordTemplateService.download).not.toHaveBeenCalled();
     });
   });
 });

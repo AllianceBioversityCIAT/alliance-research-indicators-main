@@ -34,6 +34,14 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/cache-test/cache-test.component')
   },
   {
+    path: 'oicr/download/:resultCode',
+    loadComponent: () => import('./pages/oicr-download/oicr-download.component').then(m => m.default),
+    canMatch: [rolesGuard],
+    data: {
+      isLoggedIn: true
+    }
+  },
+  {
     path: 'oicr/download',
     loadComponent: () => import('./pages/oicr-download/oicr-download.component').then(m => m.default)
   },
