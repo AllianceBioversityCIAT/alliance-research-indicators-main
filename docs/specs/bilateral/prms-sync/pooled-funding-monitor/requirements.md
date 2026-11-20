@@ -293,10 +293,11 @@ The *Results queue* tab SHALL offer four filters plus **Reset**. Options come fr
 - WHEN Reset is pressed
 - THEN all four filters return to "All …" and the quick-view chip returns to *All results*
 
-#### Scenario: Changing a filter clears the chip
-- GIVEN a selected chip
-- WHEN any filter changes
-- THEN the chip returns to *All results* (mockup behavior)
+#### Scenario: Changing a filter keeps the chip (DD-PFM-46)
+- GIVEN a selected chip (e.g. *Mapping pending*)
+- WHEN any filter changes (e.g. Result type = *Knowledge Product*)
+- THEN the chip stays selected and the list shows the results matching both
+- AND choosing the chip first and the filter second lists the same results as the reverse order
 
 ---
 
