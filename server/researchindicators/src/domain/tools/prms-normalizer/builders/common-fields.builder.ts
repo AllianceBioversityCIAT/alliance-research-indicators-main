@@ -567,13 +567,12 @@ export class CommonFieldsBuilder {
       });
     }
 
-    const publicEvidence = aggregate.evidence.filter(
-      (item) => item.is_private !== true,
-    );
-    if (publicEvidence.length > 0) {
-      data.evidence = publicEvidence.map((item) => {
+    // 2026-11-20: private evidence is now sent flagged `is_public: false`.
+    if (aggregate.evidence.length > 0) {
+      data.evidence = aggregate.evidence.map((item) => {
         const entry: Record<string, unknown> = {
           link: requirePresent(item.link, 'evidence.link'),
+          is_public: item.is_private !== true,
         };
         if (item.description) {
           entry.description = item.description;
