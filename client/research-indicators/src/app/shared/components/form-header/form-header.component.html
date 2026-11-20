@@ -1,3 +1,16 @@
+@if (cache.isExternalResult()) {
+<!-- Results reported in another platform are read-only here. A full-width amber strip
+     above the title: the negative margins cancel .app-page-wrapper's 95% width and top margin. -->
+<div
+  class="flex items-center gap-2 -mx-[2.6316%] -mt-[25px] mb-5 px-[2.6316%] py-2.5 border-0 border-b border-solid border-[var(--ac-warning-1)] bg-[var(--ac-warning-surface)] text-[13px] leading-4 text-[var(--ac-warning-fg)]"
+  role="note"
+  data-testid="external-readonly-note">
+  <i class="pi pi-lock !text-[13px] text-[var(--ac-warning-1)]" aria-hidden="true"></i>
+  <span>
+    Managed in <b>{{ externalPlatform() }}</b>. This result is read-only in STAR; make any change in {{ externalPlatform() }}.
+  </span>
+</div>
+}
 @if (this.cache.showSectionHeaderActions()) {
 <h3 class="font-['Inter'] text-[17px] font-bold leading-[18px] text-[#112F5C] mb-0 break-all">
   {{ sectionTitle() }}
@@ -7,16 +20,6 @@
 <br />
 }
 @if (cache.isExternalResult()) {
-<!-- Results reported in another platform are read-only here; say so at the top of every section. -->
-<div
-  class="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg border border-solid border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] text-[12px] leading-4 text-[var(--ac-grey-700)]"
-  role="note"
-  data-testid="external-readonly-note">
-  <i class="pi pi-lock !text-[12px] mt-0.5 text-[var(--ac-grey-500)]" aria-hidden="true"></i>
-  <span>
-    Managed in <b>{{ externalPlatform() }}</b>. This result is read-only in STAR; make any change in {{ externalPlatform() }}.
-  </span>
-</div>
 <div class="flex flex-wrap items-center gap-4 mb-2">
   @if (syncedDate()) {
   <span class="fs-[12] atc-grey-600">Last synced: {{ syncedDate() | formatDate: dateFormatConfig.config() }}</span>
