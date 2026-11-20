@@ -421,6 +421,9 @@ export class ResultSidebarComponent {
     return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  /** Platform an external (read-only) result is managed in, e.g. "TIP". */
+  externalPlatform = computed(() => this.cache.getCurrentPlatformCode());
+
   showOicrStatusDropdown = computed(() => {
     const meta = this.cache.currentMetadata();
     return this.roles.isAdmin() && meta.indicator_id === 5 && meta.status_id !== this.publishedOicrStatusId && !this.cache.isExternalResult();
