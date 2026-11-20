@@ -1844,6 +1844,36 @@ describe('AllianceAlignmentComponent', () => {
     });
   });
 
+  describe('a single contributing project is marked Primary', () => {
+    const contract = (contract_id: string, is_primary = false) => ({ contract_id, is_primary }) as any;
+    const setContracts = (contracts: any[]) => {
+      component.body.update(current => ({ ...current, contracts }));
+      fixture.detectChanges();
+    };
+
+    it('marks the only selected project as Primary', () => {
+      setContracts([contract('A1')]);
+      expect(component.body().contracts).toEqual([expect.objectContaining({ contract_id: 'A1', is_primary: true })]);
+    });
+
+    it('leaves two or more projects for the user to choose', () => {
+      setContracts([contract('A1'), contract('A2')]);
+      expect(component.body().contracts.map(c => c.is_primary)).toEqual([false, false]);
+    });
+
+    it('marks the project left after the others are removed', () => {
+      setContracts([contract('A1'), contract('A2')]);
+      setContracts([contract('A2')]);
+      expect(component.body().contracts[0].is_primary).toBe(true);
+    });
+
+    it('does not touch a result that cannot be edited', () => {
+      submission.isEditableStatus.mockReturnValue(false);
+      setContracts([contract('A1')]);
+      expect(component.body().contracts[0].is_primary).toBe(false);
+    });
+  });
+
   describe('effects', () => {
     it('should update optionsDisabled when primary_levers change', fakeAsync(() => {
       const primaryLever = { lever_id: 1, name: 'Lever 1' };
