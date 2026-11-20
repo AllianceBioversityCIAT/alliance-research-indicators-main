@@ -146,21 +146,38 @@ describe('PfmStoreService', () => {
     expect(store.tab()).toBe('queue');
   });
 
-  it('filter change sets chip null and refetches the queue (R-PFM-009)', async () => {
+  // DD-PFM-46: a filter narrows the quick view on screen, so the order of the two never matters.
+  it('filter change keeps the quick view and refetches the queue with both (R-PFM-009)', async () => {
     const store = build();
     store.init();
     await new Promise(r => setTimeout(r));
-    store.setChip('synced');
-    expect(store.chip()).toBe('synced');
+    store.setChip('mapping_incomplete');
+    expect(store.chip()).toBe('mapping_incomplete');
     api.GET_PfmQueue.mockClear();
 
-    store.setFilter('project', 'P1');
+    store.setFilter('type', 3);
     await new Promise(r => setTimeout(r));
 
-    expect(store.chip()).toBeNull();
-    expect(store.filters().project).toBe('P1');
+    expect(store.chip()).toBe('mapping_incomplete');
+    expect(store.filters().type).toBe(3);
     expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
-    expect(api.GET_PfmQueue.mock.calls[0][0]).toEqual(expect.objectContaining({ project: 'P1', chip: null }));
+    expect(api.GET_PfmQueue.mock.calls[0][0]).toEqual(expect.objectContaining({ type: 3, chip: 'mapping_incomplete' }));
+  });
+
+  it('quick view then filter equals filter then quick view', async () => {
+    const store = build();
+    store.init();
+    store.setChip('mapping_incomplete');
+    store.setFilter('type', 3);
+    const chipFirst = store.query();
+
+    store.resetFilters();
+    store.setFilter('type', 3);
+    store.setChip('mapping_incomplete');
+    await new Promise(r => setTimeout(r));
+
+    expect(chipFirst).toEqual(expect.objectContaining({ chip: 'mapping_incomplete', type: 3 }));
+    expect(store.query()).toEqual(chipFirst);
   });
 
   // Coverage-tab click: the queue must show exactly what was clicked, so earlier filters go.

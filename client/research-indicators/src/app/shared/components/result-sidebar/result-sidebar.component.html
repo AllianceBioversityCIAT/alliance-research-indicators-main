@@ -30,8 +30,13 @@
         [statusColor]="cache.currentMetadata().result_status?.config?.color?.text ?? ''"
         [statusBackground]="cache.currentMetadata().result_status?.config?.color?.background ?? ''"
         [statusBorder]="cache.currentMetadata().result_status?.config?.color?.border ?? ''"
+        [icon]="true"
+        [iconName]="cache.currentMetadata().result_status?.config?.icon?.name ?? ''"
+        [iconColor]="cache.currentMetadata().result_status?.config?.icon?.color ?? ''"
+        [tooltip]="cache.currentMetadata().result_status?.description ?? ''"
         class="-mt-1"
-        [maxWidth]="'180px'"></app-custom-tag>
+        [maxWidth]="'150px'"
+        data-testid="sidebar-status-tag"></app-custom-tag>
     }
     <div class="flex w-full text-[13.5px] font-normal pt-3">
       <span class="text-[#E69F00] pr-1">{{ getCompletedCount() }}/{{ getTotalCount() }}</span> sections completed

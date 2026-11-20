@@ -1,3 +1,16 @@
+@if (cache.isExternalResult()) {
+<!-- Results reported in another platform are read-only here: a blue strip above the title.
+     It stays in the normal flow; negative margins pushed it under the sticky page header. -->
+<div
+  class="flex items-center gap-2 mb-5 px-3 py-2.5 rounded-lg border border-solid border-[var(--ac-primary-blue-200)] bg-[var(--ac-pfm-info-bg)] text-[13px] leading-4 text-[var(--ac-pfm-info-fg)]"
+  role="note"
+  data-testid="external-readonly-note">
+  <i class="pi pi-lock !text-[13px] text-[var(--ac-pfm-info-fg)]" aria-hidden="true"></i>
+  <span>
+    Managed in <b>{{ externalPlatform() }}</b>. This result is read-only in STAR; make any change in {{ externalPlatform() }}.
+  </span>
+</div>
+}
 @if (this.cache.showSectionHeaderActions()) {
 <h3 class="font-['Inter'] text-[17px] font-bold leading-[18px] text-[#112F5C] mb-0 break-all">
   {{ sectionTitle() }}
