@@ -30,12 +30,29 @@
         [statusColor]="cache.currentMetadata().result_status?.config?.color?.text ?? ''"
         [statusBackground]="cache.currentMetadata().result_status?.config?.color?.background ?? ''"
         [statusBorder]="cache.currentMetadata().result_status?.config?.color?.border ?? ''"
+        [icon]="true"
+        [iconName]="cache.currentMetadata().result_status?.config?.icon?.name ?? ''"
+        [iconColor]="cache.currentMetadata().result_status?.config?.icon?.color ?? ''"
+        [tooltip]="cache.currentMetadata().result_status?.description ?? ''"
         class="-mt-1"
-        [maxWidth]="'150px'"></app-custom-tag>
+        [maxWidth]="'150px'"
+        data-testid="sidebar-status-tag"></app-custom-tag>
     }
     <div class="flex w-full text-[13.5px] font-normal pt-3">
       <span class="text-[#E69F00] pr-1">{{ getCompletedCount() }}/{{ getTotalCount() }}</span> sections completed
     </div>
+    @if (cache.isExternalResult()) {
+      <!-- Results reported in another platform are read-only here; say so where the status is read. -->
+      <div
+        class="flex w-full items-start gap-2 mt-3 px-3 py-2 rounded-lg border border-solid border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] text-[12px] leading-4 font-normal text-[var(--ac-grey-700)]"
+        role="note"
+        data-testid="sidebar-external-readonly">
+        <i class="pi pi-lock !text-[12px] mt-0.5 text-[var(--ac-grey-500)]" aria-hidden="true"></i>
+        <span>
+          Managed in <b>{{ externalPlatform() }}</b>. This result is read-only in STAR; make any change in {{ externalPlatform() }}.
+        </span>
+      </div>
+    }
   </div>
 
   <div class="options-container px-[25px] pb-2">
