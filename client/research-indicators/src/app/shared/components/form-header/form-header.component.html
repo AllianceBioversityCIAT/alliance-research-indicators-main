@@ -1,8 +1,8 @@
 @if (cache.isExternalResult()) {
-<!-- Results reported in another platform are read-only here. A full-width amber strip
-     above the title: the negative margins cancel .app-page-wrapper's 95% width and top margin. -->
+<!-- Results reported in another platform are read-only here: an amber strip above the title.
+     It stays in the normal flow; negative margins pushed it under the sticky page header. -->
 <div
-  class="flex items-center gap-2 -mx-[2.6316%] -mt-[25px] mb-5 px-[2.6316%] py-2.5 border-0 border-b border-solid border-[var(--ac-warning-1)] bg-[var(--ac-warning-surface)] text-[13px] leading-4 text-[var(--ac-warning-fg)]"
+  class="flex items-center gap-2 mb-5 px-3 py-2.5 rounded-lg border border-solid border-[var(--ac-warning-1)] bg-[var(--ac-warning-surface)] text-[13px] leading-4 text-[var(--ac-warning-fg)]"
   role="note"
   data-testid="external-readonly-note">
   <i class="pi pi-lock !text-[13px] text-[var(--ac-warning-1)]" aria-hidden="true"></i>
