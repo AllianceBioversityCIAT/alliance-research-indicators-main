@@ -35,6 +35,9 @@ export class FormHeaderComponent {
 
   externalLink = computed(() => this.cache.currentMetadata().external_link);
 
+  /** Platform an external (read-only) result is managed in, e.g. "TIP". */
+  externalPlatform = computed(() => this.cache.currentMetadata().platform_code ?? '');
+
   /** Same button copy rules as `ResultInformationModalComponent`'s deep-link button. */
   externalLinkLabel = computed(() => {
     const platformCode = this.cache.currentMetadata().platform_code;
