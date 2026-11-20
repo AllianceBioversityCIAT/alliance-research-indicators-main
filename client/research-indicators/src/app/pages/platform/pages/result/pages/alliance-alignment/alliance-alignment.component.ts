@@ -399,6 +399,24 @@ export default class AllianceAlignmentComponent {
     { allowSignalWrites: true }
   );
 
+  /**
+   * A lone contributing project is the Primary one: there is nothing to choose,
+   * and leaving it unmarked only fails validation. Runs on load and after every
+   * selection change, for both portfolios (the P2 view shares this `body`).
+   * With two or more projects the user still picks, and nothing is unmarked here.
+   */
+  autoPrimarySingleContractEffect = effect(
+    () => {
+      const contracts = this.body().contracts ?? [];
+      if (contracts.length !== 1 || contracts[0].is_primary || !this.submission.isEditableStatus()) return;
+      this.body.update(current => ({
+        ...current,
+        contracts: current.contracts.map(contract => ({ ...contract, is_primary: true }))
+      }));
+    },
+    { allowSignalWrites: true }
+  );
+
   canRemove = (): boolean => {
     return this.submission.isEditableStatus();
   };
