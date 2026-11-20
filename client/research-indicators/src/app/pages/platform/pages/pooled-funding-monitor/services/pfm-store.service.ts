@@ -146,10 +146,13 @@ export class PfmStoreService {
     void this.loadQueue();
   }
 
-  /** Changing a filter clears the chip (R-PFM-009) and the cached group rows. */
+  /**
+   * Changing a filter keeps the quick view and narrows it (DD-PFM-46): filters and
+   * the quick view combine with AND, so picking them in either order lists the same
+   * results. Only the cached group rows are dropped.
+   */
   setFilter<K extends keyof PfmFilters>(key: K, value: PfmFilters[K]): void {
     this.filters.update(f => ({ ...f, [key]: value }));
-    this.chip.set(null);
     this.resetGroups();
     void this.loadQueue();
   }
