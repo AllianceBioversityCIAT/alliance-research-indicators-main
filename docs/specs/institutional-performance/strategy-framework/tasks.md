@@ -268,7 +268,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `angular-developer`, `impeccable-bridge`
 
 ### T-13 — Outline editor and recursive row (mockup)
-- **Status:** todo · **Size:** L · **Depends:** T-12
+- **Status:** done (2026-11-20, PASS attempt 2 — `execution.md` § T-13; uncommitted until visual approval) · **Size:** L · **Depends:** T-12
 - **Requirements:** R-STF-007 (cards with accent; rows: label, code badge, inline name, counts, + next level, details, delete; inline name Enter/blur saves, Escape restores, empty rejected; draft *New*; + Add Performance Area; failed save keeps value; AC.1–AC.4), R-STF-006 (delete icon red only when deletable, tooltip names blocker; blocked message with way-out; confirm text; AC.1 UI side), R-STF-005 scenario (stored as `1.7`), NFR-STF-004 (keyboard, labels, colour not the only cue)
 - **Design:** §6.3 (all bullets incl. state machine, add child, refresh merge rule, delete, keyboard/focus return), §5.4 messages; D-STF-17, D-STF-19; P-29, P-33
 - **Scope:** `outline-editor` and `outline-row` (standalone, `OnPush`, recursive, signal state); accents via `--ac-framework-accent-*`; `maxlength` 255; focus return after the shared alert.
@@ -283,7 +283,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `angular-developer`, `impeccable-bridge`
 
 ### T-14 — Table view per level
-- **Status:** todo · **Size:** M · **Depends:** T-12
+- **Status:** done (2026-11-20, PASS attempt 1 — `execution.md` § T-14; uncommitted until visual approval) · **Size:** M · **Depends:** T-12
 - **Requirements:** R-STF-008 (chips from levels with counts; F-7 tables; edit/delete actions; + <Level> with required parent; columns incl. ancestor codes and responsibles; AC.1, AC.2)
 - **Design:** §6.4; D-STF-12; P-23
 - **Scope:** `framework-tables` with one `app-data-table` per level, flattened string fields, `#rowActions` wired to the panel (T-15) and the delete flow (T-13 shared handler).
@@ -298,10 +298,11 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `angular-developer`, `impeccable-bridge`
 
 ### T-15 — Details panel and staff picker
-- **Status:** todo · **Size:** M · **Depends:** T-13, T-14
+- **Status:** done (2026-11-20, PASS attempt 1 — `execution.md` § T-15; uncommitted until visual approval) · **Size:** M · **Depends:** T-13, T-14
 - **Requirements:** R-STF-004 (picker: search ≥ 2 chars, active only, max 20; chips with name/email; reorder; inactive tagged; no typed names; AC.1 UI, AC.2), R-STF-003 (move via Parent; wrong-depth options absent), R-STF-007 Details panel (Save, Cancel, Delete only — F-4), NFR-STF-004 (panel traps focus; labelled combobox)
 - **Design:** §6.5; D-STF-14, D-STF-26; P-33
 - **Scope:** `element-panel` on `p-drawer` + `pFocusTrap` + page-managed focus return; `staff-picker` on `p-autoComplete` with label and hint; Parent options = elements one level up only.
+  - **Scope amendment (owner, 2026-11-20 — T-16 tripwire gate):** the table view (`framework-tables`) gets the same stale-refresh guard the outline editor already has (`refreshToken`, `outline-editor.component.ts:40,123-126`), so two deletes confirmed back to back cannot let an older view land last and re-show a deleted row (T-14 Reviewer ADVISORY, KZ-008). Test: two refreshes resolved out of order → the newer view wins; falsifier: drop the guard → red.
   - Design route: load impeccable-bridge → design-routing.md; playbook build; ENV-2; mode Operate; polish light; motion none
 - **Tests:** focus trapped (Tab from last control returns to first) and returned to the opener on close; picker: no request under 2 chars, debounce, only server results selectable (typed text never becomes a chip), reorder buttons with `aria-label`s, inactive tag; Parent select lists only one-level-up elements; Save/Cancel/Delete only; save error shown via `frameworkErrorOf`.
 - **Falsifier:** omit `pFocusTrap` → the Tab-wrap test escapes the drawer → red; allow free-text chips → the "typed text never becomes a chip" test red.
@@ -313,7 +314,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Skills:** `angular-developer`, `impeccable-bridge`
 
 ### T-16 — Institutional Objectives page
-- **Status:** todo · **Size:** M · **Depends:** T-11 (and T-12 for API methods/types)
+- **Status:** done (2026-11-20, PASS attempt 2 — `execution.md` § T-16; uncommitted until visual approval) · **Size:** M · **Depends:** T-11 (and T-12 for API methods/types)
 - **Requirements:** R-STF-009 (own page; selector; year selector label and default; F-7 table; side form fields; no owner; AC.1, AC.2), R-STF-010 (carry forward button unavailable in last year and on empty year; confirm; toast text; AC.2 UI), R-STF-006 (IOB delete follows `deletable`), NFR-STF-004 (drawer focus trap; multiselect label)
 - **Design:** §6.6; P-33
 - **Scope:** `institutional-objectives` page + `objective-panel` (`p-drawer` + `pFocusTrap`, `p-multiSelect` grouped by depth-1 ancestor, visible label).
