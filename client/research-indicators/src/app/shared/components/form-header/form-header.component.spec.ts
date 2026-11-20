@@ -1,9 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormHeaderComponent } from './form-header.component';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { VersionSelectorComponent } from '@pages/platform/pages/result/components/version-selector/version-selector.component';
+
+@Component({ selector: 'app-version-selector', template: '' })
+class VersionSelectorStubComponent {}
 
 describe('FormHeaderComponent', () => {
   let component: FormHeaderComponent;
@@ -33,7 +37,11 @@ describe('FormHeaderComponent', () => {
         { provide: DateFormatConfigService, useValue: dateFormatConfigMock }
       ]
     })
-    .compileComponents();
+      .overrideComponent(FormHeaderComponent, {
+        remove: { imports: [VersionSelectorComponent] },
+        add: { imports: [VersionSelectorStubComponent] }
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(FormHeaderComponent);
     component = fixture.componentInstance;
@@ -109,6 +117,18 @@ describe('FormHeaderComponent', () => {
       expect(note?.textContent).toContain('read-only in STAR');
       // Above the synced date and the links, so it is the first thing read.
       expect(compiled.querySelector('[data-testid]')).toBe(note);
+    });
+
+    it('puts the read-only note above the section title', () => {
+      TestBed.inject(CacheService).showSectionHeaderActions.set(true);
+      isExternalResultSignal.set(true);
+      currentMetadataSignal.set(externalMetadata);
+      fixture.detectChanges();
+
+      const compiled: HTMLElement = fixture.nativeElement;
+      const note = compiled.querySelector('[data-testid="external-readonly-note"]')!;
+      const title = compiled.querySelector('h3')!;
+      expect(note.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('shows no read-only note for a STAR result', () => {
