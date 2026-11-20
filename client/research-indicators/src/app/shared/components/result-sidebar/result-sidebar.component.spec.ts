@@ -65,8 +65,7 @@ describe('ResultSidebarComponent', () => {
       allGreenChecksAreTrue: signal(true),
       projectResultsSearchValue: signal(''),
       isSidebarCollapsed: jest.fn().mockReturnValue(false),
-      isExternalResult: signal(false),
-      getCurrentPlatformCode: signal('TIP')
+      isExternalResult: signal(false)
     };
 
     actionsService = {
@@ -212,7 +211,7 @@ describe('ResultSidebarComponent', () => {
     });
   });
 
-  describe('status tag and read-only notice', () => {
+  describe('status tag', () => {
     const tip: GetMetadata = {
       indicator_id: 2,
       status_id: 20,
@@ -236,23 +235,6 @@ describe('ResultSidebarComponent', () => {
       expect(tag.iconColor).toBe('#358540');
       expect(tag.iconTooltip()).toBe('The Knowledge Product has been finalized.');
       expect(host().querySelector('[data-testid="sidebar-status-tag"] i.pi-exclamation-circle')).not.toBeNull();
-    });
-
-    it('an external result says it is read-only in STAR and names its platform', () => {
-      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(true);
-      cacheService.currentMetadata?.set(tip);
-      fixture.detectChanges();
-      const note = host().querySelector('[data-testid="sidebar-external-readonly"]');
-      expect(note?.getAttribute('role')).toBe('note');
-      expect(note?.textContent).toContain('Managed in TIP');
-      expect(note?.textContent).toContain('read-only in STAR');
-    });
-
-    it('a STAR result shows no read-only notice', () => {
-      (cacheService.isExternalResult as ReturnType<typeof signal<boolean>>).set(false);
-      cacheService.currentMetadata?.set(tip);
-      fixture.detectChanges();
-      expect(host().querySelector('[data-testid="sidebar-external-readonly"]')).toBeNull();
     });
   });
 

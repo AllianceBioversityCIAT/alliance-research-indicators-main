@@ -97,6 +97,28 @@ describe('FormHeaderComponent', () => {
       expect(buttons.some(b => b.textContent?.includes('Open link to result'))).toBe(true);
     });
 
+    it('opens with a read-only note that names the platform the result is managed in', () => {
+      isExternalResultSignal.set(true);
+      currentMetadataSignal.set(externalMetadata);
+      fixture.detectChanges();
+
+      const compiled: HTMLElement = fixture.nativeElement;
+      const note = compiled.querySelector('[data-testid="external-readonly-note"]');
+      expect(note?.getAttribute('role')).toBe('note');
+      expect(note?.textContent).toContain('Managed in TIP');
+      expect(note?.textContent).toContain('read-only in STAR');
+      // Above the synced date and the links, so it is the first thing read.
+      expect(compiled.querySelector('[data-testid]')).toBe(note);
+    });
+
+    it('shows no read-only note for a STAR result', () => {
+      isExternalResultSignal.set(false);
+      currentMetadataSignal.set({ ...externalMetadata, platform_code: 'STAR' });
+      fixture.detectChanges();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="external-readonly-note"]')).toBeNull();
+    });
+
     it('renders none of the 3 elements for a STAR (non-external) result', () => {
       isExternalResultSignal.set(false);
       currentMetadataSignal.set(externalMetadata);
