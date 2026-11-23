@@ -18,6 +18,7 @@ import {
 } from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
 import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/cap-sharing/cap-sharing-pdf-section.handler';
 import { InnDevPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/inn-dev/inn-dev-pdf-section.handler';
+import { PolicyChangePdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/policy-change/policy-change-pdf-section.handler';
 import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
 import { PortfoliosModule } from '../portfolios/portfolios.module';
 import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
@@ -44,13 +45,19 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     ReportsGenerationService,
     CapSharingPdfSectionHandler,
     InnDevPdfSectionHandler,
+    PolicyChangePdfSectionHandler,
     {
       provide: RESULT_PDF_INDICATOR_SECTION_HANDLERS,
       useFactory: (
         capSharing: CapSharingPdfSectionHandler,
         innDev: InnDevPdfSectionHandler,
-      ) => [capSharing, innDev],
-      inject: [CapSharingPdfSectionHandler, InnDevPdfSectionHandler],
+        policyChange: PolicyChangePdfSectionHandler,
+      ) => [capSharing, innDev, policyChange],
+      inject: [
+        CapSharingPdfSectionHandler,
+        InnDevPdfSectionHandler,
+        PolicyChangePdfSectionHandler,
+      ],
     },
     ResultPdfIndicatorSectionRegistry,
     ResultPdfReportService,
