@@ -507,6 +507,9 @@ describe('SectionHeaderComponent', () => {
     expect(component.showStarPdfReport()).toBe(true);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 4, result_official_code: 8, report_year: 2026 });
+    expect(component.showStarPdfReport()).toBe(true);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 3, result_official_code: 8, report_year: 2026 });
     expect(component.showStarPdfReport()).toBe(false);
 
     (cacheService.currentResultId as any).set('PRMS-8');

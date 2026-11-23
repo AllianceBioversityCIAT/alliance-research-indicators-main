@@ -113,6 +113,13 @@ describe('StarReportViewerComponent', () => {
     expect(component.loading()).toBe(false);
   });
 
+  it('should request the policy_change report for a Policy Change result', async () => {
+    await setup('STAR-8', '2026', { indicatorId: 4 });
+
+    expect(api.GET_ResultPdfReport).toHaveBeenCalledWith('8', 'STAR', '2026', 'policy_change');
+    expect(component.loading()).toBe(false);
+  });
+
   it('should show an error when metadata cannot be loaded', async () => {
     await setup('STAR-8', '2026', { metadataStatus: 404, metadataData: undefined });
 
