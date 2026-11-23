@@ -19,6 +19,10 @@ import { IndicatorsEnum } from '../../../indicators/enum/indicators.enum';
 import { PortfolioIdEnum } from '../../../results/portfolio-handlers/enum/portfolio-id.enum';
 import { UpdateResultCapacitySharingDto } from '../../../result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import { CreateResultInnovationDevDto } from '../../../result-innovation-dev/dto/create-result-innovation-dev.dto';
+import { ResultPolicyChange } from '../../../result-policy-change/entities/result-policy-change.entity';
+import { POLICY_AMOUNT_STATUS_VALUES } from '../../../result-policy-change/enum/policy-amount-status.enum';
+import { PolicyTypesEnum } from '../../../policy-types/enum/policy-types.enum';
+import { Result } from '../../../results/entities/result.entity';
 import {
   ResultPdfReportAlignmentCatalogItem,
   ResultPdfReportAlignmentLever,
@@ -39,6 +43,9 @@ import {
   ResultPdfReportLinkedResult,
   ResultPdfReportPartnerInstitution,
   ResultPdfReportPartnersSection,
+  ResultPdfReportCatalogRef,
+  ResultPdfReportPolicyChangeSection,
+  ResultPdfReportPolicyLinkedResult,
 } from './result-pdf-report.types';
 
 const omitUndefined = <T extends Record<string, unknown>>(value: T): T =>
@@ -443,26 +450,42 @@ export const mapEvidenceSection = (
       : {}),
   });
 
+const findHeadquartersLocation = (
+  institution: ResultInstitution['institution'],
+) => {
+  const locations = institution?.institution_locations ?? [];
+  return locations.find((location) => location.isHeadquarter) ?? locations[0];
+};
+
 const resolveHeadquarters = (
   institution: ResultInstitution['institution'],
 ): string | null => {
-  const locations = institution?.institution_locations ?? [];
-  const headquarters =
-    locations.find((location) => location.isHeadquarter) ?? locations[0];
+  const headquarters = findHeadquartersLocation(institution);
   return headquarters?.name ?? headquarters?.country?.name ?? null;
 };
 
+const resolveHeadquartersIsoAlpha2 = (
+  institution: ResultInstitution['institution'],
+): string | null => {
+  const headquarters = findHeadquartersLocation(institution);
+  return headquarters?.isoAlpha2 ?? headquarters?.country?.isoAlpha2 ?? null;
+};
+
+const mapInstitutionItem = (
+  item: ResultInstitution,
+): ResultPdfReportPartnerInstitution => ({
+  institution_id: item.institution_id,
+  institution_role_id: item.institution_role_id,
+  acronym: item.institution?.acronym,
+  name: item.institution?.name,
+  institution_type_name: item.institution?.institution_type?.name,
+  headquarters: resolveHeadquarters(item.institution),
+  isoAlpha2: resolveHeadquartersIsoAlpha2(item.institution),
+});
+
 export const mapInstitutionItems = (
   institutions: ResultInstitution[],
-): ResultPdfReportPartnerInstitution[] =>
-  institutions.map((item) => ({
-    institution_id: item.institution_id,
-    institution_role_id: item.institution_role_id,
-    acronym: item.institution?.acronym,
-    name: item.institution?.name,
-    institution_type_name: item.institution?.institution_type?.name,
-    headquarters: resolveHeadquarters(item.institution),
-  }));
+): ResultPdfReportPartnerInstitution[] => institutions.map(mapInstitutionItem);
 
 export const mapPartnersSection = (
   institutions: ResultInstitution[],
@@ -535,3 +558,100 @@ export const mapIpRightsSection = (
   formal_ip_rights_application_id:
     ipRights?.formal_ip_rights_application_id ?? null,
 });
+
+/** Ids follow the `PolicyAmountStatusEnum` order: 1 Confirmed, 2 Estimated, 3 Unknown. */
+export const mapPolicyAmountStatus = (
+  value: string | null | undefined,
+): ResultPdfReportCatalogRef | null => {
+  const index = POLICY_AMOUNT_STATUS_VALUES.indexOf(value ?? '');
+  return index === -1
+    ? null
+    : { id: index + 1, name: POLICY_AMOUNT_STATUS_VALUES[index] };
+};
+
+const mapCatalogRef = (
+  id: number | null | undefined,
+  name: string | null | undefined,
+): ResultPdfReportCatalogRef | null =>
+  id == null || !name ? null : { id: Number(id), name };
+
+export const mapPolicyLinkedResult = (
+  result: Result | null | undefined,
+): ResultPdfReportPolicyLinkedResult | null => {
+  if (!result) return null;
+  const status = result.result_status;
+  return {
+    result_id: Number(result.result_id),
+    result_official_code: Number(result.result_official_code),
+    platform_code: result.platform_code ?? null,
+    title: result.title ?? null,
+    report_year:
+      result.report_year_id == null ? null : Number(result.report_year_id),
+    result_status: status
+      ? {
+          result_status_id: Number(status.result_status_id),
+          name: status.name,
+          config: status.config ?? null,
+        }
+      : null,
+  };
+};
+
+export type PolicyChangePdfSource = {
+  policyChange: ResultPolicyChange | null;
+  implementingOrganizations: ResultInstitution[];
+  innovationDevelopment: Result | null;
+  innovationUse: Result | null;
+};
+
+/**
+ * The amount and its status only exist for Program, Budget, or Investment (type 3);
+ * for any other type they are left out of the payload.
+ */
+export const mapPolicyChangeSection = ({
+  policyChange,
+  implementingOrganizations,
+  innovationDevelopment,
+  innovationUse,
+}: PolicyChangePdfSource): ResultPdfReportPolicyChangeSection => {
+  const policyTypeId =
+    policyChange?.policy_type_id == null
+      ? null
+      : Number(policyChange.policy_type_id);
+  const policyStageId =
+    policyChange?.policy_stage_id == null
+      ? null
+      : Number(policyChange.policy_stage_id);
+  const isProgramBudgetInvestment =
+    policyTypeId === PolicyTypesEnum.PROGRAM_BUDGET_OR_INVESTMENT;
+
+  return {
+    policy_type_id: policyTypeId,
+    policy_type: mapCatalogRef(policyTypeId, policyChange?.policy_type?.name),
+    policy_stage_id: policyStageId,
+    policy_stage: mapCatalogRef(
+      policyStageId,
+      policyChange?.policy_stage?.name,
+    ),
+    ...(isProgramBudgetInvestment
+      ? {
+          usd_amount:
+            policyChange?.usd_amount == null
+              ? null
+              : Number(policyChange.usd_amount),
+          amount_status: mapPolicyAmountStatus(policyChange?.amount_status),
+        }
+      : {}),
+    evidence_stage: policyChange?.evidence_stage ?? null,
+    implementing_organization: implementingOrganizations
+      .filter((item) => item.is_active !== false)
+      .map((item) => ({
+        result_institution_id: Number(item.result_institution_id),
+        result_id: Number(item.result_id),
+        is_active: true,
+        ...mapInstitutionItem(item),
+      })),
+    innovation_development: mapPolicyLinkedResult(innovationDevelopment),
+    innovation_use: mapPolicyLinkedResult(innovationUse),
+  };
+};
