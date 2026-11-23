@@ -105,11 +105,11 @@ describe('StarReportViewerComponent', () => {
     expect(api.GET_ResultPdfReport).toHaveBeenCalledWith('8', 'STAR', null, 'cap_sharing');
   });
 
-  it('should show coming soon when inn_dev PDF is temporarily disabled', async () => {
+  it('should request the inn_dev report for an Innovation Development result', async () => {
     await setup('STAR-8', '2026', { indicatorId: 2 });
 
-    expect(api.GET_ResultPdfReport).not.toHaveBeenCalled();
-    expect(component.errorMessage()).toBe('Coming soon');
+    expect(api.GET_ResultPdfReport).toHaveBeenCalledWith('8', 'STAR', '2026', 'inn_dev');
+    expect(component.errorMessage()).not.toBe('Coming soon');
     expect(component.loading()).toBe(false);
   });
 

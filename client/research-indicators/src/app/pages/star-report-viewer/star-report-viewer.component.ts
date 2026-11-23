@@ -5,11 +5,7 @@ import { environment } from '@envs/environment';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
 import { ApiService } from '@shared/services/api.service';
-import {
-  getStarPdfReportName,
-  isStarInnDevPdfTemporarilyDisabled,
-  STAR_PDF_COMING_SOON_TOOLTIP
-} from '@shared/utils/star-pdf-report.util';
+import { getStarPdfReportName } from '@shared/utils/star-pdf-report.util';
 
 @Component({
   selector: 'app-star-report-viewer',
@@ -50,11 +46,6 @@ export default class StarReportViewerComponent implements OnInit {
       }
 
       const indicatorId = metadataResponse.data.indicator_id;
-      if (isStarInnDevPdfTemporarilyDisabled(indicatorId)) {
-        this.errorMessage.set(STAR_PDF_COMING_SOON_TOOLTIP);
-        return;
-      }
-
       const reportName = getStarPdfReportName(indicatorId);
       if (!reportName) {
         this.errorMessage.set('PDF report is not available for this indicator.');

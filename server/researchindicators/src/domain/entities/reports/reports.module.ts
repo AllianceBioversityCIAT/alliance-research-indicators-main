@@ -17,6 +17,9 @@ import {
   ResultPdfIndicatorSectionRegistry,
 } from './handlers/result-pdf-report/indicator-sections/result-pdf-indicator-section.registry';
 import { CapSharingPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/cap-sharing/cap-sharing-pdf-section.handler';
+import { InnDevPdfSectionHandler } from './handlers/result-pdf-report/indicator-sections/inn-dev/inn-dev-pdf-section.handler';
+import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
+import { PortfoliosModule } from '../portfolios/portfolios.module';
 import { PdfViewerModule } from '../../tools/pdf-viewer/pdf-viewer.module';
 import { ReportMsApp } from '../../tools/broker/report-ms.app';
 
@@ -26,6 +29,8 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     ResultEvidencesModule,
     ResultIpRightsModule,
     ResultCapacitySharingModule,
+    ResultInnovationDevModule,
+    PortfoliosModule,
     ClarisaLeversModule,
     PdfViewerModule,
   ],
@@ -38,10 +43,14 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
     ReportHandlerRegistry,
     ReportsGenerationService,
     CapSharingPdfSectionHandler,
+    InnDevPdfSectionHandler,
     {
       provide: RESULT_PDF_INDICATOR_SECTION_HANDLERS,
-      useFactory: (capSharing: CapSharingPdfSectionHandler) => [capSharing],
-      inject: [CapSharingPdfSectionHandler],
+      useFactory: (
+        capSharing: CapSharingPdfSectionHandler,
+        innDev: InnDevPdfSectionHandler,
+      ) => [capSharing, innDev],
+      inject: [CapSharingPdfSectionHandler, InnDevPdfSectionHandler],
     },
     ResultPdfIndicatorSectionRegistry,
     ResultPdfReportService,
