@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { routes } from './app.routes';
+import { rolesGuard } from '@guards/roles.guard';
 import { CacheService } from '@services/cache/cache.service';
 import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
@@ -210,5 +211,19 @@ describe('app.routes — organizational-structure route (Center admin)', () => {
 
   it('closes the route to a Contributor-only user (sent to /home)', async () => {
     await expect(navigateWithRoles([CONTRIBUTOR_ONLY], SIDEBAR_LINK)).resolves.toBe('/home');
+  });
+});
+
+describe('app.routes — oicr download', () => {
+  const guardedIndex = routes.findIndex(route => route.path === 'oicr/download/:resultCode');
+  const legacyIndex = routes.findIndex(route => route.path === 'oicr/download');
+
+  it('requires login on /oicr/download/:resultCode and declares that route before the legacy entry', () => {
+    const guarded = routes[guardedIndex];
+
+    expect(guardedIndex).toBeGreaterThanOrEqual(0);
+    expect(guarded.canMatch).toContain(rolesGuard);
+    expect(guarded.data?.['isLoggedIn']).toBe(true);
+    expect(guardedIndex).toBeLessThan(legacyIndex);
   });
 });

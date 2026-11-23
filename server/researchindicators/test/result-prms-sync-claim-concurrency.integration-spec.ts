@@ -214,6 +214,9 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
         loadByResultId: jest
           .fn()
           .mockResolvedValue({ result_id: dc11ResultId }),
+        // STAR resolves the pusher before build. This proof has no request
+        // staff, so the lookup is a null fallback and the mock builder still runs.
+        findActingStaffBySecUserId: jest.fn().mockResolvedValue(null),
       } as unknown as ResultPrmsSyncAggregateRepository,
       {
         build: jest.fn().mockReturnValue(payload),

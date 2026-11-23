@@ -71,7 +71,6 @@ export const environment = {
   frontVersionKey: '',
   frontVersionUrl: '',
   s3Folder: '',
-  oicrTemplateName: '',
   keyProjectOverview: '',
   keyTextMining: '',
 

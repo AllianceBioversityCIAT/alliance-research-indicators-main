@@ -1,44 +1,55 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
-import { Subject } from 'rxjs';
-import OicrDownloadComponent from './oicr-download.component';
-import { WasmService, ProcessResult } from '@shared/services/go/wasm.service';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import OicrDownloadComponent, { OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR } from './oicr-download.component';
 import { OicrDownloadService } from '@shared/services/oicr-download.service';
+import { ApiService } from '@shared/services/api.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('OicrDownloadComponent', () => {
   let component: OicrDownloadComponent;
   let fixture: ComponentFixture<OicrDownloadComponent>;
-  let wasmMock: jest.Mocked<WasmService>;
-  let oicrDownloadServiceMock: jest.Mocked<OicrDownloadService>;
+  let oicrDownloadServiceMock: { download: jest.Mock };
+  let apiMock: { GET_Metadata: jest.Mock };
   let routerMock: jest.Mocked<Router>;
-  let routeMock: Partial<ActivatedRoute>;
-  let queryParamsSubject: Subject<any>;
+  let routeMock: { snapshot: { paramMap: ReturnType<typeof convertToParamMap>; queryParamMap: ReturnType<typeof convertToParamMap> } };
+
+  const setRoute = (pathCode?: string, queryCode?: string) => {
+    routeMock.snapshot = {
+      paramMap: convertToParamMap(pathCode ? { resultCode: pathCode } : {}),
+      queryParamMap: convertToParamMap(queryCode ? { resultCode: queryCode } : {})
+    };
+  };
+
+  const settle = async () => {
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    fixture.detectChanges();
+  };
 
   beforeEach(async () => {
-    queryParamsSubject = new Subject<any>();
-
-    wasmMock = {
-      loadWasm: jest.fn().mockResolvedValue(true)
-    } as unknown as jest.Mocked<WasmService>;
-
     oicrDownloadServiceMock = {
-      generateAndDownload: jest.fn()
-    } as unknown as jest.Mocked<OicrDownloadService>;
+      download: jest.fn()
+    };
+    apiMock = {
+      GET_Metadata: jest.fn().mockResolvedValue({ data: { portfolio: { id: 2 } } })
+    };
 
     routerMock = {
       navigate: jest.fn().mockResolvedValue(true)
     } as unknown as jest.Mocked<Router>;
 
     routeMock = {
-      queryParams: queryParamsSubject.asObservable()
+      snapshot: {
+        paramMap: convertToParamMap({}),
+        queryParamMap: convertToParamMap({})
+      }
     };
 
     await TestBed.configureTestingModule({
       imports: [OicrDownloadComponent],
       providers: [
-        { provide: WasmService, useValue: wasmMock },
         { provide: OicrDownloadService, useValue: oicrDownloadServiceMock },
+        { provide: ApiService, useValue: apiMock },
         { provide: Router, useValue: routerMock },
         { provide: ActivatedRoute, useValue: routeMock }
       ]
@@ -49,7 +60,6 @@ describe('OicrDownloadComponent', () => {
   });
 
   afterEach(() => {
-    queryParamsSubject.complete();
     jest.clearAllMocks();
   });
 
@@ -58,121 +68,184 @@ describe('OicrDownloadComponent', () => {
   });
 
   describe('ngOnInit', () => {
-    it('should trigger download when resultCode is present in query params', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+    it('calls the download service with the path code', async () => {
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
 
       fixture.detectChanges();
-      queryParamsSubject.next({ resultCode: '12345' });
+      await settle();
 
-      await fixture.whenStable();
-
-      expect(oicrDownloadServiceMock.generateAndDownload).toHaveBeenCalledWith('12345');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 2);
     });
 
-    it('should set error result when resultCode is missing', () => {
+    it('downloads a Portfolio 1 result from the path code', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({ data: { portfolio: { id: 1 } } });
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
+
       fixture.detectChanges();
-      queryParamsSubject.next({});
+      await settle();
+
+      expect(apiMock.GET_Metadata).toHaveBeenCalledWith('554');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 1);
+    });
+
+    it('downloads a Portfolio 2 result from the path code', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({ data: { portfolio: { id: 2 } } });
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(apiMock.GET_Metadata).toHaveBeenCalledWith('554');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 2);
+    });
+
+    it('shows an error when metadata is rejected and does not download or navigate', async () => {
+      apiMock.GET_Metadata.mockRejectedValue(new Error('metadata failed'));
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR);
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when metadata has no portfolio and does not download or navigate', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({ data: {} });
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR);
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when metadata has no data and does not download or navigate', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({});
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR);
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('redirects a legacy query code to the path form', () => {
+      setRoute(undefined, '554');
+
+      fixture.detectChanges();
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/oicr/download', '554'], { replaceUrl: true });
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+    });
+
+    it('shows the missing resultCode error when no code is present', () => {
+      fixture.detectChanges();
 
       expect(component.result).toEqual({
         success: false,
         error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
       });
-      expect(oicrDownloadServiceMock.generateAndDownload).not.toHaveBeenCalled();
+      expect(fixture.nativeElement.textContent).toContain('Missing resultCode parameter. Please provide a valid resultCode in the URL.');
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
     });
 
-    it('should not trigger download when resultCode is undefined', () => {
-      fixture.detectChanges();
-      queryParamsSubject.next({ resultCode: undefined });
+    it('shows the service error and does not navigate', async () => {
+      oicrDownloadServiceMock.download.mockRejectedValue(new Error('Result is not an OICR'));
+      setRoute('554');
 
-      expect(component.result).toEqual({
-        success: false,
-        error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
-      });
-      expect(oicrDownloadServiceMock.generateAndDownload).not.toHaveBeenCalled();
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain('Result is not an OICR');
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('navigates to general information after a successful download', async () => {
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/result', `${PLATFORM_CODES.STAR}-554`, 'general-information']);
+    });
+
+    it('shows Preparing your document while the download is in flight', () => {
+      oicrDownloadServiceMock.download.mockReturnValue(new Promise(() => undefined));
+      setRoute('554');
+
+      fixture.detectChanges();
+
+      expect(component.processing()).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('Preparing your document');
     });
   });
 
   describe('generateAndDownload', () => {
     it('should set processing to true and call service', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
-      expect(oicrDownloadServiceMock.generateAndDownload).toHaveBeenCalledWith(12345);
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith(12345, 2);
       expect(component.result?.success).toBe(true);
     });
 
-    it('should set wasmLoaded and navigate on success with numeric resultCode', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+    it('should navigate on success with numeric resultCode', async () => {
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload(19542);
 
-      expect(component.wasmLoaded()).toBe(true);
-      expect(routerMock.navigate).toHaveBeenCalledWith([
-        '/result',
-        `${PLATFORM_CODES.STAR}-19542`,
-        'general-information'
-      ]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/result', `${PLATFORM_CODES.STAR}-19542`, 'general-information']);
     });
 
     it('should navigate with full resultCode path when resultCode includes dash', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload('STAR-19542');
 
-      expect(routerMock.navigate).toHaveBeenCalledWith([
-        '/result',
-        'STAR-19542',
-        'general-information'
-      ]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/result', 'STAR-19542', 'general-information']);
     });
 
-    it('should handle service errors and set processing to false', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: false,
-        error: 'Failed to load WASM'
-      } as ProcessResult);
+    it('should show the service error message and not navigate', async () => {
+      oicrDownloadServiceMock.download.mockRejectedValue(new Error('Result is not an OICR'));
 
       await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
       expect(component.result?.success).toBe(false);
-      expect(component.result?.error).toBe('Failed to load WASM');
+      expect(component.result?.error).toBe('Result is not an OICR');
       expect(routerMock.navigate).not.toHaveBeenCalled();
     });
 
     it('should reset result before processing', async () => {
-      component.result = { success: false, error: 'Previous error' } as ProcessResult;
+      component.result = { success: false, error: 'Previous error' };
 
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload(12345);
 
       expect(component.result?.success).toBe(true);
     });
 
-    it('should always set processing to false in finally block even on error', async () => {
+    it('should set processing to false when the download rejects', async () => {
       component.processing.set(true);
-      oicrDownloadServiceMock.generateAndDownload.mockRejectedValue(new Error('Test error'));
+      oicrDownloadServiceMock.download.mockRejectedValue(new Error('Result is not an OICR'));
 
-      try {
-        await component.generateAndDownload(12345);
-      } catch {
-        // Expected to throw
-      }
+      await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
+      expect(component.result?.error).toBe('Result is not an OICR');
     });
   });
 
@@ -206,10 +279,5 @@ describe('OicrDownloadComponent', () => {
     it('should initialize with result as null', () => {
       expect(component.result).toBeNull();
     });
-
-    it('should initialize with wasmLoaded as false', () => {
-      expect(component.wasmLoaded()).toBe(false);
-    });
   });
 });
-

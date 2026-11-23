@@ -445,7 +445,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         expect(out.is_read_only).toBe(true);
       });
 
-      it('non-eligible live with a PRMS code: display_only and read-only', async () => {
+      it('STAR past reporting year + not eligible + PRMS code stays display_only and read-only', async () => {
         findContext.mockResolvedValueOnce(ctx({ prms_result_code: 28663 }));
         findActiveAlignment.mockResolvedValueOnce(alignmentRow);
         findActiveTocRows.mockResolvedValueOnce([tocRow]);
@@ -550,6 +550,78 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         expect(out.display_only).toBe(false);
         expect(out.has_contribution).toBeNull();
         expect(out.toc_alignments).toEqual([]);
+      });
+
+      it('STAR current reporting year + not eligible + PRMS code is not display_only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            platform_code: 'STAR',
+            report_year_id: 2026,
+            prms_result_code: 28663,
+            is_synced_to_prms: false,
+            is_snapshot: false,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.eligible).toBe(false);
+        expect(out.display_only).toBe(false);
+        expect(out.version_locked).toBe(false);
+        expect(out.has_contribution).toBeNull();
+        expect(out.selected_levers).toEqual([]);
+        expect(out.selected_science_programs).toEqual([]);
+        expect(out.toc_alignments).toEqual([]);
+        expect(out.is_read_only).toBe(false);
+      });
+
+      it('STAR current reporting year + not eligible + synced is not display_only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            platform_code: 'STAR',
+            report_year_id: 2026,
+            is_synced_to_prms: true,
+            prms_result_code: null,
+            is_snapshot: false,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.eligible).toBe(false);
+        expect(out.display_only).toBe(false);
+        expect(out.has_contribution).toBeNull();
+        expect(out.selected_levers).toEqual([]);
+        expect(out.selected_science_programs).toEqual([]);
+        expect(out.toc_alignments).toEqual([]);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('TIP current reporting year + alignment + not eligible stays display_only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            platform_code: 'TIP',
+            report_year_id: 2026,
+            is_snapshot: false,
+            is_synced_to_prms: false,
+            prms_result_code: null,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.eligible).toBe(false);
+        expect(out.display_only).toBe(true);
+        expect(out.version_locked).toBe(false);
+        expect(out.has_contribution).toBe(true);
+        expect(out.is_read_only).toBe(true);
+        expect(out.toc_alignments).toHaveLength(1);
       });
     });
 
