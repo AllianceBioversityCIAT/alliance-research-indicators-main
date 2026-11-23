@@ -655,6 +655,34 @@ describe('AgressoContractRepository', () => {
     // (R-MPC-001, R-MPC-002). The row-visibility clause (untouched by this fix) must
     // still gate both queries; the two counting expressions must no longer reference
     // the requesting user at all.
+    it('lists only active contracts, in both the page and its count', async () => {
+      mockQueryBySql({ count: [{ total: 1 }], main: [] });
+
+      await repository.getContracts({}, undefined, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
+
+      expect(mainSql()).toContain('AND ac.is_active = TRUE');
+      expect(countSql()).toContain('AND ac.is_active = TRUE');
+    });
+
+    it('still finds an inactive contract looked up by its code', async () => {
+      mockQueryBySql({ count: [{ total: 1 }], main: [] });
+
+      await repository.getContracts(
+        { contract_code: 'A1080' },
+        undefined,
+        undefined,
+        undefined,
+        { page: 1, limit: 1 },
+      );
+
+      expect(mainSql()).toContain("AND ac.agreement_id = 'A1080'");
+      expect(mainSql()).not.toContain('ac.is_active = TRUE');
+      expect(countSql()).not.toContain('ac.is_active = TRUE');
+    });
+
     it('separates user-scoped visibility from contract-wide counting', async () => {
       const user = { sec_user_id: 456 } as any;
       mockQueryBySql({
