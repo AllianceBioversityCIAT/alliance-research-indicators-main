@@ -118,6 +118,14 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         // stack a generic toast on the inline "unavailable" state.
         const isAgrovocSearchError = req.url.includes('tools/agrovoc');
 
+        // Strategy-framework pages show every 4xx except 401 inline (D-STF-26).
+        // 401, 5xx and refresh-token handling stay on the global path.
+        const isStrategyFrameworkClientError =
+          error.status >= 400 &&
+          error.status < 500 &&
+          error.status !== 401 &&
+          req.url.includes('/strategy-framework');
+
         if (
           cache.isLoggedIn() &&
           error.status !== 409 &&
@@ -127,7 +135,8 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isPoolFundingTagValidationError &&
           !isPoolFundingAlignmentValidationError &&
           !isPrmsSyncError &&
-          !isAgrovocSearchError
+          !isAgrovocSearchError &&
+          !isStrategyFrameworkClientError
         ) {
           // `error.error.errors` alone silently produced a blank toast for every
           // endpoint whose envelope carries `description` instead of `errors`

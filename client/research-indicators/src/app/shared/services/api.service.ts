@@ -68,6 +68,25 @@ import {
   ControlListValueCreatePayload,
   ControlListValueUpdatePayload
 } from '@shared/interfaces/control-lists.interface';
+import {
+  CarryForwardObjectivesPayload,
+  CarryForwardObjectivesResult,
+  CreateFrameworkElementPayload,
+  CreateInstitutionalObjectivePayload,
+  FrameworkCodeProposal,
+  FrameworkCodeProposalQuery,
+  FrameworkContext,
+  FrameworkEditorView,
+  FrameworkElement,
+  FrameworkElementBlockers,
+  FrameworkObjective,
+  FrameworkObjectiveYears,
+  FrameworkResolveRow,
+  FrameworkStaffOption,
+  FrameworkView,
+  UpdateFrameworkElementPayload,
+  UpdateInstitutionalObjectivePayload
+} from '@shared/interfaces/strategy-framework.interface';
 import { GetGeoLocation } from '../interfaces/get-geo-location.interface';
 import { GetIndicatorsResultsAmount } from '../interfaces/get-indicators-results-amount.interface';
 import { GetResultsStatus } from '../interfaces/get-results-status.interface';
@@ -1661,5 +1680,98 @@ export class ApiService {
   currentImpersonation = (sessionId: string): Promise<MainResponse<ImpersonationCurrentResponse>> => {
     const url = () => `impersonation/current`;
     return this.TP.get(url(), { headers: { 'X-Impersonation-Session': sessionId } });
+  };
+
+  // @akili-spec institutional-performance/strategy-framework T-12 — design §4, A0–A11.
+  // Unversioned `/api/strategy-framework/...` (no `/v1`). Literal paths match the controller.
+
+  /** A0. Server clock, portfolios, default portfolio. */
+  GET_StrategyFrameworkContext = (): Promise<MainResponse<FrameworkContext>> => {
+    return this.TP.get('strategy-framework/context', {});
+  };
+
+  /** A1. Consumer read. The Framework page does not call this (it reads A1e). */
+  GET_StrategyFramework = (portfolioId: number): Promise<MainResponse<FrameworkView>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('strategy-framework/framework', { params });
+  };
+
+  /** A1e. Admin read. `usageLabels` is once on the view. */
+  GET_StrategyFrameworkEditor = (portfolioId: number): Promise<MainResponse<FrameworkEditorView>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('strategy-framework/framework/editor', { params });
+  };
+
+  /** A2. At most 200 ids, comma-separated. */
+  GET_StrategyFrameworkResolve = (ids: readonly number[]): Promise<MainResponse<FrameworkResolveRow[]>> => {
+    const params = new HttpParams().set('ids', ids.join(','));
+    return this.TP.get('strategy-framework/resolve', { params });
+  };
+
+  /** A3. Root when `parentId` is omitted; `kind: 'IOB'` proposes `IOB-n`. */
+  GET_StrategyFrameworkCodeProposal = (query: FrameworkCodeProposalQuery): Promise<MainResponse<FrameworkCodeProposal>> => {
+    let params = new HttpParams().set('portfolioId', String(query.portfolioId));
+    if (query.parentId !== undefined) params = params.set('parentId', String(query.parentId));
+    if (query.kind !== undefined) params = params.set('kind', query.kind);
+    if (query.year !== undefined) params = params.set('year', String(query.year));
+    return this.TP.get('strategy-framework/code-proposal', { params });
+  };
+
+  /** A4. Active staff, at least 2 characters, at most 20. */
+  GET_StrategyFrameworkStaff = (search: string): Promise<MainResponse<FrameworkStaffOption[]>> => {
+    const params = new HttpParams().set('search', search);
+    return this.TP.get('strategy-framework/staff', { params });
+  };
+
+  /** A5. Creates an element. The level is derived from the parent. */
+  POST_StrategyFrameworkElement = (body: CreateFrameworkElementPayload): Promise<MainResponse<FrameworkElement>> => {
+    return this.TP.post('strategy-framework/elements', body, {});
+  };
+
+  /** A8. Declared in the client next to the element writes; the path is the literal `elements/:id/blockers`. */
+  GET_StrategyFrameworkElementBlockers = (id: number): Promise<MainResponse<FrameworkElementBlockers>> => {
+    return this.TP.get(`strategy-framework/elements/${id}/blockers`, {});
+  };
+
+  /** A6. `parentId: null` is sent through so the service can answer 400. */
+  PATCH_StrategyFrameworkElement = (id: number, body: UpdateFrameworkElementPayload): Promise<MainResponse<FrameworkElement>> => {
+    return this.TP.patch(`strategy-framework/elements/${id}`, body, {});
+  };
+
+  /** A7. */
+  DELETE_StrategyFrameworkElement = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`strategy-framework/elements/${id}`, {});
+  };
+
+  /** A9 years. Every year of the portfolio range, zero counts included. */
+  GET_StrategyFrameworkObjectiveYears = (portfolioId: number): Promise<MainResponse<FrameworkObjectiveYears>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('strategy-framework/objectives/years', { params });
+  };
+
+  /** A9 list. */
+  GET_StrategyFrameworkObjectives = (portfolioId: number, year: number): Promise<MainResponse<FrameworkObjective[]>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId)).set('year', String(year));
+    return this.TP.get('strategy-framework/objectives', { params });
+  };
+
+  /** A11. Literal path, not `objectives/:id`. */
+  POST_StrategyFrameworkCarryForward = (body: CarryForwardObjectivesPayload): Promise<MainResponse<CarryForwardObjectivesResult>> => {
+    return this.TP.post('strategy-framework/objectives/carry-forward', body, {});
+  };
+
+  /** A10 create. */
+  POST_StrategyFrameworkObjective = (body: CreateInstitutionalObjectivePayload): Promise<MainResponse<FrameworkObjective>> => {
+    return this.TP.post('strategy-framework/objectives', body, {});
+  };
+
+  /** A10 update. `portfolioId` is not a field of the body. */
+  PATCH_StrategyFrameworkObjective = (id: number, body: UpdateInstitutionalObjectivePayload): Promise<MainResponse<FrameworkObjective>> => {
+    return this.TP.patch(`strategy-framework/objectives/${id}`, body, {});
+  };
+
+  /** A10 delete. */
+  DELETE_StrategyFrameworkObjective = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`strategy-framework/objectives/${id}`, {});
   };
 }

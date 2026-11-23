@@ -1,0 +1,9 @@
+<div class="panel-heading">
+  <p class="panel-heading__eyebrow" data-testid="panel-level">{{ eyebrow() }}</p>
+  <div class="panel-heading__line">
+    @if (code(); as value) {
+      <span class="panel-heading__code" data-testid="panel-code">{{ value }}</span>
+    }
+    <h2 class="panel-heading__title" data-testid="panel-title">{{ title() }}</h2>
+  </div>
+</div>

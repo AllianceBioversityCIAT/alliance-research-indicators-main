@@ -119,6 +119,29 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
         ]
       });
     }
+    // @akili-spec institutional-performance/strategy-framework T-11 — R-STF-015.
+    // After Center admin, before System admin. Each link equals its route path (KZ-017).
+    if (this.rolesService.canAccessOdsAdmin()) {
+      groups.push({
+        id: 'ods-admin',
+        label: 'ODS Admin',
+        icon: 'pi-shield',
+        children: [
+          {
+            label: 'Framework',
+            link: '/administration/ods-admin/framework',
+            icon: 'pi-sitemap',
+            iconSize: '13px'
+          },
+          {
+            label: 'Institutional Objectives',
+            link: '/administration/ods-admin/institutional-objectives',
+            icon: 'pi-flag',
+            iconSize: '13px'
+          }
+        ]
+      });
+    }
     if (this.rolesService.canAccessAppConfiguration()) {
       groups.push({
         id: 'system-admin',

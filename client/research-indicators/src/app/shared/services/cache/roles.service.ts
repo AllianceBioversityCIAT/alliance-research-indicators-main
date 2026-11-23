@@ -8,6 +8,7 @@ import { CreateResultManagementService } from '../../components/all-modals/modal
 export class RolesService {
   private readonly adminRoleId = 1;
   private readonly centerAdminRoleId = 9;
+  private readonly odsAdminRoleId = 11;
   private readonly melRegionalExpertRoleId = 10;
 
   private readonly technicalSupportRoleId = 7;
@@ -41,6 +42,11 @@ export class RolesService {
   );
 
   canAccessCenterAdmin = computed(() => this.roleList().some(e => this.userHasCenterAdminAccess(e)));
+
+  /** ODS Admin screens: System Admin (1) or ODS Admin (11). Center Admin is not included. */
+  canAccessOdsAdmin = computed(() =>
+    this.roleList().some(r => r.role_id === this.adminRoleId || r.role_id === this.odsAdminRoleId)
+  );
 
   canAccessAppConfiguration = computed(() =>
     this.roleList().some(

@@ -1,0 +1,80 @@
+<div class="flex flex-col gap-3" data-testid="framework-tables">
+  <div class="flex flex-wrap gap-2" role="group" aria-label="Levels" data-testid="level-chips">
+    @for (panel of panels(); track panel.level.depth) {
+      <button
+        type="button"
+        class="level-chip cursor-pointer px-3 py-1.5 text-[13px]"
+        [class.level-chip--active]="panel.level.depth === activeDepth()"
+        [attr.aria-pressed]="panel.level.depth === activeDepth()"
+        [attr.data-depth]="panel.level.depth"
+        [id]="'framework-level-chip-' + panel.level.depth"
+        data-testid="level-chip"
+        (click)="selectLevel(panel.level.depth)">
+        {{ panel.level.pluralName }} · {{ panel.level.count }}
+      </button>
+    }
+  </div>
+
+  @for (panel of panels(); track panel.level.depth) {
+    <section
+      class="level-table flex flex-col gap-3"
+      [hidden]="panel.level.depth !== activeDepth()"
+      [attr.aria-hidden]="panel.level.depth !== activeDepth()"
+      [attr.aria-labelledby]="'framework-level-chip-' + panel.level.depth"
+      [attr.data-depth]="panel.level.depth"
+      data-testid="level-table">
+      <div class="flex justify-end">
+        <p-button
+          [label]="'+ ' + panel.level.name"
+          icon="pi pi-plus !text-[12px]"
+          severity="info"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          (onClick)="requestCreate(panel.level.depth)"
+          data-testid="add-level">
+        </p-button>
+      </div>
+
+      <app-data-table
+        [columns]="panel.columns"
+        [rows]="panel.rows"
+        [searchFields]="panel.searchFields"
+        [exportFileName]="panel.exportFileName"
+        searchPlaceholder="Search"
+        [emptyMessage]="'No ' + panel.level.pluralName.toLowerCase() + ' yet.'"
+        [attr.data-testid]="'level-data-table-' + panel.level.depth">
+        <ng-template #rowActions let-row>
+          <div class="flex gap-2" [attr.data-element-id]="row.id">
+            <button
+              type="button"
+              data-testid="edit-row"
+              [attr.data-element-id]="row.id"
+              [attr.aria-label]="'Edit details of ' + panel.level.name + ' ' + row.code"
+              (click)="requestEdit(row.id)"
+              class="row-action inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
+              <i class="pi pi-pencil !text-[12px] atc-light-blue-400" aria-hidden="true"></i>
+            </button>
+            <button
+              type="button"
+              data-testid="delete-row"
+              [attr.data-element-id]="row.id"
+              [attr.aria-label]="'Delete ' + panel.level.name + ' ' + row.code"
+              [attr.aria-disabled]="isDeletable(row.id) ? 'false' : 'true'"
+              [attr.aria-describedby]="blockerText(row.id) && !isDeletable(row.id) ? 'framework-blocker-' + row.id : null"
+              (click)="requestDelete(row.id, $event)"
+              class="row-action inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
+              <i
+                class="pi pi-trash !text-[12px]"
+                [class.atc-red-1]="isDeletable(row.id)"
+                [class.atc-grey-700]="!isDeletable(row.id)"
+                aria-hidden="true"></i>
+            </button>
+            @if (blockerText(row.id) && !isDeletable(row.id)) {
+              <span class="sr-only" [id]="'framework-blocker-' + row.id">{{ blockerText(row.id) }}</span>
+            }
+          </div>
+        </ng-template>
+      </app-data-table>
+    </section>
+  }
+</div>

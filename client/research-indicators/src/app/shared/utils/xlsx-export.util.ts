@@ -66,3 +66,77 @@ export async function exportRowsToXlsx<T extends object>(input: XlsxExportInput<
     globalThis.URL.revokeObjectURL(url);
   }, 100);
 }
+
+export interface XlsxSheetInput<T extends object> {
+  name: string;
+  columns: XlsxExportColumn<T>[];
+  rows: T[];
+}
+
+interface ExportWorksheet {
+  addRow(values: unknown[]): unknown;
+}
+
+interface ExportWorkbook {
+  addWorksheet(name: string): ExportWorksheet;
+}
+
+const SHEET_NAME_LIMIT = 31;
+
+/** Excel sheet names reject these characters and anything longer than 31. */
+const safeSheetName = (name: string, used: Set<string>): string => {
+  const cleaned =
+    name
+      .replace(/[:\\/?*[\]]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || 'Sheet';
+  const base = cleaned.slice(0, SHEET_NAME_LIMIT);
+  let candidate = base;
+  let suffix = 2;
+  while (used.has(candidate.toLowerCase())) {
+    const tail = ` ${suffix}`;
+    candidate = `${base.slice(0, SHEET_NAME_LIMIT - tail.length)}${tail}`;
+    suffix += 1;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
+};
+
+/**
+ * Adds one worksheet per entry, in the given order, without sorting rows.
+ * `exportRowsToXlsx` is unchanged (P-14, D-STF-9): it still writes a single
+ * sheet named `Values`.
+ */
+export function writeExportSheets<T extends object>(workbook: ExportWorkbook, sheets: readonly XlsxSheetInput<T>[]): void {
+  const used = new Set<string>();
+  for (const sheet of sheets) {
+    const worksheet = workbook.addWorksheet(safeSheetName(sheet.name, used));
+    for (const row of buildExportRows(sheet)) {
+      worksheet.addRow(row);
+    }
+  }
+}
+
+/**
+ * Several sheets, one download. `exceljs` stays inside the function so it
+ * resolves to a lazy chunk, the same way `exportRowsToXlsx` does.
+ */
+export async function exportSheetsToXlsx<T extends object>(input: { sheets: readonly XlsxSheetInput<T>[]; fileName: string }): Promise<void> {
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  writeExportSheets(workbook, input.sheets);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = globalThis.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = input.fileName;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    link.remove();
+    globalThis.URL.revokeObjectURL(url);
+  }, 100);
+}

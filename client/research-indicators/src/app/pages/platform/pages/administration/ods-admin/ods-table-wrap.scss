@@ -1,0 +1,36 @@
+// strategy-framework T-17 — design §6.4, §6.6. Page-scoped. The shared data-table stays nowrap
+// (PrimeNG .p-datatable-resizable-table). These rules opt this page's tables into wrapping.
+// jsdom cannot measure scrollWidth or line breaks (KZ-017).
+
+:host ::ng-deep table.p-datatable-resizable-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-thead > tr > th,
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-tbody > tr > td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-thead > tr > th .flex {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-thead > tr > th[data-testid='column-header-code'],
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-tbody > tr > td[data-testid='cell-code'],
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-thead > tr > th[data-testid='column-header-actions'],
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-tbody > tr > td[data-testid='cell-actions'] {
+  width: 7rem;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-thead > tr > th[data-testid='column-header-actions'],
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-tbody > tr > td[data-testid='cell-actions'] {
+  width: 8.5rem;
+}

@@ -110,6 +110,15 @@ Used by the bilateral-module "Pool Funding" tag (see `docs/specs/bilateral-modul
 - `--ac-pool-funding-fg`: `#1b5e20`
 - `--ac-pool-funding-border`: `#2e7d32`
 
+### Strategy framework accents
+
+Area-card left borders for the ODS Admin framework outline (lime, orange, blue, green). Not status colours. Dark mode overrides the same names under `[data-theme='dark']`.
+
+- `--ac-framework-accent-1`: `#5c7a14` (dark `#d4e06a`) — lime
+- `--ac-framework-accent-2`: `#c05612` (dark `#f0a15a`) — orange
+- `--ac-framework-accent-3`: `#1f5fa8` (dark `#79b4ea`) — blue
+- `--ac-framework-accent-4`: `#1e7a42` (dark `#67d092`) — green
+
 ## Dark Mode Variables
 
 When the dark mode is active, the following variables will be applied:

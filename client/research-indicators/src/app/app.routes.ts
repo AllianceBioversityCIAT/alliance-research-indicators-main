@@ -3,6 +3,7 @@ import { piDelegatesGuard } from '@guards/pi-delegates.guard';
 import { pooledFundingMonitorGuard } from '@guards/pooled-funding-monitor.guard';
 import { rolesGuard } from '@guards/roles.guard';
 import { centerAdminGuard } from '@guards/center-admin.guard';
+import { odsAdminGuard } from '@guards/ods-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
 import { resultExistsResolver } from '@pages/platform/pages/result/resolvers/result-exists.resolver';
 
@@ -351,6 +352,31 @@ export const routes: Routes = [
         canMatch: [centerAdminGuard],
         data: {
           title: 'Organizational Structure',
+          isLoggedIn: true
+        }
+      },
+      // @akili-spec institutional-performance/strategy-framework T-11 — R-STF-014/015.
+      // Each path equals its sidebar link in alliance-sidebar.component.ts (KZ-017).
+      // Placeholder components until T-12 (framework) and T-16 (institutional objectives).
+      {
+        path: 'administration/ods-admin/framework',
+        loadComponent: () =>
+          import('@platform/pages/administration/ods-admin/framework/framework.component').then(m => m.default),
+        canMatch: [odsAdminGuard],
+        data: {
+          title: 'Framework',
+          isLoggedIn: true
+        }
+      },
+      {
+        path: 'administration/ods-admin/institutional-objectives',
+        loadComponent: () =>
+          import('@platform/pages/administration/ods-admin/institutional-objectives/institutional-objectives.component').then(
+            m => m.default
+          ),
+        canMatch: [odsAdminGuard],
+        data: {
+          title: 'Institutional Objectives',
           isLoggedIn: true
         }
       },

@@ -1,4 +1,4 @@
-import { buildExportRows, exportRowsToXlsx, XlsxExportColumn } from './xlsx-export.util';
+import { buildExportRows, exportRowsToXlsx, exportSheetsToXlsx, writeExportSheets, XlsxExportColumn } from './xlsx-export.util';
 
 interface Row {
   id: number;
@@ -148,5 +148,65 @@ describe('xlsx-export.util', () => {
       expect(linkElement.remove).toHaveBeenCalledTimes(1);
       expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:xlsx-export');
     }, 30000);
+
+    it('downloads one workbook for several sheets', async () => {
+      const realSetTimeout = globalThis.setTimeout;
+      let revokeCallback: (() => void) | undefined;
+      jest.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: () => void, timeout?: number, ...args: unknown[]) => {
+        if (timeout === 100) {
+          revokeCallback = handler;
+          return 0 as unknown as ReturnType<typeof setTimeout>;
+        }
+        return realSetTimeout(handler, timeout, ...args);
+      }) as typeof setTimeout);
+
+      await exportSheetsToXlsx({
+        fileName: 'strategy-framework_2026-2030.xlsx',
+        sheets: [
+          { name: 'Performance Areas', columns, rows: [{ id: 1, code: '1', value: 'Area' }] },
+          { name: 'Dimensions', columns, rows: [{ id: 2, code: '1.2', value: 'Dim' }] }
+        ]
+      });
+
+      expect(linkElement.download).toBe('strategy-framework_2026-2030.xlsx');
+      expect(linkElement.click).toHaveBeenCalledTimes(1);
+      revokeCallback?.();
+      expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:xlsx-export');
+    }, 30000);
+  });
+
+  // The sheet count lives on the workbook object. Inspecting the row arrays
+  // alone cannot show "one sheet per level" (T-12 disqualifier).
+  describe('writeExportSheets', () => {
+    it('adds one worksheet per sheet, keeping the given names and row order', async () => {
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      writeExportSheets(workbook, [
+        {
+          name: 'Performance Areas',
+          columns,
+          rows: [
+            { id: 1, code: '2', value: 'Second' },
+            { id: 2, code: '1', value: 'First' }
+          ]
+        },
+        {
+          name: 'Dimensions',
+          columns,
+          rows: [
+            { id: 3, code: '1.2', value: 'Earlier' },
+            { id: 4, code: '1.10', value: 'Later' }
+          ]
+        }
+      ]);
+
+      expect(workbook.worksheets).toHaveLength(2);
+      expect(workbook.worksheets.map(sheet => sheet.name)).toEqual(['Performance Areas', 'Dimensions']);
+      const codes: string[] = [];
+      workbook.getWorksheet('Dimensions')?.eachRow((row, index) => {
+        if (index > 1) codes.push(String(row.getCell(2).value ?? ''));
+      });
+      expect(codes).toEqual(['1.2', '1.10']);
+    });
   });
 });

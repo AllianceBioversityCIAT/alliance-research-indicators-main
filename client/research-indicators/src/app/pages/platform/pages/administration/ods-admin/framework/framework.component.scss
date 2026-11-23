@@ -1,0 +1,24 @@
+// strategy-framework T-12 — design §6.7. Tokens only; the accent colours belong to the outline cards (T-13).
+// Contains the sr-only blocker spans so they stay inside the page's scroll container.
+:host {
+  display: block;
+  position: relative;
+  width: 100%;
+}
+
+.view-toggle__button {
+  border: 1px solid var(--ac-grey-200);
+  background: var(--ac-white-1);
+  color: var(--ac-grey-700);
+}
+
+.view-toggle__button:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}
+
+.view-toggle__button--active {
+  background: var(--ac-grey-100);
+  color: var(--ac-primary-blue-600);
+  font-weight: 600;
+}
