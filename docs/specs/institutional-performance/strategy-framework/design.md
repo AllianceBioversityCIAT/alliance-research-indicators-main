@@ -282,7 +282,7 @@ None: no socket event, no OpenSearch, no queue message.
 ### 6.6 Institutional Objectives page (R-STF-009, 010)
 - Header: eyebrow *ADMIN · ODS*, title *Institutional Objectives*, portfolio `p-select` from A0.
 - Year `p-select` from A9-years (*"2026 · 28 objectives"*), selected on load = `defaultYear`; **Carry forward to <Y+1>** (disabled in the last year or when the year is empty; confirm dialog; toast *"28 objectives copied to 2027; 2026 is unchanged"*); **+ Add objective**; export via the table.
-- `app-data-table`: Code · Statement · Linked indicators (`linkedIndicatorsText`: `<code> <name>` joined with `; `) · `#rowActions`; search over code and statement.
+- `app-data-table`: Code · Statement · Linked indicators (`linkedIndicatorsText`: `<code> <name>`, one per line — joined with a newline and rendered `white-space: pre-line`; the xlsx cell breaks lines the same way. Amended 2026-11-23, owner HITL: was `; `, which forced horizontal scroll) · `#rowActions`; search over code and statement.
 - Side form in a `p-drawer` like §6.5 (`pFocusTrap`, focus returned to the opener; full width under 1024 px): Code*, Year*, Statement* (textarea), Linked indicators (`p-multiSelect` with filter and a visible label; options = indicator-level elements as `code · name`, grouped by their depth-1 ancestor). No owner field. Row delete follows the IOB `deletable` flag from A9.
 
 ### 6.7 Design tokens

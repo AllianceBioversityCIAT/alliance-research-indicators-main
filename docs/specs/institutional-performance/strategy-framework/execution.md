@@ -438,3 +438,17 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Requirements covered:** R-STF-003 (UI move), R-STF-004 AC.1 (UI)/AC.2, R-STF-007 (Details panel), NFR-STF-004 (jsdom scope; Tab order/Shift+Tab/visuals → T-17); owner amendment (table refresh race).
 - **Running totals:** tasks 16/17 · server LOC 13,581 · client LOC 7293 (measured; uncommitted) · whole ≈ 20874 vs re-based ≈ 21,500 · review rounds 27/≈36.
 - **Approval:** continue gate reached T-17, which needs the owner (Dev deploy checks + HITL) — stopping.
+
+## T-17 — HITL round 1 (2026-11-23, local, Leader live in Chrome, read-only: local server points at the shared DB)
+
+- **Phantom document scroll (owner-reported).** 47 `sr-only` blocker spans (`position: absolute`) resolved against the shell's `div.grid-container`, outside the `div.content` scroller → `documentElement.scrollHeight` 2,635 at `innerHeight` 817. Fix (Grok worker): `position: relative` on the `:host` of `framework` and `institutional-objectives`. Re-measured live: 817 in editor and table views.
+- **Owner-approved findings 1–4 (Grok worker, one rework):**
+  1. Escape inside an open select/multiselect/autocomplete closed the whole drawer (unsaved edits lost) → `OverlayEscapeGuardDirective` on both panel forms. Rework: the guard first queried `[aria-expanded="true"]` over the whole document (an unrelated expanded control would swallow every Escape) → scoped to the host form + visible PrimeNG overlay roots. Falsifiers seen red: guard removed (`framework.component.spec.ts:415`), whole-document query restored (`:468`). Live: Parent select, IOB multiselect and staff autocomplete — first Escape closes only the overlay, second closes the drawer, focus on the opener.
+  2. IOB table 2,563/1,129 px → Statement and Linked indicators wrap; Code/Actions fixed. Live: 1,129/1,129 at 1280 px, 673/673 at 800 px.
+  3. Framework tables, Indicators level 1,202/1,153 → page-scoped `ods-table-wrap.scss` (shared `data-table` untouched). Live: 1,153/1,153 for all three levels at 1280 px; 697/697 at 800 px.
+  4. Staff chips rendered as loose text with wrapped buttons → one token-styled row per person, ellipsis + `title`. Live: one line at 1280 px.
+- **Design amendment:** §6.6 `linkedIndicatorsText` one per line (was `; `).
+- **Leader re-run:** `npx jest src/app/pages/platform/pages/administration/ods-admin --coverage=false` → 11 suites, 82 tests passed. Full client suite not re-run for this round (ods-admin-only change, shared files untouched).
+- **Open, owner's call:** delete tooltip names only the way-out (R-STF-006 "names the blocker"); panel Delete red even when not deletable; panel headers differ (Framework chip+code vs IOB title); two "Export .xlsx" buttons in table view; staff search returns gmail accounts; ~5–7 s to first outline paint (re-time on Dev); equal column widths make Responsibles wrap to 3 lines.
+- **Not reachable here (KZ-017):** dark mode (the app has none — forcing `.dark-mode` only flips PrimeNG widgets, same on Results Center); write flows (shared DB); pixel comparison with the mockup.
+- **Commit:** client still uncommitted, waiting for the owner's visual approval.
