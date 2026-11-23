@@ -187,6 +187,22 @@ describe('RolesService', () => {
     expect(service.canAccessAppConfiguration()).toBe(false);
   });
 
+  it('canAccessOdsAdmin is true for System Admin (1) and ODS Admin (11), and false for Center Admin (9) and no roles', () => {
+    userRoleList.set([{ role_id: 1 }]);
+    expect(service.canAccessOdsAdmin()).toBe(true);
+
+    userRoleList.set([{ role_id: 11 }]);
+    expect(service.canAccessOdsAdmin()).toBe(true);
+    expect(service.canAccessCenterAdmin()).toBe(false);
+    expect(service.canAccessAppConfiguration()).toBe(false);
+
+    userRoleList.set([{ role_id: 9, role: { focus_id: 1, sec_role_id: 9 } }]);
+    expect(service.canAccessOdsAdmin()).toBe(false);
+
+    userRoleList.set([]);
+    expect(service.canAccessOdsAdmin()).toBe(false);
+  });
+
   it('canEditAppConfiguration should mirror canAccessAppConfiguration', () => {
     userRoleList.set([{ role_id: 7 }]);
     expect(service.canEditAppConfiguration()).toBe(true);

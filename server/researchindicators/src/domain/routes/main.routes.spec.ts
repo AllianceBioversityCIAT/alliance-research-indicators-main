@@ -1,6 +1,8 @@
 import { Routes } from '@nestjs/core';
 import { route } from './main.routes';
 import { ResultInnovationUseModule } from '../entities/result-innovation-use/result-innovation-use.module';
+import { ControlListsModule } from '../entities/control-lists/control-lists.module';
+import { OrganizationalStructureModule } from '../entities/organizational-structure/organizational-structure.module';
 import { PrmsWebhookCallbackModule } from '../entities/prms-webhook/prms-webhook-callback.module';
 import { PrmsWebhookModule } from '../entities/prms-webhook/prms-webhook.module';
 
@@ -27,6 +29,24 @@ describe('main.routes — results/innovation-use registration', () => {
 
     expect(innovationUseNode).toBeDefined();
     expect(innovationUseNode.module).toBe(ResultInnovationUseModule);
+  });
+});
+
+/**
+ * T-01 (docs/specs/institutional-performance/control-lists), KZ-017: a route
+ * node is not a registration on its own (RouterModule.register() looks the
+ * module up in modulesContainer and returns silently when absent) — the
+ * companion gate is `entities.module.spec.ts`'s membership assertion. This
+ * spec is the falsifiable check over the route *tree* node itself.
+ */
+describe('main.routes — control-lists registration (T-01)', () => {
+  it('registers ControlListsModule at path control-lists', () => {
+    const controlListsNode = (route as Routes).find(
+      (node) => (node as { path?: string }).path === 'control-lists',
+    ) as { module?: unknown };
+
+    expect(controlListsNode).toBeDefined();
+    expect(controlListsNode.module).toBe(ControlListsModule);
   });
 });
 
@@ -74,5 +94,22 @@ describe('main.routes — prms-webhook registration (T-03)', () => {
     ).toHaveLength(1);
     expect('prms-webhook'.startsWith('prms-callback')).toBe(false);
     expect('prms-callback'.startsWith('prms-webhook')).toBe(false);
+  });
+});
+
+/**
+ * T-01 (docs/specs/institutional-performance/organizational-structure), KZ-017:
+ * the route-tree half of the registration gate (the module-graph half is
+ * `entities.module.spec.ts`; reachability on a booted app is pinned by
+ * `test/org-structure-module-wiring.integration-spec.ts`).
+ */
+describe('main.routes — organizational-structure registration (T-01)', () => {
+  it('registers OrganizationalStructureModule at path organizational-structure', () => {
+    const node = (route as Routes).find(
+      (n) => (n as { path?: string }).path === 'organizational-structure',
+    ) as { module?: unknown };
+
+    expect(node).toBeDefined();
+    expect(node.module).toBe(OrganizationalStructureModule);
   });
 });

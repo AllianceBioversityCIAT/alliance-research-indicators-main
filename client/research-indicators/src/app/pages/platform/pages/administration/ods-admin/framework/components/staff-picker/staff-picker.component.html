@@ -1,0 +1,75 @@
+<div class="staff-picker flex flex-col gap-1" data-testid="staff-picker">
+  <label id="staffPickerLabel" for="staffPickerInput" class="text-sm font-medium atc-grey-800">Responsibles</label>
+  <p id="staffPickerHint" class="m-0 text-sm leading-[1.5] atc-grey-700" data-testid="staff-hint">
+    Search by name or email. At least 2 characters. Active staff only, up to 20.
+  </p>
+  <p-autoComplete
+    inputId="staffPickerInput"
+    [suggestions]="suggestions()"
+    (completeMethod)="search($event.query)"
+    (onSelect)="pick($event.value)"
+    (onKeyUp)="onSearchKey($event)"
+    [multiple]="true"
+    [forceSelection]="true"
+    [unique]="true"
+    dataKey="carnet"
+    optionLabel="name"
+    [minLength]="2"
+    [delay]="300"
+    [typeahead]="true"
+    appendTo="body"
+    styleClass="w-full"
+    ariaLabelledBy="staffPickerLabel"
+    placeholder="Search staff by name or email"
+    data-testid="staff-search">
+    <ng-template let-person pTemplate="item">
+      <span class="flex flex-col text-[13px]">
+        <span class="atc-grey-800">{{ person.name }}</span>
+        <span class="atc-grey-700">{{ person.email }}</span>
+      </span>
+    </ng-template>
+  </p-autoComplete>
+  <ul class="staff-picker__chips m-0 flex list-none flex-col gap-1 p-0" role="list" aria-label="Selected responsibles">
+    @for (person of shown(); track person.carnet) {
+      <li class="staff-picker__chip" role="listitem" data-testid="staff-chip">
+        <span class="staff-picker__identity" [attr.title]="chipTitle(person)">
+          <span class="atc-grey-800">{{ person.name }}</span>
+          @if (person.email) {
+            <span class="atc-grey-700"> {{ person.email }}</span>
+          }
+        </span>
+        @if (person.isActiveStaff === false) {
+          <span class="staff-picker__inactive" data-testid="staff-inactive">inactive</span>
+        }
+        <span class="staff-picker__actions">
+          <button
+            type="button"
+            class="staff-picker__icon cursor-pointer"
+            [attr.aria-label]="'Move ' + person.name + ' up'"
+            [disabled]="isFirst(person)"
+            (click)="move(person, -1, $event)"
+            data-testid="staff-up">
+            <i class="pi pi-arrow-up" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            class="staff-picker__icon cursor-pointer"
+            [attr.aria-label]="'Move ' + person.name + ' down'"
+            [disabled]="isLast(person)"
+            (click)="move(person, 1, $event)"
+            data-testid="staff-down">
+            <i class="pi pi-arrow-down" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            class="staff-picker__icon cursor-pointer"
+            [attr.aria-label]="'Remove ' + person.name"
+            (click)="remove(person, $event)"
+            data-testid="staff-remove">
+            <i class="pi pi-times" aria-hidden="true"></i>
+          </button>
+        </span>
+      </li>
+    }
+  </ul>
+</div>

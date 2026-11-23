@@ -212,6 +212,34 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/funding-types', {});
     });
 
+    it('should call GET_ControlListCategories with no query params (lists are global, no portfolio)', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      service.GET_ControlListCategories();
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('control-lists/categories', {});
+      expect(service).not.toHaveProperty('GET_ControlListPortfolioSummaries');
+    });
+
+    // @akili-spec institutional-performance/organizational-structure T-03: the contract the dialog and History tab code against.
+    it('calls the Organizational Structure lifecycle and history endpoints (B6, B11, B12, B13)', () => {
+      service.GET_OrgStructureHistory(7);
+      service.POST_OrgStructureInactivate(7, { fromYear: 2027, successorId: 9 });
+      service.POST_OrgStructureReactivate(7, { fromYear: 2028, backdate: true });
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('organizational-structure/units/7/history', {});
+      expect(mockToPromiseService.post).toHaveBeenCalledWith('organizational-structure/units/7/inactivate', { fromYear: 2027, successorId: 9 }, {});
+      expect(mockToPromiseService.post).toHaveBeenCalledWith('organizational-structure/units/7/reactivate', { fromYear: 2028, backdate: true }, {});
+    });
+
+    it('DELETE_OrgStructureUnit puts the query in the path (ToPromiseService.delete takes no params); a physical delete omits fromYear', () => {
+      service.DELETE_OrgStructureUnit(7, 2027, true);
+      service.DELETE_OrgStructureUnit(8, null, false);
+
+      expect(mockToPromiseService.delete).toHaveBeenCalledWith('organizational-structure/units/7?backdate=true&fromYear=2027', {});
+      expect(mockToPromiseService.delete).toHaveBeenCalledWith('organizational-structure/units/8?backdate=false', {});
+    });
+
     it('should call GET_ClarisaSdgTargets', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
 

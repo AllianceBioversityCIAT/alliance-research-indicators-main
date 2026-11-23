@@ -106,6 +106,38 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
             link: '/administration/center-admin/portfolio-management',
             icon: 'pi-briefcase',
             iconSize: '13px'
+          },
+          // @akili-spec institutional-performance/organizational-structure T-01 — R-ORG-013: its own
+          // flat item right after Portfolio Management (never nested inside it). The link must equal
+          // the route path in app.routes.ts exactly (KZ-017).
+          {
+            label: 'Organizational Structure',
+            link: '/administration/center-admin/organizational-structure',
+            icon: 'pi-sitemap',
+            iconSize: '13px'
+          }
+        ]
+      });
+    }
+    // @akili-spec institutional-performance/strategy-framework T-11 — R-STF-015.
+    // After Center admin, before System admin. Each link equals its route path (KZ-017).
+    if (this.rolesService.canAccessOdsAdmin()) {
+      groups.push({
+        id: 'ods-admin',
+        label: 'ODS Admin',
+        icon: 'pi-shield',
+        children: [
+          {
+            label: 'Framework',
+            link: '/administration/ods-admin/framework',
+            icon: 'pi-sitemap',
+            iconSize: '13px'
+          },
+          {
+            label: 'Institutional Objectives',
+            link: '/administration/ods-admin/institutional-objectives',
+            icon: 'pi-flag',
+            iconSize: '13px'
           }
         ]
       });
@@ -127,6 +159,15 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
             label: 'Prompt Manager',
             link: '/administration/configuration/prompt-manager',
             icon: 'pi-sparkles',
+            iconSize: '13px'
+          },
+          // @akili-spec changes/control-lists-global-scope T-01 — D-CLG-7: lists are system-wide
+          // settings, so the item lives under System admin; the route uses the same guard
+          // (`appConfigurationGuard`) so menu visibility and route access stay identical.
+          {
+            label: 'Control Lists',
+            link: '/administration/configuration/control-lists',
+            icon: 'pi-list',
             iconSize: '13px'
           }
         ]

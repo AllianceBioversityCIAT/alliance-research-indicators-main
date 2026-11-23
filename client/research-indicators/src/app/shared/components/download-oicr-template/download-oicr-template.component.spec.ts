@@ -12,6 +12,7 @@ import { ToPromiseService } from '@shared/services/to-promise.service';
 import { WasmService } from '@shared/services/go/wasm.service';
 import { httpErrorInterceptor } from '@shared/interceptors/http-error.interceptor';
 import { ImpersonationService } from '@shared/services/impersonation.service';
+import { environment } from '@envs/environment';
 
 describe('DownloadOicrTemplateComponent', () => {
   let fixture: ComponentFixture<DownloadOicrTemplateComponent>;
@@ -205,7 +206,7 @@ describe('DownloadOicrTemplateComponent Portfolio 1 HTTP failure', () => {
 
     const request = httpMock.expectOne(req => req.url.includes('results/oicr/details/554'));
     request.flush({ errors: 'Result is inactive' }, { status: 400, statusText: 'Bad Request' });
-    for (const pending of httpMock.match(req => req.url.includes('ciat-errors'))) {
+    for (const pending of httpMock.match(req => req.url.includes(environment.saveErrorsUrl))) {
       pending.flush({});
     }
 

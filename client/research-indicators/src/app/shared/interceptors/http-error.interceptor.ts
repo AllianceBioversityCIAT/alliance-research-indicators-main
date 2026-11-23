@@ -121,6 +121,14 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         // stack a generic toast on the inline "unavailable" state.
         const isAgrovocSearchError = req.url.includes('tools/agrovoc');
 
+        // Strategy-framework pages show every 4xx except 401 inline (D-STF-26).
+        // 401, 5xx and refresh-token handling stay on the global path.
+        const isStrategyFrameworkClientError =
+          error.status >= 400 &&
+          error.status < 500 &&
+          error.status !== 401 &&
+          req.url.includes('/strategy-framework');
+
         // The download button owns this error. The body is a Blob, so a toast
         // here would be the technical "Http failure…" message.
         const isOicrWordTemplateError = req.url.includes('oicr/word-template');
@@ -145,6 +153,7 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isPoolFundingAlignmentValidationError &&
           !isPrmsSyncError &&
           !isAgrovocSearchError &&
+          !isStrategyFrameworkClientError &&
           !isOicrWordTemplateError &&
           !isOicrLegacyDetailsError &&
           !isOicrLegacyTemplateError &&

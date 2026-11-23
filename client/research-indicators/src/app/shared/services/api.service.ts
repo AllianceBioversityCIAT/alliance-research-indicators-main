@@ -44,6 +44,49 @@ import { GlobalTarget } from '../interfaces/global-target.interface';
 import { GetResultsByContract } from '../interfaces/get-results-by-contract.interface';
 import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
+import {
+  OrgCodeProposal,
+  OrgDeleteResult,
+  OrgHistory,
+  OrgLinkedData,
+  OrgLifecyclePayload,
+  OrgStaffOption,
+  OrgUnitCreatePayload,
+  OrgUnitSaved,
+  OrgUnitUpdatePayload,
+  OrgYearRange,
+  OrgYearViewRow
+} from '../interfaces/org-structure.interface';
+import {
+  ControlList,
+  ControlListCategory,
+  ControlListCategoryCreatePayload,
+  ControlListCategoryUpdatePayload,
+  ControlListCreatePayload,
+  ControlListUpdatePayload,
+  ControlListValue,
+  ControlListValueCreatePayload,
+  ControlListValueUpdatePayload
+} from '@shared/interfaces/control-lists.interface';
+import {
+  CarryForwardObjectivesPayload,
+  CarryForwardObjectivesResult,
+  CreateFrameworkElementPayload,
+  CreateInstitutionalObjectivePayload,
+  FrameworkCodeProposal,
+  FrameworkCodeProposalQuery,
+  FrameworkContext,
+  FrameworkEditorView,
+  FrameworkElement,
+  FrameworkElementBlockers,
+  FrameworkObjective,
+  FrameworkObjectiveYears,
+  FrameworkResolveRow,
+  FrameworkStaffOption,
+  FrameworkView,
+  UpdateFrameworkElementPayload,
+  UpdateInstitutionalObjectivePayload
+} from '@shared/interfaces/strategy-framework.interface';
 import { GetGeoLocation } from '../interfaces/get-geo-location.interface';
 import { GetIndicatorsResultsAmount } from '../interfaces/get-indicators-results-amount.interface';
 import { GetResultsStatus } from '../interfaces/get-results-status.interface';
@@ -234,6 +277,120 @@ export class ApiService {
 
   DELETE_Portfolio = (portfolioId: number): Promise<MainResponse<unknown>> => {
     return this.TP.delete(`portfolios/${portfolioId}`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-01 (B1, B2, B5) — read half; no
+  // portfolio parameter anywhere (R-ORG-001).
+  GET_OrgStructureYears = (): Promise<MainResponse<OrgYearRange>> => {
+    return this.TP.get('organizational-structure/years', {});
+  };
+
+  GET_OrgStructureUnits = (year: number, includeEnded: boolean): Promise<MainResponse<OrgYearViewRow[]>> => {
+    const httpParams = new HttpParams().set('year', String(year)).set('includeEnded', String(includeEnded));
+    return this.TP.get('organizational-structure/units', { params: httpParams });
+  };
+
+  GET_OrgStructureUnit = (id: number): Promise<MainResponse<unknown>> => {
+    return this.TP.get(`organizational-structure/units/${id}`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-02 (B3, B4, B9, B10) — write half.
+  GET_OrgStructureCodeProposal = (): Promise<MainResponse<OrgCodeProposal>> => {
+    return this.TP.get('organizational-structure/units/code-proposal', {});
+  };
+
+  GET_OrgStaff = (search: string): Promise<MainResponse<OrgStaffOption[]>> => {
+    const httpParams = new HttpParams().set('search', search);
+    return this.TP.get('organizational-structure/staff', { params: httpParams });
+  };
+
+  POST_OrgStructureUnit = (body: OrgUnitCreatePayload): Promise<MainResponse<OrgUnitSaved>> => {
+    return this.TP.post('organizational-structure/units', body, {});
+  };
+
+  PATCH_OrgStructureUnit = (id: number, body: OrgUnitUpdatePayload): Promise<MainResponse<OrgUnitSaved>> => {
+    return this.TP.patch(`organizational-structure/units/${id}`, body, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-03 (B6, B11, B12, B13) — lifecycle and history.
+  GET_OrgStructureHistory = (id: number): Promise<MainResponse<OrgHistory>> => {
+    return this.TP.get(`organizational-structure/units/${id}/history`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-04 (B8) — Linked data tab.
+  GET_OrgStructureLinkedData = (id: number): Promise<MainResponse<OrgLinkedData>> => {
+    return this.TP.get(`organizational-structure/units/${id}/linked-data`, {});
+  };
+
+  POST_OrgStructureInactivate = (id: number, body: OrgLifecyclePayload): Promise<MainResponse<unknown>> => {
+    return this.TP.post(`organizational-structure/units/${id}/inactivate`, body, {});
+  };
+
+  POST_OrgStructureReactivate = (id: number, body: OrgLifecyclePayload): Promise<MainResponse<unknown>> => {
+    return this.TP.post(`organizational-structure/units/${id}/reactivate`, body, {});
+  };
+
+  // `ToPromiseService.delete` takes no params, so the query string is part of the path.
+  DELETE_OrgStructureUnit = (id: number, fromYear: number | null, backdate: boolean): Promise<MainResponse<OrgDeleteResult>> => {
+    const httpParams = new HttpParams().set('backdate', String(backdate));
+    const query = (fromYear === null ? httpParams : httpParams.set('fromYear', String(fromYear))).toString();
+    return this.TP.delete(`organizational-structure/units/${id}?${query}`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-02 (design §2.1) — by-key list values.
+  GET_ControlListValuesByKey = (listKey: string, activeOnly: boolean): Promise<MainResponse<ControlListValue[]>> => {
+    const httpParams = new HttpParams().set('activeOnly', String(activeOnly));
+    return this.TP.get(`control-lists/by-key/${encodeURIComponent(listKey)}/values`, { params: httpParams });
+  };
+
+  // @akili-spec institutional-performance/control-lists T-01 (A1–A5) — categories only; lists/values follow in T-02/T-03.
+  GET_ControlListCategories = (): Promise<MainResponse<ControlListCategory[]>> => {
+    return this.TP.get('control-lists/categories', {});
+  };
+
+  POST_ControlListCategory = (body: ControlListCategoryCreatePayload): Promise<MainResponse<ControlListCategory>> => {
+    return this.TP.post('control-lists/categories', body, {});
+  };
+
+  PATCH_ControlListCategory = (id: number, body: ControlListCategoryUpdatePayload): Promise<MainResponse<ControlListCategory>> => {
+    return this.TP.patch(`control-lists/categories/${id}`, body, {});
+  };
+
+  DELETE_ControlListCategory = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`control-lists/categories/${id}`, {});
+  };
+
+  // @akili-spec institutional-performance/control-lists T-02 (client half) — A6–A8.
+  POST_ControlList = (body: ControlListCreatePayload): Promise<MainResponse<ControlList>> => {
+    return this.TP.post('control-lists/lists', body, {});
+  };
+
+  // `listKey` must never be part of `body` (design §5 rule 3 — the update DTO omits it).
+  PATCH_ControlList = (id: number, body: ControlListUpdatePayload): Promise<MainResponse<ControlList>> => {
+    return this.TP.patch(`control-lists/lists/${id}`, body, {});
+  };
+
+  DELETE_ControlList = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`control-lists/lists/${id}`, {});
+  };
+
+  // @akili-spec institutional-performance/control-lists T-03 (client half) — A9–A12.
+  GET_ControlListValues = (listId: number): Promise<MainResponse<ControlListValue[]>> => {
+    return this.TP.get(`control-lists/lists/${listId}/values`, {});
+  };
+
+  POST_ControlListValue = (listId: number, body: ControlListValueCreatePayload): Promise<MainResponse<ControlListValue>> => {
+    return this.TP.post(`control-lists/lists/${listId}/values`, body, {});
+  };
+
+  // `id` must never be part of `body` (design §4 A11 / D-CTL-14 — the permanent value ID is
+  // never sent in an update).
+  PATCH_ControlListValue = (id: number, body: ControlListValueUpdatePayload): Promise<MainResponse<ControlListValue>> => {
+    return this.TP.patch(`control-lists/values/${id}`, body, {});
+  };
+
+  DELETE_ControlListValue = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`control-lists/values/${id}`, {});
   };
 
   GET_FundingTypes = (): Promise<MainResponse<FundingType[]>> => {
@@ -1554,5 +1711,98 @@ export class ApiService {
   currentImpersonation = (sessionId: string): Promise<MainResponse<ImpersonationCurrentResponse>> => {
     const url = () => `impersonation/current`;
     return this.TP.get(url(), { headers: { 'X-Impersonation-Session': sessionId } });
+  };
+
+  // @akili-spec institutional-performance/strategy-framework T-12 — design §4, A0–A11.
+  // Unversioned `/api/strategy-framework/...` (no `/v1`). Literal paths match the controller.
+
+  /** A0. Server clock, portfolios, default portfolio. */
+  GET_StrategyFrameworkContext = (): Promise<MainResponse<FrameworkContext>> => {
+    return this.TP.get('strategy-framework/context', {});
+  };
+
+  /** A1. Consumer read. The Framework page does not call this (it reads A1e). */
+  GET_StrategyFramework = (portfolioId: number): Promise<MainResponse<FrameworkView>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('strategy-framework/framework', { params });
+  };
+
+  /** A1e. Admin read. `usageLabels` is once on the view. */
+  GET_StrategyFrameworkEditor = (portfolioId: number): Promise<MainResponse<FrameworkEditorView>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('strategy-framework/framework/editor', { params });
+  };
+
+  /** A2. At most 200 ids, comma-separated. */
+  GET_StrategyFrameworkResolve = (ids: readonly number[]): Promise<MainResponse<FrameworkResolveRow[]>> => {
+    const params = new HttpParams().set('ids', ids.join(','));
+    return this.TP.get('strategy-framework/resolve', { params });
+  };
+
+  /** A3. Root when `parentId` is omitted; `kind: 'IOB'` proposes `IOB-n`. */
+  GET_StrategyFrameworkCodeProposal = (query: FrameworkCodeProposalQuery): Promise<MainResponse<FrameworkCodeProposal>> => {
+    let params = new HttpParams().set('portfolioId', String(query.portfolioId));
+    if (query.parentId !== undefined) params = params.set('parentId', String(query.parentId));
+    if (query.kind !== undefined) params = params.set('kind', query.kind);
+    if (query.year !== undefined) params = params.set('year', String(query.year));
+    return this.TP.get('strategy-framework/code-proposal', { params });
+  };
+
+  /** A4. Active staff, at least 2 characters, at most 20. */
+  GET_StrategyFrameworkStaff = (search: string): Promise<MainResponse<FrameworkStaffOption[]>> => {
+    const params = new HttpParams().set('search', search);
+    return this.TP.get('strategy-framework/staff', { params });
+  };
+
+  /** A5. Creates an element. The level is derived from the parent. */
+  POST_StrategyFrameworkElement = (body: CreateFrameworkElementPayload): Promise<MainResponse<FrameworkElement>> => {
+    return this.TP.post('strategy-framework/elements', body, {});
+  };
+
+  /** A8. Declared in the client next to the element writes; the path is the literal `elements/:id/blockers`. */
+  GET_StrategyFrameworkElementBlockers = (id: number): Promise<MainResponse<FrameworkElementBlockers>> => {
+    return this.TP.get(`strategy-framework/elements/${id}/blockers`, {});
+  };
+
+  /** A6. `parentId: null` is sent through so the service can answer 400. */
+  PATCH_StrategyFrameworkElement = (id: number, body: UpdateFrameworkElementPayload): Promise<MainResponse<FrameworkElement>> => {
+    return this.TP.patch(`strategy-framework/elements/${id}`, body, {});
+  };
+
+  /** A7. */
+  DELETE_StrategyFrameworkElement = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`strategy-framework/elements/${id}`, {});
+  };
+
+  /** A9 years. Every year of the portfolio range, zero counts included. */
+  GET_StrategyFrameworkObjectiveYears = (portfolioId: number): Promise<MainResponse<FrameworkObjectiveYears>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('strategy-framework/objectives/years', { params });
+  };
+
+  /** A9 list. */
+  GET_StrategyFrameworkObjectives = (portfolioId: number, year: number): Promise<MainResponse<FrameworkObjective[]>> => {
+    const params = new HttpParams().set('portfolioId', String(portfolioId)).set('year', String(year));
+    return this.TP.get('strategy-framework/objectives', { params });
+  };
+
+  /** A11. Literal path, not `objectives/:id`. */
+  POST_StrategyFrameworkCarryForward = (body: CarryForwardObjectivesPayload): Promise<MainResponse<CarryForwardObjectivesResult>> => {
+    return this.TP.post('strategy-framework/objectives/carry-forward', body, {});
+  };
+
+  /** A10 create. */
+  POST_StrategyFrameworkObjective = (body: CreateInstitutionalObjectivePayload): Promise<MainResponse<FrameworkObjective>> => {
+    return this.TP.post('strategy-framework/objectives', body, {});
+  };
+
+  /** A10 update. `portfolioId` is not a field of the body. */
+  PATCH_StrategyFrameworkObjective = (id: number, body: UpdateInstitutionalObjectivePayload): Promise<MainResponse<FrameworkObjective>> => {
+    return this.TP.patch(`strategy-framework/objectives/${id}`, body, {});
+  };
+
+  /** A10 delete. */
+  DELETE_StrategyFrameworkObjective = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`strategy-framework/objectives/${id}`, {});
   };
 }

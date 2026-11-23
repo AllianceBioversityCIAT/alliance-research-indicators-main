@@ -81,6 +81,13 @@
     .admin-flyout-row {
       box-sizing: border-box;
 
+      // @akili-spec institutional-performance/control-lists — second-level flyout row
+      // (e.g. Control Lists under Portfolio Management), indented under its parent row.
+      &.admin-flyout-row--nested {
+        margin-left: 16px;
+        width: calc(100% - 16px);
+      }
+
       .sidebar-option-icon {
         color: #112f5c;
       }
@@ -298,6 +305,23 @@
         flex: 1;
         min-width: 0;
       }
+    }
+
+    // @akili-spec institutional-performance/control-lists — D-CTL-9 / design §6.1:
+    // a second nested level (e.g. Control Lists under Portfolio Management), drawn
+    // with the mockup's left rule + indent instead of a new group type.
+    .option-nested-children {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin: 0 8px 0 24px;
+      padding-left: 8px;
+      border-left: 2px solid var(--ac-grey-200);
+    }
+
+    .option.option--nested-child {
+      margin: 0;
+      width: 100%;
     }
   }
 

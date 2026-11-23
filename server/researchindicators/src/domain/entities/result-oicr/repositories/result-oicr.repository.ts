@@ -161,65 +161,6 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
     const project = projectRows[0] as ProjectRow | undefined;
     const contact = contactRows[0] as ContactRow | undefined;
 
-    const subsByCountry = new Map<string, string[]>();
-    for (const row of subRows as SubNationalRow[]) {
-      const name = textOrNull(row.name);
-      if (!name) continue;
-      const key = String(row.result_country_id);
-      const names = subsByCountry.get(key) ?? [];
-      names.push(name);
-      subsByCountry.set(key, names);
-    }
-
-    const countries: OicrWordTemplateCountryRow[] = [];
-    for (const row of countryRows as CountryRow[]) {
-      const name = textOrNull(row.name);
-      if (!name) continue;
-      countries.push({
-        name,
-        subNationals: subsByCountry.get(String(row.result_country_id)) ?? [],
-      });
-    }
-
-    const regions: OicrWordTemplateRegionRow[] = [];
-    for (const row of regionRows as RegionRow[]) {
-      const code = Number(row.code);
-      const name = textOrNull(row.name);
-      if (!Number.isFinite(code) || !name) continue;
-      regions.push({ code, name });
-    }
-
-    const researchAreas: OicrWordTemplateAreaRow[] = (
-      areaRows as AreaRow[]
-    ).map((row) => ({
-      leverId: numOrNull(row.lever_id),
-      isPrimary:
-        row.is_primary === true ||
-        row.is_primary === 1 ||
-        row.is_primary === '1',
-      customName: textOrNull(row.custom_lever_name),
-    }));
-
-    const mainProject: OicrWordTemplateProjectRow | null =
-      project &&
-      textOrNull(project.agreement_id) &&
-      textOrNull(project.description)
-        ? {
-            agreementId: String(project.agreement_id),
-            description: String(project.description),
-          }
-        : null;
-
-    const contactRow: OicrWordTemplateContactRow | null = contact
-      ? {
-          firstName: textOrNull(contact.first_name),
-          lastName: textOrNull(contact.last_name),
-          position: textOrNull(contact.position),
-          center: textOrNull(contact.center),
-          email: textOrNull(contact.email),
-        }
-      : null;
-
     return {
       reportingYear: core ? textOrNull(core.reporting_year) : null,
       title: core ? textOrNull(core.title) : null,
@@ -228,11 +169,14 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       elaboration: core ? textOrNull(core.elaboration) : null,
       tagId: core ? numOrNull(core.tag_id) : null,
       previousHandle: textOrNull(handle?.handle_link),
-      mainProject,
-      researchAreas,
-      regions,
-      countries,
-      contact: contactRow,
+      mainProject: mapMainProject(project),
+      researchAreas: mapResearchAreas(areaRows as AreaRow[]),
+      regions: mapRegions(regionRows as RegionRow[]),
+      countries: mapCountries(
+        countryRows as CountryRow[],
+        subRows as SubNationalRow[],
+      ),
+      contact: mapContact(contact),
     };
   }
 }
@@ -355,61 +299,145 @@ WHERE u.result_id = ?
 ORDER BY u.result_user_id ASC
 LIMIT 1`;
 
+/** MySQL text/id columns arrive as a string or a number, never an object. */
+type DbScalar = string | number | null;
+
 interface CoreRow {
-  reporting_year: unknown;
-  title: unknown;
-  geo_scope_id: unknown;
-  comment_geo_scope: unknown;
-  elaboration: unknown;
-  tag_id: unknown;
+  reporting_year: DbScalar;
+  title: DbScalar;
+  geo_scope_id: DbScalar;
+  comment_geo_scope: DbScalar;
+  elaboration: DbScalar;
+  tag_id: DbScalar;
 }
 
 interface HandleRow {
-  handle_link: unknown;
+  handle_link: DbScalar;
 }
 
 interface ProjectRow {
-  agreement_id: unknown;
-  description: unknown;
+  agreement_id: DbScalar;
+  description: DbScalar;
 }
 
 interface AreaRow {
-  lever_id: unknown;
-  is_primary: unknown;
-  custom_lever_name: unknown;
+  lever_id: DbScalar;
+  is_primary: boolean | number | string | null;
+  custom_lever_name: DbScalar;
 }
 
 interface RegionRow {
-  code: unknown;
-  name: unknown;
+  code: DbScalar;
+  name: DbScalar;
 }
 
 interface CountryRow {
-  result_country_id: unknown;
-  name: unknown;
+  result_country_id: DbScalar;
+  name: DbScalar;
 }
 
 interface SubNationalRow {
-  result_country_id: unknown;
-  name: unknown;
+  result_country_id: DbScalar;
+  name: DbScalar;
 }
 
 interface ContactRow {
-  first_name: unknown;
-  last_name: unknown;
-  position: unknown;
-  center: unknown;
-  email: unknown;
+  first_name: DbScalar;
+  last_name: DbScalar;
+  position: DbScalar;
+  center: DbScalar;
+  email: DbScalar;
 }
 
-function textOrNull(value: unknown): string | null {
+function scalarText(value: DbScalar | undefined): string {
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') return value;
+  return value === undefined ? 'undefined' : 'null';
+}
+
+function textOrNull(value: DbScalar | undefined): string | null {
   if (value === null || value === undefined) return null;
-  const text = String(value);
+  const text = typeof value === 'number' ? String(value) : value;
   return text === '' ? null : text;
 }
 
-function numOrNull(value: unknown): number | null {
+function numOrNull(value: DbScalar | undefined): number | null {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function indexSubNationals(
+  rows: readonly SubNationalRow[],
+): Map<string, string[]> {
+  const subsByCountry = new Map<string, string[]>();
+  for (const row of rows) {
+    const name = textOrNull(row.name);
+    if (!name) continue;
+    const key = scalarText(row.result_country_id);
+    const names = subsByCountry.get(key) ?? [];
+    names.push(name);
+    subsByCountry.set(key, names);
+  }
+  return subsByCountry;
+}
+
+function mapCountries(
+  rows: readonly CountryRow[],
+  subRows: readonly SubNationalRow[],
+): OicrWordTemplateCountryRow[] {
+  const subsByCountry = indexSubNationals(subRows);
+  const countries: OicrWordTemplateCountryRow[] = [];
+  for (const row of rows) {
+    const name = textOrNull(row.name);
+    if (!name) continue;
+    countries.push({
+      name,
+      subNationals: subsByCountry.get(scalarText(row.result_country_id)) ?? [],
+    });
+  }
+  return countries;
+}
+
+function mapRegions(rows: readonly RegionRow[]): OicrWordTemplateRegionRow[] {
+  const regions: OicrWordTemplateRegionRow[] = [];
+  for (const row of rows) {
+    const code = Number(row.code);
+    const name = textOrNull(row.name);
+    if (!Number.isFinite(code) || !name) continue;
+    regions.push({ code, name });
+  }
+  return regions;
+}
+
+function mapResearchAreas(rows: readonly AreaRow[]): OicrWordTemplateAreaRow[] {
+  return rows.map((row) => ({
+    leverId: numOrNull(row.lever_id),
+    isPrimary:
+      row.is_primary === true || row.is_primary === 1 || row.is_primary === '1',
+    customName: textOrNull(row.custom_lever_name),
+  }));
+}
+
+function mapMainProject(
+  project: ProjectRow | undefined,
+): OicrWordTemplateProjectRow | null {
+  if (!project) return null;
+  const agreementId = textOrNull(project.agreement_id);
+  const description = textOrNull(project.description);
+  if (!agreementId || !description) return null;
+  return { agreementId, description };
+}
+
+function mapContact(
+  contact: ContactRow | undefined,
+): OicrWordTemplateContactRow | null {
+  if (!contact) return null;
+  return {
+    firstName: textOrNull(contact.first_name),
+    lastName: textOrNull(contact.last_name),
+    position: textOrNull(contact.position),
+    center: textOrNull(contact.center),
+    email: textOrNull(contact.email),
+  };
 }

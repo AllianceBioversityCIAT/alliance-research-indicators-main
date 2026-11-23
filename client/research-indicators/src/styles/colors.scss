@@ -59,6 +59,12 @@
   --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #1b5e20;
   --ac-pool-funding-border: #2e7d32;
+  // Strategy framework area borders (D-STF-25): lime, orange, blue, green.
+  // Darker pair so each clears 3:1 on a white / #f5f5f5 card. Not status colours.
+  --ac-framework-accent-1: #5c7a14;
+  --ac-framework-accent-2: #c05612;
+  --ac-framework-accent-3: #1f5fa8;
+  --ac-framework-accent-4: #1e7a42;
   // Pooled Funding Monitor (--ac-pfm-*): semantic status pairs, see spec design.md 6.2
   --ac-pfm-accent-navy: #0d2b4e;
   --ac-pfm-success-bg: #e6f2ea;
@@ -259,6 +265,11 @@ $colors: (
   --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #a5d6a7;
   --ac-pool-funding-border: #66bb6a;
+  // Lighter pair of the framework accents so each clears 3:1 on #191919 and on a raised dark card.
+  --ac-framework-accent-1: #d4e06a;
+  --ac-framework-accent-2: #f0a15a;
+  --ac-framework-accent-3: #79b4ea;
+  --ac-framework-accent-4: #67d092;
   --ac-pfm-accent-navy: #7c9cb9;
   --ac-pfm-success-bg: #1d3a2a;
   --ac-pfm-success-fg: #8fd6ab;

@@ -1,0 +1,108 @@
+<div class="outline-row__controls flex flex-wrap items-start gap-2" data-testid="row-controls">
+  @if (hasChildren()) {
+    <button
+      type="button"
+      class="outline-row__icon outline-row__toggle cursor-pointer"
+      data-testid="toggle-children"
+      [attr.aria-expanded]="expanded()"
+      [attr.aria-controls]="childrenDomId()"
+      [attr.aria-label]="toggleLabel()"
+      (click)="toggle()">
+      <i class="pi" [class.pi-chevron-down]="expanded()" [class.pi-chevron-right]="!expanded()" aria-hidden="true"></i>
+    </button>
+  }
+
+  @if (isIndicator()) {
+    <i class="pi pi-arrow-right outline-row__mark" aria-hidden="true" data-testid="level-mark"></i>
+  } @else {
+    <span class="outline-row__level" data-testid="level-mark">{{ shortLabel() }}</span>
+  }
+
+  <span class="outline-row__code" data-testid="code-badge">{{ codeText() }}</span>
+
+  <div class="outline-row__name">
+    <input
+      type="text"
+      class="outline-row__input"
+      data-testid="name-input"
+      [value]="shownName()"
+      [readonly]="phase() === 'saving'"
+      maxlength="255"
+      [attr.aria-label]="nameLabel()"
+      [attr.aria-invalid]="errorText() ? 'true' : 'false'"
+      autocomplete="off"
+      (input)="onInput($event)"
+      (keydown)="onKeydown($event)"
+      (blur)="onBlur($event)" />
+    @if (errorText(); as message) {
+      <p class="outline-row__error" role="alert" data-testid="name-error">{{ message }}</p>
+    }
+  </div>
+
+  @if (countsText()) {
+    <span class="outline-row__counts" data-testid="counts">{{ countsText() }}</span>
+  }
+
+  @if (nextLevel(); as next) {
+    <button type="button" class="outline-row__text-button cursor-pointer" data-testid="add-child" (click)="requestChild()">
+      + {{ next.name }}
+    </button>
+  }
+
+  <button
+    type="button"
+    class="outline-row__icon cursor-pointer"
+    data-testid="details"
+    [attr.aria-label]="detailsLabel()"
+    [disabled]="phase() === 'saving' || isDraft()"
+    (click)="openDetails()">
+    <i class="pi pi-pencil" aria-hidden="true"></i>
+  </button>
+
+  <button
+    type="button"
+    class="outline-row__icon outline-row__delete cursor-pointer"
+    data-testid="delete"
+    [class.outline-row__delete--ready]="deleteReady()"
+    [class.outline-row__delete--blocked]="!deleteReady()"
+    [attr.aria-label]="deleteLabel()"
+    [attr.aria-disabled]="isDraft() || phase() === 'saving' ? null : deletable() ? 'false' : 'true'"
+    [attr.aria-describedby]="blockerId()"
+    [disabled]="phase() === 'saving' || isDraft()"
+    [pTooltip]="blockerText()"
+    tooltipPosition="top"
+    tooltipEvent="both"
+    [tooltipDisabled]="blockerId() === null"
+    (click)="requestDelete($event)">
+    <i class="pi pi-trash" aria-hidden="true"></i>
+  </button>
+  @if (blockerId(); as id) {
+    <span class="sr-only" [id]="id">{{ blockerText() }}</span>
+  }
+</div>
+
+@if (hasChildren()) {
+  <div
+    [id]="childrenDomId()"
+    [hidden]="!expanded()"
+    [class]="depth() === 1 ? 'outline-nest' : 'outline-indent'"
+    [attr.data-testid]="depth() === 1 ? 'outline-nest' : 'outline-indent'">
+    @for (child of node().children; track child.key) {
+      <app-outline-row
+        [node]="child"
+        [levels]="levels()"
+        [usageLabels]="usageLabels()"
+        [portfolioId]="portfolioId()"
+        [query]="query()"
+        [collapsedIds]="collapsedIds()"
+        [pinnedKeys]="pinnedKeys()"
+        (committed)="committed.emit($event)"
+        (discardDraft)="discardDraft.emit($event)"
+        (addChild)="addChild.emit($event)"
+        (details)="details.emit($event)"
+        (remove)="remove.emit($event)"
+        (toggleCollapsed)="toggleCollapsed.emit($event)"
+        (presence)="presence.emit($event)" />
+    }
+  </div>
+}

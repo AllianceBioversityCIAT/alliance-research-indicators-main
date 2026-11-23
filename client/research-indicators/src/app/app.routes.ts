@@ -3,6 +3,7 @@ import { piDelegatesGuard } from '@guards/pi-delegates.guard';
 import { pooledFundingMonitorGuard } from '@guards/pooled-funding-monitor.guard';
 import { rolesGuard } from '@guards/roles.guard';
 import { centerAdminGuard } from '@guards/center-admin.guard';
+import { odsAdminGuard } from '@guards/ods-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
 import { resultExistsResolver } from '@pages/platform/pages/result/resolvers/result-exists.resolver';
 
@@ -352,6 +353,45 @@ export const routes: Routes = [
           isLoggedIn: true
         }
       },
+      // @akili-spec institutional-performance/organizational-structure T-01 — R-ORG-012/013; path must
+      // match the sidebar link in alliance-sidebar.component.ts exactly (KZ-017).
+      {
+        path: 'administration/center-admin/organizational-structure',
+        loadComponent: () =>
+          import('@platform/pages/administration/center-admin/organizational-structure/organizational-structure.component').then(
+            m => m.default
+          ),
+        canMatch: [centerAdminGuard],
+        data: {
+          title: 'Organizational Structure',
+          isLoggedIn: true
+        }
+      },
+      // @akili-spec institutional-performance/strategy-framework T-11 — R-STF-014/015.
+      // Each path equals its sidebar link in alliance-sidebar.component.ts (KZ-017).
+      // Placeholder components until T-12 (framework) and T-16 (institutional objectives).
+      {
+        path: 'administration/ods-admin/framework',
+        loadComponent: () =>
+          import('@platform/pages/administration/ods-admin/framework/framework.component').then(m => m.default),
+        canMatch: [odsAdminGuard],
+        data: {
+          title: 'Framework',
+          isLoggedIn: true
+        }
+      },
+      {
+        path: 'administration/ods-admin/institutional-objectives',
+        loadComponent: () =>
+          import('@platform/pages/administration/ods-admin/institutional-objectives/institutional-objectives.component').then(
+            m => m.default
+          ),
+        canMatch: [odsAdminGuard],
+        data: {
+          title: 'Institutional Objectives',
+          isLoggedIn: true
+        }
+      },
       {
         path: 'administration/configuration/prompt-manager',
         loadComponent: () =>
@@ -359,6 +399,18 @@ export const routes: Routes = [
         canMatch: [appConfigurationGuard],
         data: {
           title: 'Prompt Manager',
+          isLoggedIn: true
+        }
+      },
+      // @akili-spec changes/control-lists-global-scope T-01 — D-CLG-7; path must match the sidebar
+      // link in alliance-sidebar.component.ts exactly (J-9, KZ-017).
+      {
+        path: 'administration/configuration/control-lists',
+        loadComponent: () =>
+          import('@platform/pages/administration/configuration/control-lists/control-lists.component').then(m => m.default),
+        canMatch: [appConfigurationGuard],
+        data: {
+          title: 'Control Lists',
           isLoggedIn: true
         }
       },

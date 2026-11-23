@@ -9,4 +9,5 @@ export enum SecRolesEnum {
   TESTER = 8, // DEPRECATED
   CENTER_ADMIN = 9, // TODO: Rename to GENERAL_ADMIN
   MEL_REGIONAL_EXPERT = 10, // TODO: Rename to CENTER_ADMIN
+  ODS_ADMIN = 11,
 }

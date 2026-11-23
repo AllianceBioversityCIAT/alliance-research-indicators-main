@@ -1,0 +1,23 @@
+@use '../ods-code-pill' as pill;
+
+// strategy-framework T-16 / T-17 — design §6.7. Tokens only.
+// Contains the sr-only blocker spans so they stay inside the page's scroll container.
+:host {
+  display: block;
+  position: relative;
+  width: 100%;
+}
+
+.row-action:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}
+
+:host ::ng-deep td[data-testid='cell-code'] > span {
+  @include pill.ods-code-pill;
+}
+
+// Newlines from linkedIndicatorsText. The shared wrap rules live in ods-table-wrap.scss.
+:host ::ng-deep .p-datatable-resizable-table > .p-datatable-tbody > tr > td[data-testid='cell-linkedIndicatorsText'] {
+  white-space: pre-line;
+}

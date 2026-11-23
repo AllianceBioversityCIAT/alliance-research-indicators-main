@@ -1,0 +1,47 @@
+@use '../ods-code-pill' as pill;
+
+// strategy-framework T-17. One header look for both drawers. Tokens only.
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.panel-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.panel-heading__eyebrow {
+  margin: 0;
+  color: var(--ac-grey-700);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 2.5px;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.panel-heading__line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.panel-heading__code {
+  @include pill.ods-code-pill;
+  font-size: 14px;
+  padding: 2px 8px;
+}
+
+.panel-heading__title {
+  margin: 0;
+  min-width: 0;
+  color: var(--ac-primary-blue-600);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+}

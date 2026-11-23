@@ -1,0 +1,74 @@
+// strategy-framework T-15 / T-17 — design §6.5, §6.7. Tokens only.
+// One chip row: identity truncates, the three actions stay on that line, aligned right.
+// Reorder controls are 44px so the chip actions meet the touch target.
+// jsdom does not measure the drawer width, the ellipsis, or the focus ring (KZ-017).
+:host {
+  display: block;
+}
+
+.staff-picker__chips {
+  gap: 4px;
+}
+
+.staff-picker__chip {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 8px;
+  background: var(--ac-grey-100);
+  padding: 2px 4px 2px 8px;
+}
+
+.staff-picker__identity {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.staff-picker__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin-left: auto;
+}
+
+.staff-picker__inactive {
+  flex: 0 0 auto;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 999px;
+  background: var(--ac-white-1);
+  color: var(--ac-grey-700);
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.staff-picker__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 8px;
+  background: var(--ac-white-1);
+  color: var(--ac-grey-800);
+}
+
+.staff-picker__icon:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}
+
+.staff-picker__icon:disabled {
+  opacity: 0.45;
+}

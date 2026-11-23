@@ -1,0 +1,1089 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
+import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
+import { ControlListRepository } from './repositories/control-list.repository';
+import { ControlListValueRepository } from './repositories/control-list-value.repository';
+import { ControlListValuePortfolioRepository } from './repositories/control-list-value-portfolio.repository';
+import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
+import { UpdateControlListCategoryDto } from './dto/update-control-list-category.dto';
+import { CreateControlListDto } from './dto/create-control-list.dto';
+import { UpdateControlListDto } from './dto/update-control-list.dto';
+import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
+import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
+import { ControlListCategory } from './entities/control-list-category.entity';
+import { ControlList } from './entities/control-list.entity';
+import { ControlListValue } from './entities/control-list-value.entity';
+import { ControlListValuePortfolio } from './entities/control-list-value-portfolio.entity';
+import { Portfolio } from '../portfolios/entities/portfolio.entity';
+import {
+  CurrentUserUtil,
+  SetAuditEnum,
+} from '../../shared/utils/current-user.util';
+import {
+  ControlListCategoryResponse,
+  ControlListResponse,
+  ControlListValueResponse,
+  ListSummary,
+} from './control-lists.types';
+import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ControlListUsageRegistry } from './control-list-usage.registry';
+import { controlListNaturalCompare } from './control-list-natural-compare.util';
+
+// MySQL "Duplicate entry" errno. TypeORM's QueryFailedError copies every
+// driverError property (minus `name`) onto the thrown instance itself
+// (typeorm/error/QueryFailedError.js), so `error.errno` is readable directly
+// — no `.driverError` indirection needed.
+const MYSQL_DUPLICATE_ENTRY_ERRNO = 1062;
+// @akili-spec institutional-performance/organizational-structure (T-04, R-ORG-011 AC.2)
+const MYSQL_ROW_IS_REFERENCED_ERRNO = 1451;
+
+// R-CLG-009 "Applies to" of one value, as the reads expose it (see
+// `ControlListValueResponse`). A value with no entry in the batch map has no
+// link rows, i.e. it applies to every portfolio.
+interface ValueAppliesTo {
+  appliesTo: number[];
+  appliesToAll: boolean;
+}
+
+const APPLIES_TO_ALL: ValueAppliesTo = { appliesTo: [], appliesToAll: true };
+
+@Injectable()
+export class ControlListsService {
+  private readonly logger = new LoggerUtil({ name: ControlListsService.name });
+
+  constructor(
+    private readonly categoryRepository: ControlListCategoryRepository,
+    private readonly listRepository: ControlListRepository,
+    private readonly valueRepository: ControlListValueRepository,
+    private readonly currentUser: CurrentUserUtil,
+    private readonly usageRegistry: ControlListUsageRegistry,
+    // R-CLG-009: the value <-> portfolio link table (read here; written
+    // through the transaction's own manager, see `createValue`/`updateValue`).
+    private readonly linkRepository: ControlListValuePortfolioRepository,
+    // D-CLG-13: portfolios are read directly (active ones only) to validate an
+    // "Applies to" set and the A13 filter. `PortfoliosService.findOne` throws
+    // a 404, which is the wrong answer for a write, and importing
+    // `PortfoliosModule` would re-couple this module to portfolios.
+    @InjectRepository(Portfolio)
+    private readonly portfolioRepository: Repository<Portfolio>,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  // ---------------------------------------------------------------------
+  // A1 — GET /categories
+  // ---------------------------------------------------------------------
+  // Every category with every list: no scope parameter (R-CLG-001).
+  async getCategories(): Promise<ControlListCategoryResponse[]> {
+    const categories = await this.categoryRepository.find({
+      where: { is_active: true },
+      order: { display_order: 'ASC', id: 'ASC' },
+    });
+
+    // T-03: A1's valueCount now counts real rows per list (design §4 A1).
+    // `usedBy` stays [] until the T-04 registry exists.
+    const listsWithCounts = await this.loadListEntries({ is_active: true });
+
+    return categories.map((category) =>
+      this.mapCategory(
+        category,
+        listsWithCounts.filter(
+          (entry) => entry.list.category_id === category.id,
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // A3 — POST /categories
+  // ---------------------------------------------------------------------
+  async createCategory(
+    dto: CreateControlListCategoryDto,
+  ): Promise<ControlListCategoryResponse> {
+    await this.assertCategoryNameAvailable(dto.name);
+
+    const newCategory: Partial<ControlListCategory> = {
+      name: dto.name,
+      // Leader-adjudicated forward pointer (T-03 rework attempt 2):
+      // normalizeDescription() also runs on CREATE, not only on update —
+      // ''/whitespace/null all store NULL (same single representation of
+      // "no description" as the PATCH path).
+      description: this.normalizeDescription(dto.description),
+      display_order: 0,
+      ...this.currentUser.audit(SetAuditEnum.NEW),
+    };
+
+    let saved: ControlListCategory;
+    try {
+      saved = await this.categoryRepository.save(newCategory);
+    } catch (error) {
+      this.rethrowAsConflictIfDuplicate(error, dto.name);
+    }
+
+    this.logWrite('created', 'control_list_category', saved.id);
+
+    return this.mapCategory(saved);
+  }
+
+  // ---------------------------------------------------------------------
+  // A4 — PATCH /categories/:id
+  // ---------------------------------------------------------------------
+  async updateCategory(
+    id: number,
+    dto: UpdateControlListCategoryDto,
+  ): Promise<ControlListCategoryResponse> {
+    const category = await this.findActiveCategoryOrFail(id);
+
+    if (dto.name !== undefined && dto.name !== category.name) {
+      await this.assertCategoryNameAvailable(dto.name, id);
+    }
+
+    const update: Partial<ControlListCategory> = {
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.description !== undefined
+        ? { description: this.normalizeDescription(dto.description) }
+        : {}),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    };
+
+    try {
+      await this.categoryRepository.update(id, update);
+    } catch (error) {
+      this.rethrowAsConflictIfDuplicate(error, dto.name ?? category.name);
+    }
+
+    const updated = await this.categoryRepository.findOne({ where: { id } });
+
+    this.logWrite('updated', 'control_list_category', id);
+
+    // R-CTL-002: A4 returns the category's real list summaries (A1's shape).
+    const listEntries = await this.loadListEntries({
+      category_id: id,
+      is_active: true,
+    });
+
+    return this.mapCategory(updated, listEntries);
+  }
+
+  // ---------------------------------------------------------------------
+  // A5 — DELETE /categories/:id
+  // ---------------------------------------------------------------------
+  async removeCategory(id: number): Promise<{ id: number }> {
+    const category = await this.findActiveCategoryOrFail(id);
+
+    // T-02 (design §5 rule 6, forward pointer from T-01): a category can be
+    // deleted only when it has no lists. Blocked here, before the physical
+    // delete (D-CTL-5), with a warn-level log (design §9) and a 409 whose
+    // message names the blocking lists (R-CTL-002 "Delete a non-empty
+    // category").
+    const blockingLists = await this.listRepository.find({
+      where: { category_id: id, is_active: true },
+      order: { id: 'ASC' },
+    });
+
+    if (blockingLists.length > 0) {
+      const listNames = blockingLists.map((list) => list.name).join(', ');
+      this.logger._warn(
+        `control_lists.blocked_delete entity=control_list_category id=${id} reason=has_lists count=${blockingLists.length}`,
+      );
+      this.throwNonFieldConflict(
+        `Category "${category.name}" cannot be deleted while it has lists: ${listNames}`,
+      );
+    }
+
+    // Physical delete (D-CTL-5).
+    await this.categoryRepository.delete(id);
+
+    this.logWrite('deleted', 'control_list_category', id);
+
+    return { id };
+  }
+
+  // ---------------------------------------------------------------------
+  // A6 — POST /lists
+  // ---------------------------------------------------------------------
+  async createList(dto: CreateControlListDto): Promise<ControlListResponse> {
+    const category = await this.findActiveCategoryOrFail(dto.categoryId);
+    await this.assertListKeyAvailable(dto.listKey);
+
+    const newList: Partial<ControlList> = {
+      category_id: category.id,
+      list_key: dto.listKey,
+      name: dto.name,
+      // Leader-adjudicated forward pointer (T-03 rework attempt 2): same
+      // normalization on create as on update (categories, lists, values).
+      description: this.normalizeDescription(dto.description),
+      // A-1: empty / whitespace-only codePrefix counts as absent (`??` alone
+      // would store ''); a given prefix is stored trimmed, so " DIR" cannot
+      // produce " DIR-01" proposals.
+      code_prefix:
+        dto.codePrefix?.trim() || this.deriveDefaultCodePrefix(dto.listKey),
+      is_system: false,
+      ...this.currentUser.audit(SetAuditEnum.NEW),
+    };
+
+    let saved: ControlList;
+    try {
+      saved = await this.listRepository.save(newList);
+    } catch (error) {
+      this.rethrowAsListConflictIfDuplicate(error, dto.listKey);
+    }
+
+    this.logWrite('created', 'control_list', saved.id);
+
+    return this.mapList(saved);
+  }
+
+  // ---------------------------------------------------------------------
+  // A7 — PATCH /lists/:id
+  // ---------------------------------------------------------------------
+  async updateList(
+    id: number,
+    dto: UpdateControlListDto,
+  ): Promise<ControlListResponse> {
+    const list = await this.findActiveListOrFail(id);
+
+    let categoryId = list.category_id;
+    if (dto.categoryId !== undefined && dto.categoryId !== list.category_id) {
+      // R-CLG-003 "Move to any category": any active category is a valid
+      // target now that categories and lists are global.
+      const newCategory = await this.findActiveCategoryOrFail(dto.categoryId);
+      categoryId = newCategory.id;
+    }
+
+    const update: Partial<ControlList> = {
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.description !== undefined
+        ? { description: this.normalizeDescription(dto.description) }
+        : {}),
+      ...(dto.categoryId !== undefined ? { category_id: categoryId } : {}),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    };
+
+    await this.listRepository.update(id, update);
+
+    const updated = await this.listRepository.findOne({ where: { id } });
+
+    this.logWrite('updated', 'control_list', id);
+
+    return this.mapList(updated);
+  }
+
+  // ---------------------------------------------------------------------
+  // A8 — DELETE /lists/:id
+  // ---------------------------------------------------------------------
+  async removeList(id: number): Promise<{ id: number }> {
+    const list = await this.findActiveListOrFail(id);
+
+    // CR-2 / D-CTL-18 (2026-10-07): there is no "system list" protection.
+    // Any list — seeded (`is_system = 1`) or admin-created — can be
+    // deleted once it has no values; `is_system` keeps no behavioral
+    // effect on delete (it stays in the schema/entity and is shown read-only
+    // as `isSystem` in list responses). A list with values cannot be deleted,
+    // regardless of whether those values are active or deactivated —
+    // physical delete (D-CTL-5) means a deactivated value is still a row.
+    // The in-use protection on a VALUE's own delete (A12) is T-04's; this
+    // is a separate rule on the LIST's delete.
+    const valueCount = await this.valueRepository.count({
+      where: { list_id: id },
+    });
+    if (valueCount > 0) {
+      this.logger._warn(
+        `control_lists.blocked_delete entity=control_list id=${id} reason=has_values count=${valueCount}`,
+      );
+      this.throwNonFieldConflict(
+        `List "${list.name}" (key ${list.list_key}) cannot be deleted while it has values`,
+      );
+    }
+
+    await this.listRepository.delete(id);
+
+    this.logWrite('deleted', 'control_list', id);
+
+    return { id };
+  }
+
+  // ---------------------------------------------------------------------
+  // A9 — GET /lists/:id/values
+  // ---------------------------------------------------------------------
+  async getValues(listId: number): Promise<ControlListValueResponse[]> {
+    await this.findActiveListOrFail(listId);
+
+    const values = await this.valueRepository.find({
+      where: { list_id: listId },
+      order: { display_order: 'ASC', id: 'ASC' },
+    });
+
+    // T-04 (design §5 rule 5): inUse is the sum of every registered
+    // provider's count for each value id — 0 when none is registered yet.
+    const valueIds = values.map((value) => value.id);
+    const counts = await this.usageRegistry.getInUseCounts(valueIds);
+    const appliesTo = await this.loadAppliesTo(valueIds);
+
+    return values.map((value) =>
+      this.mapValue(
+        value,
+        counts.get(value.id) ?? 0,
+        appliesTo.get(Number(value.id)),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // A13 — GET /by-key/:listKey/values?activeOnly=&portfolioId=
+  // ---------------------------------------------------------------------
+  // Consumer read (design.md §8): no @Roles — any authenticated user.
+  // R-CTL-006 "Ordered read": display order first, then natural code order
+  // (`UOM-2` before `UOM-10` at equal order), mirroring the admin table's
+  // own ordering semantics (R-CTL-009, client naturalCompare).
+  //
+  // R-CLG-009: with `portfolioId` it returns the values that apply to ALL
+  // portfolios (no link rows) plus those linked to that portfolio, and it
+  // combines with `activeOnly`. The filter is ONE query whose portfolio
+  // condition is a `Brackets` group, so its `OR` can never widen the
+  // surrounding `AND`s (design §5 rule 5; KZ-017 precedent: `A OR B AND C`
+  // read as `(A OR B) AND C`). That property lives in the generated SQL, so it
+  // is proven against a real MySQL (`test/control-lists-applies-to.integration-spec.ts`),
+  // never on this call sequence.
+  async getValuesByKey(
+    listKey: string,
+    activeOnly: boolean,
+    portfolioId?: number,
+  ): Promise<ControlListValueResponse[]> {
+    // R-CLG-004: the key alone selects the list (it is unique module-wide).
+    const list = await this.listRepository.findOne({
+      where: { list_key: listKey, is_active: true },
+    });
+    if (!list) {
+      throw new NotFoundException(`List "${listKey}" not found`);
+    }
+
+    if (portfolioId !== undefined) {
+      await this.assertFilterPortfolio(portfolioId);
+    }
+
+    const query = this.valueRepository
+      .createQueryBuilder('cv')
+      .where('cv.list_id = :listId', { listId: list.id });
+    if (activeOnly) {
+      query.andWhere('cv.is_active = :isActive', { isActive: true });
+    }
+    if (portfolioId !== undefined) {
+      query.andWhere(
+        new Brackets((applies) => {
+          applies
+            .where(
+              `NOT EXISTS (SELECT 1 FROM control_list_value_portfolios cvp WHERE cvp.value_id = cv.id)`,
+            )
+            .orWhere(
+              `EXISTS (SELECT 1 FROM control_list_value_portfolios cvp WHERE cvp.value_id = cv.id AND cvp.portfolio_id = :portfolioId)`,
+              { portfolioId },
+            );
+        }),
+      );
+    }
+    const values = await query.getMany();
+
+    const sorted = [...values].sort((a, b) => {
+      if (a.display_order !== b.display_order) {
+        return a.display_order - b.display_order;
+      }
+      return controlListNaturalCompare(a.code, b.code);
+    });
+
+    const sortedIds = sorted.map((value) => value.id);
+    const counts = await this.usageRegistry.getInUseCounts(sortedIds);
+    const appliesTo = await this.loadAppliesTo(sortedIds);
+
+    return sorted.map((value) =>
+      this.mapValue(
+        value,
+        counts.get(value.id) ?? 0,
+        appliesTo.get(Number(value.id)),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // A10 — POST /lists/:id/values
+  // ---------------------------------------------------------------------
+  async createValue(
+    listId: number,
+    dto: CreateControlListValueDto,
+  ): Promise<ControlListValueResponse> {
+    const list = await this.findActiveListOrFail(listId);
+
+    // R-CLG-009: reject unknown/inactive "Applies to" ids (400 naming
+    // `portfolioIds`) before anything is read or written. Omitted and `[]`
+    // both mean "all portfolios" and need no check.
+    await this.assertPortfolioIdsValid(dto.portfolioIds);
+
+    // Rework attempt 2 (Reviewer risk-lens FAIL, Leader decision A10):
+    // attempt 1 only proposed when `dto.code === undefined`, so `''`,
+    // whitespace (the DTO's own `@Transform` already collapses
+    // whitespace-only to `''` before this runs — see
+    // `CreateControlListValueDto.code`) and a literal `null` (the DTO has
+    // no `@IsNotEmpty()`, by design, so `null` reaches here unchanged) all
+    // skipped the proposal, saved straight into the NOT NULL `code` column,
+    // and either stored `''`/blew up with a raw 1048/500 or produced a
+    // false 409. `== null` deliberately catches BOTH `undefined` and
+    // `null` in one check (the DTO's declared type is `string | undefined`,
+    // but `null` reaches here at runtime regardless — see the dto's own
+    // comment). A non-empty, already-trimmed code falls through unchanged.
+    let code = dto.code;
+    if (code == null || code === '') {
+      const existingValues = await this.valueRepository.find({
+        where: { list_id: list.id },
+      });
+      code = this.proposeNextCode(
+        list,
+        existingValues.map((value) => value.code),
+      );
+    }
+
+    await this.assertValueFieldsAvailable(list.id, code, dto.value);
+
+    const newValue: Partial<ControlListValue> = {
+      list_id: list.id,
+      code,
+      value: dto.value,
+      // Leader-adjudicated forward pointer (T-03 rework attempt 2): same
+      // create-time normalization as categories/lists above.
+      description: this.normalizeDescription(dto.description),
+      display_order: dto.displayOrder ?? 0,
+      is_active: dto.isActive ?? true,
+      ...this.currentUser.audit(SetAuditEnum.NEW),
+    };
+
+    // design §5 rule 4: the value and its "Applies to" links are one unit of
+    // work — a failure while storing the links rolls the value back too
+    // (R-CLG-009 "Partial save impossible"). Only the transaction's own
+    // manager is used inside the callback. The errno-1062 mapping wraps the
+    // WHOLE transaction call, so a duplicate code/value still becomes the
+    // named 409 and nothing is committed.
+    let saved: ControlListValue;
+    try {
+      saved = await this.dataSource.transaction(async (manager) => {
+        const created = await manager
+          .getRepository(ControlListValue)
+          .save(newValue);
+        if (dto.portfolioIds?.length) {
+          await this.replaceLinks(manager, created.id, dto.portfolioIds);
+        }
+        return created;
+      });
+    } catch (error) {
+      this.rethrowAsValueConflictIfDuplicate(error, code, dto.value);
+    }
+
+    this.logWrite(
+      'created',
+      'control_list_value',
+      saved.id,
+      this.describePortfolioIds(dto.portfolioIds ?? []),
+    );
+
+    const appliesTo = await this.loadAppliesTo([saved.id]);
+    return this.mapValue(saved, 0, appliesTo.get(Number(saved.id)));
+  }
+
+  // ---------------------------------------------------------------------
+  // A11 — PATCH /values/:id
+  // ---------------------------------------------------------------------
+  async updateValue(
+    id: number,
+    dto: UpdateControlListValueDto,
+  ): Promise<ControlListValueResponse> {
+    const value = await this.findValueOrFail(id);
+
+    // R-CLG-009: omitted keeps the current set (nothing to check), `[]`
+    // clears it, a list replaces it and must name active portfolios only.
+    await this.assertPortfolioIdsValid(dto.portfolioIds);
+
+    if (dto.code !== undefined && dto.code !== value.code) {
+      await this.assertCodeAvailable(value.list_id, dto.code, id);
+    }
+    if (dto.value !== undefined && dto.value !== value.value) {
+      await this.assertValueNameAvailable(value.list_id, dto.value, id);
+    }
+
+    const update: Partial<ControlListValue> = {
+      ...(dto.code !== undefined ? { code: dto.code } : {}),
+      ...(dto.value !== undefined ? { value: dto.value } : {}),
+      ...(dto.description !== undefined
+        ? { description: this.normalizeDescription(dto.description) }
+        : {}),
+      ...(dto.displayOrder !== undefined
+        ? { display_order: dto.displayOrder }
+        : {}),
+      ...(dto.isActive !== undefined ? { is_active: dto.isActive } : {}),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    };
+
+    // design §5 rule 4 / D-CLG-12: the value row is ALWAYS saved here, even
+    // for a links-only PATCH — `update` then carries just the audit fields, so
+    // the value's `updated_by`/`updated_at` record who changed its "Applies
+    // to" (the link table has no audit columns of its own). Value and links
+    // commit together or not at all; the errno-1062 mapping wraps the whole
+    // transaction call.
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.getRepository(ControlListValue).update(id, update);
+        if (dto.portfolioIds !== undefined) {
+          await this.replaceLinks(manager, id, dto.portfolioIds);
+        }
+      });
+    } catch (error) {
+      this.rethrowAsValueConflictIfDuplicate(
+        error,
+        dto.code ?? value.code,
+        dto.value ?? value.value,
+      );
+    }
+
+    const updated = await this.valueRepository.findOne({ where: { id } });
+
+    this.logWrite(
+      'updated',
+      'control_list_value',
+      id,
+      dto.portfolioIds === undefined
+        ? 'portfolioIds=unchanged'
+        : this.describePortfolioIds(dto.portfolioIds),
+    );
+
+    const appliesTo = await this.loadAppliesTo([id]);
+    return this.mapValue(updated, 0, appliesTo.get(Number(id)));
+  }
+
+  // ---------------------------------------------------------------------
+  // A12 — DELETE /values/:id
+  // ---------------------------------------------------------------------
+  async removeValue(id: number): Promise<{ id: number }> {
+    const value = await this.findValueOrFail(id);
+
+    // T-04 (design §5 rule 5, R-CTL-005): refuse when the value is
+    // referenced by at least one record of a registered consumer. The
+    // description states the count and proposes deactivation (falsifier 2:
+    // dropping this check must fail on the ConflictException itself, not on
+    // its wording).
+    const inUse = await this.usageRegistry.getInUseCount(id);
+    if (inUse > 0) {
+      this.logger._warn(
+        `control_lists.blocked_delete entity=control_list_value id=${id} reason=in_use count=${inUse}`,
+      );
+      this.throwNonFieldConflict(
+        `Value "${value.value}" is referenced by ${inUse} record(s) and cannot be deleted; deactivate it instead`,
+      );
+    }
+
+    // Physical delete (D-CTL-5). The list-has-values rule lives on A8, not
+    // here.
+    // @akili-spec institutional-performance/organizational-structure (T-04,
+    // R-ORG-011 AC.2): a consumer FK (ON DELETE RESTRICT) is the race / missing
+    // registration backstop behind the registry check above; errno 1451 reads
+    // as the same 409, never a 500. Same technique as the 1062 mapping.
+    try {
+      await this.valueRepository.delete(id);
+    } catch (error) {
+      if (
+        (error as { errno?: number })?.errno === MYSQL_ROW_IS_REFERENCED_ERRNO
+      ) {
+        this.logger._warn(
+          `control_lists.blocked_delete entity=control_list_value id=${id} reason=fk_restrict`,
+        );
+        this.throwNonFieldConflict(
+          `Value "${value.value}" is referenced by a record of another module and cannot be deleted; deactivate it instead`,
+        );
+      }
+      throw error;
+    }
+
+    this.logWrite('deleted', 'control_list_value', id);
+
+    return { id };
+  }
+
+  // ---------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------
+
+  private async findActiveCategoryOrFail(
+    id: number,
+  ): Promise<ControlListCategory> {
+    const category = await this.categoryRepository.findOne({
+      where: { id, is_active: true },
+    });
+    if (!category) {
+      throw new NotFoundException(`Category ${id} not found`);
+    }
+    return category;
+  }
+
+  private async findActiveListOrFail(id: number): Promise<ControlList> {
+    const list = await this.listRepository.findOne({
+      where: { id, is_active: true },
+    });
+    if (!list) {
+      throw new NotFoundException(`List ${id} not found`);
+    }
+    return list;
+  }
+
+  // Unlike `findActiveCategoryOrFail` / `findActiveListOrFail`, this does
+  // NOT filter `is_active: true`. Deletes are physical for all three tables
+  // (D-CTL-5), so `is_active` on a value is never a soft-delete marker —
+  // it is the Active flag an admin toggles (D-CTL-4). A deactivated value
+  // must still be findable, for both the admin read (R-CTL-004 "Deactivate"
+  // — "IT MUST still be returned by the admin read") and for re-activating
+  // it later.
+  private async findValueOrFail(id: number): Promise<ControlListValue> {
+    const value = await this.valueRepository.findOne({ where: { id } });
+    if (!value) {
+      throw new NotFoundException(`Value ${id} not found`);
+    }
+    return value;
+  }
+
+  // R-CLG-009 (write side): every id must be an existing, ACTIVE portfolio —
+  // anything else is a 400 naming `portfolioIds`, not a 404 (D-CLG-13, S-5):
+  // the portfolio is a field of the request body, not the resource asked for.
+  // One batch lookup for the whole set. Uniqueness and positivity are the
+  // DTO's job; omitted/`[]` need no database round trip.
+  private async assertPortfolioIdsValid(
+    portfolioIds: number[] | undefined,
+  ): Promise<void> {
+    if (!portfolioIds || portfolioIds.length === 0) {
+      return;
+    }
+    const active = await this.portfolioRepository.find({
+      where: { id: In(portfolioIds), is_active: true },
+      select: { id: true },
+    });
+    const activeIds = new Set(active.map((portfolio) => Number(portfolio.id)));
+    const rejected = portfolioIds.filter((id) => !activeIds.has(Number(id)));
+    if (rejected.length > 0) {
+      throw new BadRequestException({
+        message: {
+          description: `portfolioIds contains unknown or inactive portfolios: ${rejected.join(', ')}`,
+          field: 'portfolioIds',
+        },
+      });
+    }
+  }
+
+  // R-CLG-009 (read side, A13): the `portfolioId` filter must name an existing
+  // ACTIVE portfolio — otherwise 404 (the portfolio is the thing the read is
+  // scoped to, unlike the write where it is a body field).
+  private async assertFilterPortfolio(portfolioId: number): Promise<void> {
+    const portfolio = await this.portfolioRepository.findOne({
+      where: { id: portfolioId, is_active: true },
+      select: { id: true },
+    });
+    if (!portfolio) {
+      throw new NotFoundException(`Portfolio ${portfolioId} not found`);
+    }
+  }
+
+  // R-CLG-009: make the value's link rows exactly `portfolioIds`. Runs on the
+  // TRANSACTION's manager (never `this.linkRepository`, which is bound to its
+  // own connection and would escape the transaction). `[]` leaves no rows,
+  // i.e. "applies to all".
+  private async replaceLinks(
+    manager: EntityManager,
+    valueId: number,
+    portfolioIds: number[],
+  ): Promise<void> {
+    const linkRepository = manager.getRepository(ControlListValuePortfolio);
+    await linkRepository.delete({ value_id: valueId });
+    if (portfolioIds.length > 0) {
+      await linkRepository.insert(
+        portfolioIds.map((portfolioId) => ({
+          value_id: valueId,
+          portfolio_id: portfolioId,
+        })),
+      );
+    }
+  }
+
+  // R-CLG-009 (read side, A9/A10/A11/A13): loads the "Applies to" of a whole
+  // batch of values in two constant queries (the link rows, then which of the
+  // linked portfolios are still active) — never one query per value. Ids are
+  // coerced with `Number()` because MySQL BIGINT can arrive as a string
+  // (design §4). `appliesToAll` is "no link rows at all"; `appliesTo` keeps only
+  // ACTIVE portfolios, so a value linked solely to deactivated portfolios is
+  // `appliesToAll: false, appliesTo: []` (D-CLG-14). Values absent from the
+  // returned map have no links and apply to all.
+  private async loadAppliesTo(
+    valueIds: number[],
+  ): Promise<Map<number, ValueAppliesTo>> {
+    const result = new Map<number, ValueAppliesTo>();
+    if (valueIds.length === 0) {
+      return result;
+    }
+
+    const links = await this.linkRepository.find({
+      where: { value_id: In(valueIds) },
+    });
+    if (links.length === 0) {
+      return result;
+    }
+
+    const linkedPortfolioIds = [
+      ...new Set(links.map((link) => Number(link.portfolio_id))),
+    ];
+    const active = await this.portfolioRepository.find({
+      where: { id: In(linkedPortfolioIds), is_active: true },
+      select: { id: true },
+    });
+    const activeIds = new Set(active.map((portfolio) => Number(portfolio.id)));
+
+    for (const link of links) {
+      const valueId = Number(link.value_id);
+      const entry = result.get(valueId) ?? {
+        appliesTo: [],
+        appliesToAll: false,
+      };
+      const portfolioId = Number(link.portfolio_id);
+      if (activeIds.has(portfolioId)) {
+        entry.appliesTo.push(portfolioId);
+      }
+      result.set(valueId, entry);
+    }
+    for (const entry of result.values()) {
+      entry.appliesTo.sort((a, b) => a - b);
+    }
+    return result;
+  }
+
+  // design §9: the value write logs name the "Applies to" set that was sent.
+  private describePortfolioIds(portfolioIds: number[]): string {
+    return `portfolioIds=${JSON.stringify(portfolioIds)}`;
+  }
+
+  private async assertCategoryNameAvailable(
+    name: string,
+    excludeId?: number,
+  ): Promise<void> {
+    // Pre-check for a clean, field-named 409, module-wide (R-CLG-002). The
+    // column's explicit utf8mb4_unicode_ci collation makes this `=`
+    // comparison already case-insensitive (design.md §3, Premise Ledger
+    // P-4). It is NOT the uniqueness guarantee: `uq_control_list_categories_name`
+    // is, and a race that slips past this check is mapped from errno 1062.
+    const existing = await this.categoryRepository.findOne({
+      where: { name, is_active: true },
+    });
+    if (existing && existing.id !== excludeId) {
+      this.throwDuplicateNameConflict(name);
+    }
+  }
+
+  private async assertListKeyAvailable(listKey: string): Promise<void> {
+    // Pre-check for a clean, field-named 409, module-wide (R-CLG-003). Like
+    // the category check, it is not the guarantee: `uq_control_lists_key` is,
+    // and a race that slips past this check is mapped from errno 1062.
+    const existing = await this.listRepository.findOne({
+      where: { list_key: listKey, is_active: true },
+    });
+    if (existing) {
+      this.throwDuplicateListKeyConflict(listKey);
+    }
+  }
+
+  // R-CTL-004 "Duplicate code or value": both are checked, case-insensitive
+  // via the column's explicit collation (P-4), scoped to the list. Used by
+  // createValue (code AND value against the proposed/supplied pair).
+  private async assertValueFieldsAvailable(
+    listId: number,
+    code: string,
+    value: string,
+  ): Promise<void> {
+    await this.assertCodeAvailable(listId, code);
+    await this.assertValueNameAvailable(listId, value);
+  }
+
+  private async assertCodeAvailable(
+    listId: number,
+    code: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const existing = await this.valueRepository.findOne({
+      where: { list_id: listId, code },
+    });
+    if (existing && existing.id !== excludeId) {
+      this.throwDuplicateValueConflict(code, 'code');
+    }
+  }
+
+  private async assertValueNameAvailable(
+    listId: number,
+    value: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const existing = await this.valueRepository.findOne({
+      where: { list_id: listId, value },
+    });
+    if (existing && existing.id !== excludeId) {
+      this.throwDuplicateValueConflict(value, 'value');
+    }
+  }
+
+  // design.md §5 rule 2 / D-CTL-11: the service — never `sqlErrorsHelper`
+  // (P-14) — catches a concurrent-insert race at the unique index (errno
+  // 1062) and rethrows a field-named 409. Any other error is rethrown as-is.
+  // `error instanceof QueryFailedError` would reject a plain mocked
+  // `{ errno: 1062 }` in unit tests (service tests never construct a real
+  // QueryFailedError), so the errno check alone is the gate — exactly what
+  // the simulated-1062 falsifier in tasks.md exercises.
+  private rethrowAsConflictIfDuplicate(error: unknown, name: string): never {
+    const errno = (error as { errno?: number })?.errno;
+
+    if (errno === MYSQL_DUPLICATE_ENTRY_ERRNO) {
+      this.throwDuplicateNameConflict(name);
+    }
+    throw error;
+  }
+
+  private rethrowAsListConflictIfDuplicate(
+    error: unknown,
+    listKey: string,
+  ): never {
+    const errno = (error as { errno?: number })?.errno;
+
+    if (errno === MYSQL_DUPLICATE_ENTRY_ERRNO) {
+      this.throwDuplicateListKeyConflict(listKey);
+    }
+    throw error;
+  }
+
+  // Two unique indexes guard this table (`uq_control_list_values_list_code`,
+  // `uq_control_list_values_list_value` — design §3), so a race caught here
+  // (as opposed to the synchronous pre-check above) must disambiguate which
+  // one tripped from the driver error's message/sqlMessage, to keep the
+  // field-named 409 contract (code vs value) even on this backstop path.
+  // Falls back to 'code' when neither index name is present in the message
+  // (defensive; the pre-check already covers the common, non-race case).
+  private rethrowAsValueConflictIfDuplicate(
+    error: unknown,
+    code: string,
+    value: string,
+  ): never {
+    const errno = (error as { errno?: number })?.errno;
+
+    if (errno === MYSQL_DUPLICATE_ENTRY_ERRNO) {
+      const message = String(
+        (error as { sqlMessage?: string; message?: string })?.sqlMessage ??
+          (error as { message?: string })?.message ??
+          '',
+      );
+      if (message.includes('uq_control_list_values_list_value')) {
+        this.throwDuplicateValueConflict(value, 'value');
+      }
+      this.throwDuplicateValueConflict(code, 'code');
+    }
+    throw error;
+  }
+
+  private throwDuplicateNameConflict(name: string): never {
+    throw new ConflictException({
+      message: {
+        description: `A category named "${name}" already exists`,
+        field: 'name',
+      },
+    });
+  }
+
+  private throwDuplicateListKeyConflict(listKey: string): never {
+    throw new ConflictException({
+      message: {
+        description: `A list with key "${listKey}" already exists`,
+        field: 'listKey',
+      },
+    });
+  }
+
+  private throwDuplicateValueConflict(
+    fieldValue: string,
+    field: 'code' | 'value',
+  ): never {
+    throw new ConflictException({
+      message: {
+        description: `A value with ${field} "${fieldValue}" already exists in this list`,
+        field,
+      },
+    });
+  }
+
+  // Non-field 409s (category-has-lists, list-has-values, value-in-use): the same
+  // `{message: {description}}` envelope as the field-named conflicts above,
+  // but with no `field` key — GlobalExceptions then puts the OBJECT
+  // `{description}` (never a bare string) on the wire as `errors` (Leader
+  // contract note, T-02), which the client reads without a field to bind
+  // to any one input.
+  private throwNonFieldConflict(description: string): never {
+    throw new ConflictException({
+      message: { description },
+    });
+  }
+
+  // Risk Reviewer defect 3 (T-02 rework attempt 2): the client sends
+  // `description: ''` on PATCH when the field is emptied (and may also send
+  // `null`). Both mean "clear it" — normalized to a stored NULL, not a
+  // stored `''`, so `description ?? null` in the mappers below keeps a
+  // single representation of "no description" (never `''` AND `NULL`
+  // meaning the same thing on the wire). Applies identically to categories
+  // and lists; `undefined` (field omitted) is handled by the caller, not
+  // here — this only runs when the caller already decided the field is
+  // present in the PATCH body.
+  private normalizeDescription(
+    value: string | null | undefined,
+  ): string | null | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (value === null || value.trim() === '') {
+      return null;
+    }
+    return value;
+  }
+
+  // T-03 owns the real `<prefix>-<nn>` proposal logic (code_prefix is not
+  // consumed until values exist). This only supplies a NOT NULL column
+  // value when an admin creates a custom list without naming one: up to 10
+  // alphanumeric characters of the key, uppercased.
+  private deriveDefaultCodePrefix(listKey: string): string {
+    const alnum = listKey.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return alnum.slice(0, 10) || 'LIST';
+  }
+
+  // design.md §5 rule 4: `<prefix>-<nn>` zero-padded to 2 digits (e.g.
+  // UOM-08 after UOM-07); `org.level`'s prefix `L` is the one exception —
+  // no dash, no zero-padding (`L5` after `L4`). `nn`/`n` is 1 + the highest
+  // numeric suffix already in the list; a list with no matching codes yet
+  // starts at 1. The admin can still edit the proposal (F-6).
+  private proposeNextCode(list: ControlList, existingCodes: string[]): string {
+    const prefix = list.code_prefix;
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const isOrgLevelFormat = prefix === 'L';
+    const pattern = isOrgLevelFormat
+      ? new RegExp(`^${escapedPrefix}(\\d+)$`, 'i')
+      : new RegExp(`^${escapedPrefix}-(\\d+)$`, 'i');
+
+    let maxSuffix = 0;
+    for (const code of existingCodes) {
+      const match = pattern.exec(code);
+      if (match) {
+        const suffix = parseInt(match[1], 10);
+        if (suffix > maxSuffix) {
+          maxSuffix = suffix;
+        }
+      }
+    }
+
+    const next = maxSuffix + 1;
+    return isOrgLevelFormat
+      ? `${prefix}${next}`
+      : `${prefix}-${String(next).padStart(2, '0')}`;
+  }
+
+  // design.md §9: info-level log through LoggerUtil on create/update/delete,
+  // naming the entity, its id and the acting user id.
+  private logWrite(
+    action: 'created' | 'updated' | 'deleted',
+    entity: string,
+    id: number,
+    detail?: string,
+  ): void {
+    this.logger._log(
+      `control_lists.${action} entity=${entity} id=${id} user_id=${this.currentUser.user_id}${detail ? ` ${detail}` : ''}`,
+    );
+  }
+
+  private async loadListEntries(
+    where: Partial<Pick<ControlList, 'category_id' | 'is_active'>>,
+  ): Promise<{ list: ControlList; valueCount: number }[]> {
+    const lists = await this.listRepository.find({
+      where,
+      order: { id: 'ASC' },
+    });
+    return Promise.all(
+      lists.map(async (list) => ({
+        list,
+        valueCount: await this.valueRepository.count({
+          where: { list_id: list.id },
+        }),
+      })),
+    );
+  }
+
+  private mapCategory(
+    category: ControlListCategory,
+    listEntries: { list: ControlList; valueCount: number }[] = [],
+  ): ControlListCategoryResponse {
+    return {
+      id: category.id,
+      name: category.name,
+      description: category.description ?? null,
+      displayOrder: category.display_order,
+      lists: listEntries.map((entry) =>
+        this.mapListSummary(entry.list, entry.valueCount),
+      ),
+    };
+  }
+
+  // valueCount is the real row count per list (T-03). usedBy is derived at
+  // read time from the registry (T-04, D-CTL-12) — nothing stored.
+  private mapListSummary(list: ControlList, valueCount = 0): ListSummary {
+    return {
+      id: list.id,
+      key: list.list_key,
+      name: list.name,
+      description: list.description ?? null,
+      // D-CTL-17: additive field so the client can mirror proposeNextCode.
+      codePrefix: list.code_prefix,
+      valueCount,
+      isSystem: list.is_system,
+      usedBy: this.usageRegistry.getConsumerNamesForKey(list.list_key),
+    };
+  }
+
+  // inUse is the sum of every registered provider's count for this value id
+  // (design §5 rule 5, T-04) — the caller (getValues/getValuesByKey) looks
+  // it up once per batch and passes it in; 0 when none is registered yet.
+  private mapValue(
+    value: ControlListValue,
+    inUse = 0,
+    appliesTo: ValueAppliesTo = APPLIES_TO_ALL,
+  ): ControlListValueResponse {
+    return {
+      id: value.id,
+      listId: value.list_id,
+      code: value.code,
+      value: value.value,
+      description: value.description ?? null,
+      displayOrder: value.display_order,
+      isActive: value.is_active,
+      inUse,
+      // Copied so the shared default is never handed out by reference.
+      appliesTo: [...appliesTo.appliesTo],
+      appliesToAll: appliesTo.appliesToAll,
+    };
+  }
+
+  private mapList(list: ControlList): ControlListResponse {
+    return {
+      id: list.id,
+      categoryId: list.category_id,
+      key: list.list_key,
+      name: list.name,
+      description: list.description ?? null,
+      codePrefix: list.code_prefix,
+      isSystem: list.is_system,
+    };
+  }
+}

@@ -220,6 +220,17 @@ export class AllModalsService {
       isOpen: false,
       title: 'About Pool Funding & Theory of Change alignment',
       isWide: true
+    },
+    // @akili-spec institutional-performance/control-lists — T-01: category mode only.
+    controlListForm: {
+      isOpen: false,
+      title: 'New category'
+    },
+    // @akili-spec institutional-performance/organizational-structure T-03: no footer actions registered —
+    // `org-lifecycle-dialog` renders its own Close / Confirm so a 409 can leave a single Close (R-ORG-013).
+    orgUnitLifecycle: {
+      isOpen: false,
+      title: 'Entry lifecycle'
     }
   });
 
@@ -347,7 +358,9 @@ export class AllModalsService {
       portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
       portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false },
       // isWide stays true: it is this modal's layout, not a per-opening state.
-      poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false }
+      poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false },
+      controlListForm: { ...this.modalConfig().controlListForm, isOpen: false, isWide: false },
+      orgUnitLifecycle: { ...this.modalConfig().orgUnitLifecycle, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);

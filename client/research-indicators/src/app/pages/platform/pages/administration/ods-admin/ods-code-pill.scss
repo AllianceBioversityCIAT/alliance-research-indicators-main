@@ -1,0 +1,17 @@
+// Shared code pill. The outline badge, both drawer headers and the table
+// code cells include this mixin so the look stays one token set (no hex).
+
+@mixin ods-code-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ac-grey-100);
+  color: var(--ac-primary-blue-600);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  font-family: inherit;
+}

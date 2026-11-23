@@ -1,0 +1,74 @@
+// strategy-framework T-15 — design §6.5, §6.7. Tokens only.
+// The drawer node is moved to the body, so its width is the `[style]` binding
+// (420px, 100% below 1024px). jsdom does not measure that width (KZ-017).
+:host {
+  display: block;
+}
+
+.element-panel__form {
+  min-width: 0;
+}
+
+// Side by side when the drawer is at least 420px. The drawer is 420px from
+// 1024px up, and 100% of the viewport below that, so this viewport query
+// matches the drawer width. jsdom does not apply it (KZ-017).
+.element-panel__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  min-width: 0;
+}
+
+@media (min-width: 420px) {
+  .element-panel__pair--split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.element-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.element-panel__actions-end {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.field__hint {
+  margin: 0;
+  color: var(--ac-grey-700);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.field__control {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 8px;
+  background: var(--ac-white-1);
+  color: var(--ac-grey-800);
+  padding: 6px 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.field__control[readonly] {
+  background: var(--ac-grey-100);
+}
+
+.field__control:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}

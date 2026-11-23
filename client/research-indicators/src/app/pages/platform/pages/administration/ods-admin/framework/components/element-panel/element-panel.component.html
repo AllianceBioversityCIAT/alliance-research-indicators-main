@@ -1,0 +1,149 @@
+<p-drawer
+  [visible]="open()"
+  (visibleChange)="onVisibleChange($event)"
+  position="right"
+  [modal]="true"
+  [dismissible]="true"
+  [closeOnEscape]="true"
+  appendTo="body"
+  styleClass="element-panel"
+  [style]="drawerStyle()"
+  ariaCloseLabel="Close"
+  data-testid="element-drawer">
+  <ng-template pTemplate="header">
+    <app-panel-heading [eyebrow]="eyebrow()" [title]="headerTitle()" [code]="pillCode()" />
+  </ng-template>
+
+  <form class="element-panel__form flex flex-col gap-4" pFocusTrap appOverlayEscapeGuard [formGroup]="form" data-testid="element-form" (ngSubmit)="save()" [attr.aria-busy]="saving()">
+    <div class="element-panel__pair" [class.element-panel__pair--split]="showParent()">
+      <div class="field">
+        <label for="elementCode" class="text-sm font-medium atc-grey-800">Code <span aria-hidden="true">*</span></label>
+        <input
+          #codeField
+          id="elementCode"
+          type="text"
+          class="field__control"
+          formControlName="code"
+          maxlength="30"
+          required
+          autocomplete="off"
+          data-testid="element-code" />
+        <p class="field__hint" data-testid="code-hint">{{ codeHint() }}</p>
+        @if (form.controls.code.touched && form.controls.code.hasError('required')) {
+          <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="code-error">Code is required</p>
+        }
+        @if (form.controls.code.hasError('maxlength')) {
+          <p class="m-0 text-sm leading-[1.5] atc-red-1">Code must be 30 characters or fewer</p>
+        }
+      </div>
+
+      @if (showParent()) {
+        <div class="field">
+          <label for="elementParent" class="text-sm font-medium atc-grey-800">{{ parentLevelName() }} <span aria-hidden="true">*</span></label>
+          <p-select
+            inputId="elementParent"
+            [options]="parentOptions()"
+            optionLabel="label"
+            optionValue="id"
+            formControlName="parentId"
+            (onChange)="onParentPicked($event.value)"
+            [filter]="true"
+            appendTo="body"
+            styleClass="w-full"
+            [ariaLabel]="parentLevelName()"
+            [placeholder]="'Select a ' + parentLevelName()"
+            data-testid="element-parent">
+          </p-select>
+          @if (form.controls.parentId.touched && form.controls.parentId.invalid) {
+            <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="parent-error">{{ parentLevelName() }} is required</p>
+          }
+        </div>
+      }
+    </div>
+
+    @for (ancestor of derivedAncestors(); track ancestor.depth) {
+      <div class="field">
+        <label class="text-sm font-medium atc-grey-800" [attr.for]="'derived-' + ancestor.depth" data-testid="derived-label">{{ ancestor.label }}</label>
+        <input
+          [id]="'derived-' + ancestor.depth"
+          type="text"
+          class="field__control"
+          readonly
+          [value]="ancestor.value"
+          [attr.data-depth]="ancestor.depth"
+          data-testid="derived-ancestor" />
+      </div>
+    }
+
+    <div class="field">
+      <label for="elementName" class="text-sm font-medium atc-grey-800">Name <span aria-hidden="true">*</span></label>
+      <input
+        id="elementName"
+        type="text"
+        class="field__control"
+        formControlName="name"
+        maxlength="255"
+        required
+        autocomplete="off"
+        data-testid="element-name" />
+      @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+        <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="name-error">Name is required</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="elementDescription" class="text-sm font-medium atc-grey-800">Description</label>
+      <textarea
+        id="elementDescription"
+        class="field__control"
+        formControlName="description"
+        rows="4"
+        data-testid="element-description"></textarea>
+    </div>
+
+    @if (indicatorLevel()) {
+      <app-staff-picker [people]="responsibles()" (peopleChange)="onResponsibles($event)" />
+    }
+
+    @if (formError(); as message) {
+      <p class="m-0 text-sm leading-[1.5] atc-red-1" role="alert" data-testid="element-error">{{ message }}</p>
+    }
+
+    <div class="element-panel__actions" data-testid="element-actions">
+      <span data-testid="element-delete">
+        <button
+          type="button"
+          pButton
+          label="Delete"
+          severity="danger"
+          [outlined]="true"
+          size="small"
+          class="!rounded-[9px] !text-[13px]"
+          [disabled]="saving() || element() === null"
+          (click)="remove($event)">
+        </button>
+      </span>
+      <div class="element-panel__actions-end">
+        <p-button
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          (onClick)="cancel()"
+          data-testid="element-cancel">
+        </p-button>
+        <p-button
+          type="submit"
+          label="Save"
+          severity="info"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          [disabled]="saving()"
+          [loading]="saving()"
+          data-testid="element-save">
+        </p-button>
+      </div>
+    </div>
+  </form>
+</p-drawer>

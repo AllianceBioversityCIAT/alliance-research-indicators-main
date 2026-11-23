@@ -1,0 +1,42 @@
+// strategy-framework T-16 — design §6.6, §6.7. Tokens only.
+// The drawer node is moved to the body, so its width is the `[style]` binding
+// (420px, 100% below 1024px). jsdom does not measure that width (KZ-017).
+:host {
+  display: block;
+}
+
+.objective-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.objective-panel__actions-end {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field__control {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 8px;
+  background: var(--ac-white-1);
+  color: var(--ac-grey-800);
+  padding: 6px 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.field__control:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}

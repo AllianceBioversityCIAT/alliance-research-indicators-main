@@ -703,6 +703,56 @@ describe('httpErrorInterceptor', () => {
     });
   });
 
+  const strategyFrameworkError = (status: number, done: jest.DoneCallback, expectToast: boolean) => {
+    const request = new HttpRequest('GET', 'http://test.com/api/strategy-framework/portfolios/2', {});
+    const errorResponse = new HttpErrorResponse({
+      error: { errors: 'Framework error', description: 'Framework error' },
+      status,
+      statusText: 'Error'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(request, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: error => {
+        expect(error).toBe(errorResponse);
+        expect(mockApiService.saveErrors).toHaveBeenCalled();
+        if (expectToast) {
+          expect(mockActionsService.showToast).toHaveBeenCalledWith({
+            detail: 'Framework error',
+            severity: 'error',
+            summary: 'Error'
+          });
+        } else {
+          expect(mockActionsService.showToast).not.toHaveBeenCalled();
+        }
+        done();
+      }
+    });
+  };
+
+  it('should not show toast when 400 comes from /strategy-framework', done => {
+    strategyFrameworkError(400, done, false);
+  });
+
+  it('should not show toast when 404 comes from /strategy-framework', done => {
+    strategyFrameworkError(404, done, false);
+  });
+
+  it('should show toast when 500 comes from /strategy-framework', done => {
+    strategyFrameworkError(500, done, true);
+  });
+
+  it('should not show toast when 401 comes from /strategy-framework (same as any 401)', done => {
+    strategyFrameworkError(401, done, false);
+  });
+
   // --- PRMS sync owns its own error UX (2026-09-18) --------------------------
   // result-sidebar shows a friendly modal for every PRMS sync failure. Without
   // these suppressions the interceptor stacked a second, technical toast on top.

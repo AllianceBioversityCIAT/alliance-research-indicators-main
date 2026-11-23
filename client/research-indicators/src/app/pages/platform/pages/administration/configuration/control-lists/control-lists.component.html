@@ -1,0 +1,277 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-[18px]">
+    <div class="content-section w-full">
+      <section class="flex w-full min-w-0 flex-col gap-[18px]">
+        <div class="flex flex-wrap items-start justify-between gap-4" data-testid="page-header">
+          <div class="flex flex-col gap-[2px]">
+            <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal atc-primary-blue-600">Control lists</h1>
+            <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.2] atc-grey-700">
+              Manage the Alliance-wide controlled vocabularies, grouped by category. Every list is global and is read by its key. Values in use cannot be deleted; deactivate them instead.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-3">
+            <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+              styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '140px' }"
+              (onClick)="startCreate()" data-testid="new-category-button">
+            </p-button>
+          </div>
+        </div>
+
+        <div class="flex min-h-[320px] w-full gap-4">
+          <div class="flex w-[300px] shrink-0 flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white" data-testid="navigator-panel">
+            @if (loading()) {
+            <app-custom-progress-bar></app-custom-progress-bar>
+            }
+
+            @if (loadError()) {
+            <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state">
+              <p class="m-0 text-sm atc-red-1">We could not load control lists. Please try again.</p>
+              <p-button label="Retry" icon="pi pi-refresh !text-[12px]" severity="secondary" size="small"
+                styleClass="!rounded-[9px] !text-[13px]" (onClick)="load()" data-testid="retry-button">
+              </p-button>
+            </div>
+            } @else if (!loading()) {
+            @if (!hasCategories()) {
+            <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
+              <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+              <p class="m-0 text-sm atc-grey-700">No categories yet.</p>
+              <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+                styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreate()" data-testid="empty-new-category-button">
+              </p-button>
+            </div>
+            } @else {
+            <ul class="m-0 flex list-none flex-col gap-1 p-3" data-testid="category-list" aria-label="Categories">
+              @for (category of categories(); track trackByCategoryId($index, category)) {
+              <li class="flex flex-col gap-1" data-testid="category-row">
+                <div class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-[var(--ac-grey-100)]">
+                  <span class="truncate text-sm atc-grey-900">{{ category.name }}</span>
+                  <span class="flex shrink-0 items-center gap-2">
+                    <button type="button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                      [attr.aria-label]="'Edit ' + category.name" (click)="startEdit(category)">
+                      <i class="pi pi-pencil !text-[12px] atc-light-blue-400"></i>
+                    </button>
+                    <button type="button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                      [attr.aria-label]="'Add a list to ' + category.name" (click)="startCreateList(category)" data-testid="add-list-button">
+                      <i class="pi pi-plus !text-[12px] atc-light-blue-400"></i>
+                    </button>
+                    <button type="button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                      [attr.aria-label]="'Delete ' + category.name" (click)="delete(category)">
+                      <i class="pi pi-trash !text-[12px] atc-red-1"></i>
+                    </button>
+                  </span>
+                </div>
+
+                @if (category.lists.length > 0) {
+                <ul class="m-0 flex list-none flex-col gap-1 py-1 pl-4" data-testid="list-list">
+                  @for (list of category.lists; track trackByListId($index, list)) {
+                  <li>
+                    <button type="button"
+                      class="list-row flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-[13.5px]"
+                      [class.list-row--selected]="list.id === selectedListId()"
+                      [attr.aria-current]="list.id === selectedListId() ? 'true' : null"
+                      (click)="selectList(list.id)" data-testid="list-row">
+                      <span class="truncate atc-grey-900">{{ list.name }}</span>
+                      <span class="shrink-0 text-xs atc-grey-700">{{ list.valueCount }}</span>
+                    </button>
+                  </li>
+                  }
+                </ul>
+                } @else {
+                <div class="flex flex-col items-start gap-2 py-1 pl-4 pb-2" data-testid="category-empty-lists">
+                  <span class="text-xs atc-grey-700">No lists yet</span>
+                  <p-button label="Add list" icon="pi pi-plus !text-[11px]" severity="secondary" size="small"
+                    styleClass="!rounded-[8px] !text-[12px]" (onClick)="startCreateList(category)" data-testid="add-list-empty-button">
+                  </p-button>
+                </div>
+                }
+              </li>
+              }
+            </ul>
+            }
+            }
+          </div>
+
+          <div class="flex min-w-0 flex-1 flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white" data-testid="list-detail-panel">
+            @if (selectedList(); as list) {
+            <div class="flex items-start justify-between gap-4 border-b border-[var(--ac-grey-200)] p-4" data-testid="list-header">
+              <div class="flex min-w-0 flex-col gap-1">
+                <span class="font-['Space_Grotesk'] text-[10.5px] font-light uppercase tracking-[2.5px] atc-grey-700"
+                  data-testid="list-header-category">{{ selectedCategory()?.name }}</span>
+                <h2 class="m-0 text-[18px] font-bold atc-primary-blue-600" data-testid="list-header-name">{{ list.name }}</h2>
+                @if (list.description) {
+                <span class="text-[12.5px] atc-grey-900" data-testid="list-header-description">{{ list.description }}</span>
+                }
+                <span class="text-[12px] atc-grey-700">
+                  Key: <strong class="atc-light-blue-400" data-testid="list-header-key">{{ list.key }}</strong>
+                </span>
+                <span class="text-[12px] atc-grey-700">
+                  Used by: <span data-testid="list-header-used-by">{{ usedByLabel() }}</span>
+                </span>
+              </div>
+              <div class="flex shrink-0 gap-2">
+                <p-button label="Add value" icon="pi pi-plus !text-[12px]" size="small" severity="info"
+                  styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreateValue()" data-testid="add-value-button"></p-button>
+                <p-button label="Edit list" size="small" severity="secondary" styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="startEditList()" data-testid="edit-list-button"></p-button>
+                <p-button label="Delete list" size="small" severity="danger" styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="deleteList()" data-testid="delete-list-button"></p-button>
+              </div>
+            </div>
+
+            <div class="min-h-0 flex-1 p-4" data-testid="values-panel">
+              @if (valuesLoadError()) {
+              <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="values-error-state">
+                <p class="m-0 text-sm atc-red-1">We could not load values. Please refresh the page.</p>
+              </div>
+              } @else {
+              <div class="mb-3 flex flex-wrap items-center gap-3" data-testid="values-portfolio-filter-bar">
+                <label for="controlListsPortfolioFilter" class="text-sm font-medium atc-grey-800">Show values for</label>
+                <p-select inputId="controlListsPortfolioFilter" [options]="portfolioFilterOptions()" optionLabel="label"
+                  optionValue="value" [ngModel]="pfFilter()" (ngModelChange)="pfFilter.set($event)"
+                  [disabled]="portfoliosLoadFailed()" styleClass="min-w-[200px]" aria-label="Show values for portfolio"
+                  data-testid="values-portfolio-filter">
+                </p-select>
+                @if (portfoliosLoadFailed()) {
+                <p class="m-0 text-[12px] atc-grey-700" data-testid="portfolios-unavailable-note">{{ portfoliosUnavailableNote }}</p>
+                }
+              </div>
+              <app-data-table [columns]="valueColumns" [rows]="valueRows()" [loading]="valuesLoading()"
+                [searchFields]="valueSearchFields" [exportFileName]="valuesExportFileName()"
+                searchPlaceholder="Search code, value or description" emptyMessage="No values yet for this list."
+                data-testid="values-table">
+                <ng-template #rowActions let-row>
+                  <div class="flex gap-2">
+                    <button type="button" [attr.aria-label]="'Edit ' + row.value" (click)="startEditValue(row)"
+                      data-testid="edit-value-button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
+                      <i class="pi pi-pencil !text-[12px] atc-light-blue-400"></i>
+                    </button>
+                    <button type="button" [attr.aria-label]="'Delete ' + row.value" (click)="deleteValue(row)"
+                      data-testid="delete-value-button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
+                      <i class="pi pi-trash !text-[12px] atc-red-1"></i>
+                    </button>
+                  </div>
+                </ng-template>
+                <ng-template #emptyState>
+                  @if (values().length > 0) {
+                  <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="values-filtered-empty">
+                    <i class="pi pi-filter !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                    <p class="m-0 text-sm atc-grey-700">No values apply to this portfolio.</p>
+                  </div>
+                  } @else {
+                  <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="values-empty-state">
+                    <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                    <p class="m-0 text-sm atc-grey-700">No values yet for this list.</p>
+                    <p-button label="Add value" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+                      styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreateValue()" data-testid="add-value-empty-button">
+                    </p-button>
+                  </div>
+                  }
+                </ng-template>
+              </app-data-table>
+              }
+            </div>
+            } @else {
+            <div class="flex flex-1 items-center justify-center p-10" data-testid="list-detail-empty">
+              <p class="m-0 text-sm atc-grey-700">Select a list to see its details.</p>
+            </div>
+            }
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<app-modal modalName="controlListForm" [clearModal]="clearModal">
+  @if (modalMode() === 'list') {
+  <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8" data-testid="list-form">
+    <app-input label="List name" [signal]="listForm" optionValue="name" [isRequired]="true" [maxLength]="150"
+      placeholder="e.g. Unit of measure"></app-input>
+    <div class="flex flex-col gap-1" data-testid="list-key-field">
+      <app-input label="System key" [signal]="listForm" optionValue="listKey" [isRequired]="true" [maxLength]="100"
+        [disabled]="isEditingList()" placeholder="e.g. kpi.data_source"></app-input>
+      <p class="m-0 text-[12px] atc-grey-700" data-testid="list-key-hint">
+        Unique across all lists and fixed once created. Consumers read the list by this key.
+      </p>
+      @if (listKeyFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="list-key-field-error">{{ listKeyFieldError() }}</p>
+      }
+    </div>
+    <app-textarea label="Description" [signal]="listForm" optionValue="description" placeholder="Optional description"
+      [rows]="4" [maxLength]="500"></app-textarea>
+    <div class="flex flex-col gap-1" data-testid="list-code-prefix-field">
+      <app-input label="Code prefix" [signal]="listForm" optionValue="codePrefix" [maxLength]="10"
+        [disabled]="isEditingList()" placeholder="Optional, e.g. UOM"></app-input>
+    </div>
+  </div>
+  } @else if (modalMode() === 'value') {
+  <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8" data-testid="value-form">
+    @if (isEditingValue()) {
+    <div class="flex flex-col gap-1">
+      <span class="text-xs font-medium uppercase tracking-wide atc-grey-700">ID</span>
+      <span class="text-sm atc-grey-900" data-testid="value-id-readonly">{{ editingValueId() }}</span>
+    </div>
+    }
+    <div class="flex flex-col gap-1" data-testid="value-code-field">
+      <app-input label="Code" [signal]="valueForm" optionValue="code" [maxLength]="30"
+        placeholder="Proposed automatically if left blank"></app-input>
+      @if (valueCodeFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="value-code-field-error">{{ valueCodeFieldError() }}</p>
+      }
+    </div>
+    <div class="flex flex-col gap-1">
+      <app-input label="Value" [signal]="valueForm" optionValue="value" [isRequired]="true" [maxLength]="150"
+        placeholder="e.g. Increase"></app-input>
+      @if (valueValueFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="value-value-field-error">{{ valueValueFieldError() }}</p>
+      }
+    </div>
+    <app-textarea label="Description" [signal]="valueForm" optionValue="description" placeholder="Optional description"
+      [rows]="4" [maxLength]="500"></app-textarea>
+    <app-input label="Order" type="number" [signal]="valueForm" optionValue="displayOrder" [min]="0"></app-input>
+    <fieldset class="m-0 flex min-w-0 flex-col gap-2 border-0 p-0" [disabled]="portfoliosLoadFailed()" data-testid="value-applies-to-field">
+      <legend class="mb-1 p-0 text-sm font-medium atc-grey-800">Applies to</legend>
+      @for (portfolio of portfolios(); track trackByPortfolioId($index, portfolio)) {
+      <label class="flex cursor-pointer items-center gap-2 text-[13px] atc-grey-900">
+        <input type="checkbox" class="h-4 w-4 cursor-pointer" [checked]="valueForm().portfolioIds.includes(portfolioId(portfolio))"
+          (change)="togglePortfolio(portfolioId(portfolio), $any($event.target).checked)"
+          [attr.data-testid]="'value-applies-to-' + portfolioId(portfolio)" />
+        {{ portfolio.name }}
+      </label>
+      }
+      @if (portfoliosLoadFailed()) {
+      <p class="m-0 text-[12px] atc-grey-700" data-testid="value-applies-to-unavailable">{{ portfoliosUnavailableNote }}</p>
+      } @else {
+      <p class="m-0 text-[12px] atc-grey-700" data-testid="value-applies-to-hint">{{ appliesToHint() }}</p>
+      @if (showApplyToAll()) {
+      <p-button label="Apply to all portfolios" severity="secondary" size="small" [outlined]="true" type="button"
+        (onClick)="applyToAllPortfolios()" data-testid="value-apply-to-all"></p-button>
+      }
+      }
+    </fieldset>
+    <div class="flex items-center gap-3">
+      <p-toggleswitch inputId="valueActiveToggle" [ngModel]="valueForm().isActive" (ngModelChange)="updateValueFormActive($event)"
+        data-testid="value-active-toggle"></p-toggleswitch>
+      <label for="valueActiveToggle" class="text-sm atc-grey-900">Active</label>
+    </div>
+  </div>
+  } @else {
+  <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8">
+    <div class="flex flex-col gap-1">
+      <app-input label="Category name" [signal]="form" optionValue="name" [isRequired]="true" [maxLength]="150"
+        placeholder="e.g. Key Performance Indicators (KPIs)"></app-input>
+      @if (nameFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="name-field-error">{{ nameFieldError() }}</p>
+      }
+    </div>
+    <app-textarea label="Description" [signal]="form" optionValue="description" placeholder="Optional description"
+      [rows]="4" [maxLength]="500"></app-textarea>
+  </div>
+  }
+</app-modal>

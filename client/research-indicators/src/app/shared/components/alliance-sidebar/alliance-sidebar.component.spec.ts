@@ -40,6 +40,7 @@ describe('AllianceSidebarComponent', () => {
     const mockRolesService = {
       canAccessCenterAdmin: jest.fn().mockReturnValue(false),
       canAccessAppConfiguration: jest.fn().mockReturnValue(false),
+      canAccessOdsAdmin: jest.fn().mockReturnValue(false),
       // Admins ask the access endpoint with scope='all' — see the scope test below.
       isAdmin: jest.fn().mockReturnValue(false),
       canAccessPooledFundingMonitor: jest.fn().mockReturnValue(false)
@@ -76,7 +77,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('should include Bilateral Mapping in center-admin children when user can access center admin', () => {
-    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessOdsAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
     const centerAdmin = component.administrationGroups().find(g => g.id === 'center-admin');
     expect(centerAdmin).toBeTruthy();
@@ -90,7 +91,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('should hide center-admin group when user cannot access center admin', () => {
-    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessOdsAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(false);
     const centerAdmin = component.administrationGroups().find(g => g.id === 'center-admin');
     expect(centerAdmin).toBeUndefined();
@@ -335,7 +336,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('should still expose the center-admin group when access is granted (no existing group removed)', () => {
-    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessOdsAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
     const centerAdmin = component.administrationGroups().find(g => g.id === 'center-admin');
     expect(centerAdmin).toBeTruthy();
@@ -346,6 +347,7 @@ describe('AllianceSidebarComponent', () => {
     const roles = TestBed.inject(RolesService) as unknown as {
       canAccessCenterAdmin: jest.Mock;
       canAccessAppConfiguration: jest.Mock;
+      canAccessOdsAdmin: jest.Mock;
     };
     roles.canAccessAppConfiguration.mockReturnValue(true);
     const sysAdmin = component.administrationGroups().find(g => g.id === 'system-admin');
@@ -354,7 +356,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('should include portfolio management in center admin navigation', () => {
-    const roles = TestBed.inject(RolesService) as { canAccessCenterAdmin: jest.Mock };
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessOdsAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
 
     const centerAdmin = component.administrationGroups().find(group => group.id === 'center-admin');
@@ -367,6 +369,207 @@ describe('AllianceSidebarComponent', () => {
         })
       ])
     );
+  });
+
+  // ─── changes/control-lists-global-scope T-01 — Control Lists moved to System admin (D-CLG-7,
+  // R-CLG-008 AC.1). The exact arrays (not arrayContaining) pin every other item's order, label
+  // and link in BOTH groups, so a future edit cannot silently move or drop one, and cannot
+  // render Control Lists in both groups.
+  const CENTER_ADMIN_CHILDREN = [
+    { label: 'Bulk upload', link: '/administration/center-admin/bulk-upload', s3Image: 'images/brain.png' },
+    {
+      label: 'SDG Management',
+      link: '/administration/center-admin/sdg-management',
+      icon: 'pi-bullseye',
+      iconSize: '13px'
+    },
+    {
+      label: 'Bilateral Mapping',
+      link: '/administration/center-admin/bilateral-mapping',
+      icon: 'pi-sitemap',
+      iconSize: '13px'
+    },
+    {
+      label: 'Portfolio Management',
+      link: '/administration/center-admin/portfolio-management',
+      icon: 'pi-briefcase',
+      iconSize: '13px'
+    },
+    {
+      label: 'Organizational Structure',
+      link: '/administration/center-admin/organizational-structure',
+      icon: 'pi-sitemap',
+      iconSize: '13px'
+    }
+  ];
+
+  const SYSTEM_ADMIN_CHILDREN = [
+    {
+      label: 'Environment variables',
+      link: '/administration/configuration/variables',
+      icon: 'pi-database',
+      iconSize: '13px'
+    },
+    {
+      label: 'Prompt Manager',
+      link: '/administration/configuration/prompt-manager',
+      icon: 'pi-sparkles',
+      iconSize: '13px'
+    },
+    {
+      label: 'Control Lists',
+      link: '/administration/configuration/control-lists',
+      icon: 'pi-list',
+      iconSize: '13px'
+    }
+  ];
+
+  const CENTER_ADMIN_HREFS = CENTER_ADMIN_CHILDREN.map(child => child.link);
+  const SYSTEM_ADMIN_HREFS = SYSTEM_ADMIN_CHILDREN.map(child => child.link);
+
+  const grantBothAdminGroups = () => {
+    const roles = TestBed.inject(RolesService) as unknown as {
+      canAccessCenterAdmin: jest.Mock;
+      canAccessAppConfiguration: jest.Mock;
+      canAccessOdsAdmin: jest.Mock;
+    };
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+  };
+
+  const setCollapsed = (collapsed: boolean) => {
+    const cache = TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock };
+    cache.isSidebarCollapsed.mockReturnValue(collapsed);
+  };
+
+  it('lists exactly the five center-admin children, flat, with no Control Lists and no nested children', () => {
+    grantBothAdminGroups();
+
+    const centerAdmin = component.administrationGroups().find(group => group.id === 'center-admin');
+
+    expect(centerAdmin?.children).toEqual(CENTER_ADMIN_CHILDREN);
+    expect(centerAdmin?.children.some(child => child.children !== undefined)).toBe(false);
+  });
+
+  it('lists exactly Environment variables, Prompt Manager, Control Lists under System admin, in that order', () => {
+    grantBothAdminGroups();
+
+    const systemAdmin = component.administrationGroups().find(group => group.id === 'system-admin');
+
+    expect(systemAdmin?.children).toEqual(SYSTEM_ADMIN_CHILDREN);
+  });
+
+  it('shows Control Lists to a System admin / Technical Support user who is not a Center admin', () => {
+    const roles = TestBed.inject(RolesService) as unknown as {
+      canAccessCenterAdmin: jest.Mock;
+      canAccessAppConfiguration: jest.Mock;
+      canAccessOdsAdmin: jest.Mock;
+    };
+    roles.canAccessCenterAdmin.mockReturnValue(false);
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+
+    const groups = component.administrationGroups();
+
+    expect(groups.map(group => group.id)).toEqual(['system-admin']);
+    expect(groups[0].children.map(child => child.link)).toContain('/administration/configuration/control-lists');
+  });
+
+  it('does not show Control Lists to a Center admin who cannot access app configuration', () => {
+    const roles = TestBed.inject(RolesService) as unknown as {
+      canAccessCenterAdmin: jest.Mock;
+      canAccessAppConfiguration: jest.Mock;
+      canAccessOdsAdmin: jest.Mock;
+    };
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    roles.canAccessAppConfiguration.mockReturnValue(false);
+    setCollapsed(false);
+    fixture.detectChanges();
+
+    const groups = component.administrationGroups();
+    expect(groups.map(group => group.id)).toEqual(['center-admin']);
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href*="control-lists"]')).toBeNull();
+  });
+
+  it('renders Control Lists only under System admin in the EXPANDED sidebar, other items unchanged', () => {
+    grantBothAdminGroups();
+    setCollapsed(false);
+    fixture.detectChanges();
+
+    const groupBlocks = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.administration-block > div')
+    ) as HTMLElement[];
+    const hrefsPerGroup = groupBlocks.map(block =>
+      Array.from(block.querySelectorAll('a')).map(anchor => anchor.getAttribute('href'))
+    );
+
+    expect(hrefsPerGroup).toEqual([CENTER_ADMIN_HREFS, SYSTEM_ADMIN_HREFS]);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('a[href="/administration/configuration/control-lists"]')).toHaveLength(1);
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href="/administration/center-admin/control-lists"]')).toBeNull();
+  });
+
+  it('renders Control Lists only in the System admin flyout of the COLLAPSED sidebar, other items unchanged', () => {
+    grantBothAdminGroups();
+    setCollapsed(true);
+    fixture.detectChanges();
+
+    const flyoutHrefs = (groupId: string) => {
+      component.administrationFlyoutGroupId.set(null);
+      component.toggleAdministrationFlyout(groupId, { stopPropagation: jest.fn() } as unknown as Event);
+      fixture.detectChanges();
+      return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.admin-center-admin-flyout a')).map(anchor =>
+        anchor.getAttribute('href')
+      );
+    };
+
+    expect(flyoutHrefs('center-admin')).toEqual(CENTER_ADMIN_HREFS);
+    expect(flyoutHrefs('system-admin')).toEqual(SYSTEM_ADMIN_HREFS);
+  });
+
+  // ─── Nested-children rendering (D-CTL-9) is dormant until Strategy Framework uses it (S-3).
+  // No real group nests today, so a SYNTHETIC group keeps both render paths covered.
+  const syntheticNestedGroup = (): AdministrationNavGroup[] => [
+    {
+      id: 'synthetic',
+      label: 'Synthetic group',
+      icon: 'pi-test',
+      children: [
+        {
+          label: 'Parent item',
+          link: '/synthetic/parent',
+          icon: 'pi-folder',
+          iconSize: '13px',
+          children: [{ label: 'Nested item', link: '/synthetic/parent/nested', icon: 'pi-list', iconSize: '13px' }]
+        }
+      ]
+    }
+  ];
+
+  it('renders a nested child under its parent in the EXPANDED sidebar (synthetic group)', () => {
+    grantBothAdminGroups(); // the administration block only renders for an admin role
+    setCollapsed(false);
+    jest.spyOn(component, 'administrationGroups').mockReturnValue(syntheticNestedGroup());
+    fixture.detectChanges();
+
+    const nestedGroup = (fixture.nativeElement as HTMLElement).querySelector('.option-nested-children');
+    expect(nestedGroup).toBeTruthy();
+    expect(nestedGroup?.getAttribute('aria-label')).toBe('Parent item pages');
+    const link = nestedGroup?.querySelector('a[href="/synthetic/parent/nested"]');
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toContain('Nested item');
+  });
+
+  it('renders a nested child in the COLLAPSED flyout (synthetic group)', () => {
+    grantBothAdminGroups();
+    setCollapsed(true);
+    jest.spyOn(component, 'administrationGroups').mockReturnValue(syntheticNestedGroup());
+    fixture.detectChanges();
+
+    component.toggleAdministrationFlyout('synthetic', { stopPropagation: jest.fn() } as unknown as Event);
+    fixture.detectChanges();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a.admin-flyout-row--nested[href="/synthetic/parent/nested"]');
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toContain('Nested item');
   });
 
   it('should clear flyout id when closeAdministrationFlyout is called', () => {
@@ -404,9 +607,10 @@ describe('AllianceSidebarComponent', () => {
 
   it('should switch flyout to a different group when another group id is toggled while open', () => {
     const cache = TestBed.inject(CacheService) as { isSidebarCollapsed: jest.Mock };
-    const roles = TestBed.inject(RolesService) as {
+    const roles = TestBed.inject(RolesService) as unknown as {
       canAccessCenterAdmin: jest.Mock;
       canAccessAppConfiguration: jest.Mock;
+      canAccessOdsAdmin: jest.Mock;
     };
     cache.isSidebarCollapsed.mockReturnValue(true);
     roles.canAccessCenterAdmin.mockReturnValue(true);
@@ -420,9 +624,10 @@ describe('AllianceSidebarComponent', () => {
 
   it('should render system admin s3 group icon in collapsed sidebar', () => {
     const cache = TestBed.inject(CacheService) as { isSidebarCollapsed: jest.Mock };
-    const roles = TestBed.inject(RolesService) as {
+    const roles = TestBed.inject(RolesService) as unknown as {
       canAccessCenterAdmin: jest.Mock;
       canAccessAppConfiguration: jest.Mock;
+      canAccessOdsAdmin: jest.Mock;
     };
     cache.isSidebarCollapsed.mockReturnValue(true);
     roles.canAccessCenterAdmin.mockReturnValue(false);
@@ -441,6 +646,141 @@ describe('AllianceSidebarComponent', () => {
     expect(img?.style.width).toBe(group?.iconSize);
     expect(img?.style.height).toBe(group?.iconSize);
     expect(img?.getAttribute('src')).toContain('icons/graph.svg');
+  });
+
+  describe('ODS Admin group (R-STF-015)', () => {
+    const ODS_HREFS = ['/administration/ods-admin/framework', '/administration/ods-admin/institutional-objectives'];
+
+    const rolesMock = () =>
+      TestBed.inject(RolesService) as unknown as {
+        canAccessCenterAdmin: jest.Mock;
+        canAccessAppConfiguration: jest.Mock;
+        canAccessOdsAdmin: jest.Mock;
+      };
+
+    const setAccess = (center: boolean, configuration: boolean, ods: boolean) => {
+      const roles = rolesMock();
+      roles.canAccessCenterAdmin.mockReturnValue(center);
+      roles.canAccessAppConfiguration.mockReturnValue(configuration);
+      roles.canAccessOdsAdmin.mockReturnValue(ods);
+    };
+
+    const expandedLabels = () =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.admin-parent .sidebar-option-label')).map(el =>
+        el.textContent?.trim()
+      );
+
+    const collapsedLabels = () =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button.admin-parent--collapsed')).map(el =>
+        el.getAttribute('aria-label')
+      );
+
+    const odsHrefs = () =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('a'))
+        .map(anchor => anchor.getAttribute('href'))
+        .filter(href => href?.includes('/ods-admin'));
+
+    it('ODS-only user sees the ODS Admin group in the expanded sidebar DOM', () => {
+      setAccess(false, false, true);
+      setCollapsed(false);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(expandedLabels()).toEqual(['ODS Admin']);
+      expect(odsHrefs()).toEqual(ODS_HREFS);
+      expect(root.textContent).toContain('Framework');
+      expect(root.textContent).toContain('Institutional Objectives');
+      expect(root.textContent).not.toContain('Center admin');
+      expect(root.textContent).not.toContain('System admin');
+    });
+
+    it('ODS-only user sees the ODS Admin group in the collapsed sidebar DOM', () => {
+      setAccess(false, false, true);
+      setCollapsed(true);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(collapsedLabels()).toEqual(['ODS Admin']);
+      expect(root.textContent).not.toContain('Center admin');
+      expect(root.textContent).not.toContain('System admin');
+
+      component.toggleAdministrationFlyout('ods-admin', { stopPropagation: jest.fn() } as unknown as Event);
+      fixture.detectChanges();
+
+      const flyout = root.querySelector('.admin-center-admin-flyout');
+      const hrefs = Array.from(flyout?.querySelectorAll('a') ?? []).map(anchor => anchor.getAttribute('href'));
+      expect(hrefs).toEqual(ODS_HREFS);
+      expect(flyout?.textContent).toContain('Framework');
+      expect(flyout?.textContent).toContain('Institutional Objectives');
+    });
+
+    it('System Admin sees Center admin, then ODS Admin, then System admin in the expanded DOM', () => {
+      setAccess(true, true, true);
+      setCollapsed(false);
+      fixture.detectChanges();
+
+      expect(expandedLabels()).toEqual(['Center admin', 'ODS Admin', 'System admin']);
+      expect(odsHrefs()).toEqual(ODS_HREFS);
+    });
+
+    it('System Admin sees Center admin, then ODS Admin, then System admin in the collapsed DOM', () => {
+      setAccess(true, true, true);
+      setCollapsed(true);
+      fixture.detectChanges();
+
+      expect(collapsedLabels()).toEqual(['Center admin', 'ODS Admin', 'System admin']);
+      component.toggleAdministrationFlyout('ods-admin', { stopPropagation: jest.fn() } as unknown as Event);
+      fixture.detectChanges();
+      const hrefs = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.admin-center-admin-flyout a')
+      ).map(anchor => anchor.getAttribute('href'));
+      expect(hrefs).toEqual(ODS_HREFS);
+    });
+
+    it('Center Admin does not see the ODS Admin group in the expanded DOM', () => {
+      setAccess(true, false, false);
+      setCollapsed(false);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(expandedLabels()).toEqual(['Center admin']);
+      expect(odsHrefs()).toEqual([]);
+      expect(root.textContent).not.toContain('ODS Admin');
+      expect(root.textContent).not.toContain('System admin');
+    });
+
+    it('Center Admin does not see the ODS Admin group in the collapsed DOM', () => {
+      setAccess(true, false, false);
+      setCollapsed(true);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(collapsedLabels()).toEqual(['Center admin']);
+      expect(root.querySelector('button.admin-parent--collapsed[aria-label="ODS Admin"]')).toBeNull();
+      expect(root.querySelector('button.admin-parent--collapsed[aria-label="System admin"]')).toBeNull();
+    });
+
+    it('a user with no admin role sees no ODS Admin group in the expanded DOM', () => {
+      setAccess(false, false, false);
+      setCollapsed(false);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(root.querySelector('.administration-block')).toBeNull();
+      expect(expandedLabels()).toEqual([]);
+      expect(root.textContent).not.toContain('ODS Admin');
+    });
+
+    it('a user with no admin role sees no ODS Admin group in the collapsed DOM', () => {
+      setAccess(false, false, false);
+      setCollapsed(true);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(root.querySelector('.administration-block')).toBeNull();
+      expect(collapsedLabels()).toEqual([]);
+      expect(root.textContent).not.toContain('ODS Admin');
+    });
   });
 });
 
@@ -500,6 +840,7 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
           useValue: {
             canAccessCenterAdmin: jest.fn().mockReturnValue(true),
             canAccessAppConfiguration: jest.fn().mockReturnValue(false),
+            canAccessOdsAdmin: jest.fn().mockReturnValue(false),
             isAdmin: jest.fn().mockReturnValue(false),
             canAccessPooledFundingMonitor: jest.fn().mockReturnValue(false)
           }

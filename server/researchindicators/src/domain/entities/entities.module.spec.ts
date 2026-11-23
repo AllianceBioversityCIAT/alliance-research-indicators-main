@@ -4,6 +4,9 @@ import { join } from 'path';
 import { EntitiesModule } from './entities.module';
 import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
+import { ControlListsModule } from './control-lists/control-lists.module';
+import { OrganizationalStructureModule } from './organizational-structure/organizational-structure.module';
+import { StrategyFrameworkModule } from './strategy-framework/strategy-framework.module';
 import { PrmsWebhookModule } from './prms-webhook/prms-webhook.module';
 
 /**
@@ -72,6 +75,21 @@ describe('EntitiesModule — result-prms-sync registration (T-13)', () => {
 });
 
 /**
+ * T-01 (docs/specs/institutional-performance/control-lists), KZ-017. A route
+ * node in main.routes.ts (see main.routes.spec.ts) is not a registration —
+ * RouterModule.register() only stamps MODULE_PATH metadata and looks the
+ * module up in modulesContainer, returning silently and 404-ing every
+ * handler when it is absent. This is the module-graph half of that gate.
+ */
+describe('EntitiesModule — control-lists registration (T-01)', () => {
+  it('lists ControlListsModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(ControlListsModule);
+  });
+});
+
+/**
  * T-03 (docs/specs/bilateral/prms-sync/decision-webhook). Same KZ-001 gap
  * as T-13 above: `main.routes.spec.ts` pins the `prms-webhook` route
  * *node*, which `RouterModule.register()` looks up in `modulesContainer`
@@ -136,5 +154,33 @@ describe('EntitiesModule — T-05 boot-order invariant (R-8)', () => {
     expect(resultsAt).toBeGreaterThanOrEqual(0);
     expect(innovUseAt).toBeGreaterThanOrEqual(0);
     expect(resultsAt).toBeLessThan(innovUseAt);
+  });
+});
+
+/**
+ * T-01 (docs/specs/institutional-performance/organizational-structure), KZ-017.
+ * The module-graph half of the registration gate: a route node alone is a
+ * silent 404 when the module is missing from this module's imports.
+ */
+describe('EntitiesModule — organizational-structure registration (T-01)', () => {
+  it('lists OrganizationalStructureModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(OrganizationalStructureModule);
+  });
+});
+
+/**
+ * T-08 (docs/specs/institutional-performance/strategy-framework), KZ-017.
+ * A route node in `main.routes.ts` is not registration: drop this import and
+ * every strategy-framework handler is a silent 404. This assertion cannot
+ * see HTTP reachability (that is an app boot, T-10) and cannot see the route
+ * node (a present node with a missing import still fails here).
+ */
+describe('EntitiesModule — strategy-framework registration (T-08)', () => {
+  it('lists StrategyFrameworkModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(StrategyFrameworkModule);
   });
 });

@@ -1,0 +1,144 @@
+<p-drawer
+  [visible]="open()"
+  (visibleChange)="onVisibleChange($event)"
+  position="right"
+  [modal]="true"
+  [dismissible]="true"
+  [closeOnEscape]="true"
+  appendTo="body"
+  styleClass="objective-panel"
+  [style]="drawerStyle()"
+  ariaCloseLabel="Close"
+  data-testid="objective-drawer">
+  <ng-template pTemplate="header">
+    <app-panel-heading [eyebrow]="eyebrow()" [title]="headerTitle()" />
+  </ng-template>
+  <!-- No owner and no responsible (R-STF-009 AC.2, A-3). The mockup's owner unit stays out. -->
+  <form class="flex flex-col gap-4" pFocusTrap appOverlayEscapeGuard [formGroup]="form" data-testid="objective-form" (ngSubmit)="save()" [attr.aria-busy]="saving()">
+    <div class="field">
+      <label for="objectiveCode" class="text-sm font-medium atc-grey-800">Code <span aria-hidden="true">*</span></label>
+      <input
+        #codeField
+        id="objectiveCode"
+        type="text"
+        class="field__control"
+        formControlName="code"
+        maxlength="30"
+        required
+        autocomplete="off"
+        data-testid="objective-code" />
+      @if (form.controls.code.touched && form.controls.code.hasError('required')) {
+        <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="code-error">Code is required</p>
+      }
+      @if (form.controls.code.hasError('maxlength')) {
+        <p class="m-0 text-sm leading-[1.5] atc-red-1">Code must be 30 characters or fewer</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="objectiveYear" class="text-sm font-medium atc-grey-800">Year <span aria-hidden="true">*</span></label>
+      <p-select
+        inputId="objectiveYear"
+        [options]="yearOptions()"
+        optionLabel="label"
+        optionValue="year"
+        formControlName="year"
+        (onChange)="onYearPicked($event.value)"
+        appendTo="body"
+        styleClass="w-full"
+        ariaLabel="Year"
+        data-testid="objective-year">
+      </p-select>
+      @if (form.controls.year.touched && form.controls.year.invalid) {
+        <p class="m-0 text-sm leading-[1.5] atc-red-1">Year is required</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="objectiveStatement" class="text-sm font-medium atc-grey-800">Statement <span aria-hidden="true">*</span></label>
+      <textarea
+        id="objectiveStatement"
+        class="field__control"
+        formControlName="statement"
+        rows="5"
+        required
+        data-testid="objective-statement"></textarea>
+      @if (form.controls.statement.touched && form.controls.statement.invalid) {
+        <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="statement-error">Statement is required</p>
+      }
+    </div>
+
+    <div class="field">
+      <label id="objectiveIndicatorsLabel" for="objectiveIndicators" class="text-sm font-medium atc-grey-800">Linked indicators</label>
+      <p-multiSelect
+        inputId="objectiveIndicators"
+        [options]="groups()"
+        [group]="true"
+        optionLabel="label"
+        optionValue="value"
+        optionGroupLabel="label"
+        optionGroupChildren="items"
+        [filter]="true"
+        filterPlaceHolder="Search indicators"
+        formControlName="elementIds"
+        display="chip"
+        appendTo="body"
+        styleClass="w-full"
+        ariaLabelledBy="objectiveIndicatorsLabel"
+        placeholder="Select indicators"
+        data-testid="objective-indicators">
+      </p-multiSelect>
+    </div>
+
+    @if (formError(); as message) {
+      <p class="m-0 text-sm leading-[1.5] atc-red-1" role="alert" data-testid="objective-error">{{ message }}</p>
+    }
+
+    <div class="objective-panel__actions">
+      @if (objective(); as current) {
+        <span data-testid="objective-panel-delete">
+          <button
+            type="button"
+            pButton
+            label="Delete"
+            [severity]="current.deletable ? 'danger' : 'secondary'"
+            [outlined]="true"
+            size="small"
+            class="!rounded-[9px] !text-[13px]"
+            [attr.aria-disabled]="current.deletable ? 'false' : 'true'"
+            [attr.aria-describedby]="!current.deletable && blockerText() ? 'objective-panel-blocker-' + current.id : null"
+            [pTooltip]="current.deletable ? '' : blockerText()"
+            tooltipPosition="top"
+            tooltipEvent="both"
+            [tooltipDisabled]="current.deletable || blockerText() === ''"
+            (click)="requestDelete($event)">
+          </button>
+          @if (!current.deletable && blockerText()) {
+            <span class="sr-only" [id]="'objective-panel-blocker-' + current.id">{{ blockerText() }}</span>
+          }
+        </span>
+      }
+      <div class="objective-panel__actions-end">
+      <p-button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        size="small"
+        styleClass="!rounded-[9px] !text-[13px]"
+        (onClick)="cancel()"
+        data-testid="objective-cancel">
+      </p-button>
+      <p-button
+        type="submit"
+        label="Save"
+        severity="info"
+        size="small"
+        styleClass="!rounded-[9px] !text-[13px]"
+        [disabled]="saving()"
+        [loading]="saving()"
+        data-testid="objective-save">
+      </p-button>
+      </div>
+    </div>
+  </form>
+</p-drawer>

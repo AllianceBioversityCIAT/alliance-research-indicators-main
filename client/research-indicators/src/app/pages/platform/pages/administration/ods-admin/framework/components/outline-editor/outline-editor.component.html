@@ -1,0 +1,54 @@
+<div class="flex flex-col gap-3 p-4">
+  <div class="outline-editor__find">
+    <label class="outline-editor__find-label" for="outline-search">Find by code or name</label>
+    <div class="outline-editor__find-field">
+      <input
+        id="outline-search"
+        type="text"
+        class="outline-editor__find-input"
+        data-testid="outline-search"
+        placeholder="Find by code or name"
+        autocomplete="off"
+        [value]="query()"
+        (input)="onSearchInput($event)" />
+      @if (query()) {
+        <button type="button" class="outline-editor__clear cursor-pointer" data-testid="outline-search-clear" aria-label="Clear search" (click)="clearSearch()">
+          <i class="pi pi-times" aria-hidden="true"></i>
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (noMatches()) {
+    <p class="outline-editor__empty" role="status" data-testid="outline-search-empty">No elements match "{{ trimmedQuery() }}"</p>
+  }
+
+  @for (node of roots(); track node.key; let index = $index) {
+    <article
+      class="outline-card"
+      [class]="'outline-card outline-card--accent-' + ((index % 4) + 1)"
+      [attr.data-accent]="(index % 4) + 1"
+      [hidden]="rootHidden(node, query(), pinned())"
+      data-testid="outline-card">
+      <app-outline-row
+        [node]="node"
+        [levels]="shownView().levels"
+        [usageLabels]="shownView().usageLabels"
+        [portfolioId]="shownView().portfolioId"
+        [query]="query()"
+        [collapsedIds]="collapsed()"
+        [pinnedKeys]="pinned()"
+        (committed)="onCommitted($event)"
+        (discardDraft)="discardDraft($event)"
+        (addChild)="onAddChild($event)"
+        (details)="detailsRequested.emit($event)"
+        (remove)="onRemove($event)"
+        (toggleCollapsed)="onToggle($event)"
+        (presence)="onPresence($event)" />
+    </article>
+  }
+
+  <button type="button" class="outline-editor__add cursor-pointer" data-testid="add-root" (click)="addRoot()">
+    {{ addRootLabel() }}
+  </button>
+</div>
