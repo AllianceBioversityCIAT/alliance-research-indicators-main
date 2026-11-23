@@ -1328,6 +1328,36 @@ describe('portfolio-2-alignment.mapper', () => {
       );
     });
 
+    it('flags an SDG target removed from the portfolio list (SDG Management) even though its catalog row is active', () => {
+      const offered = [
+        { id: 1, sdg_target_id: 1, sdg_target_code: '1.1', sdg_target: 'Poverty', select_label: '1.1 — Poverty' },
+        { id: 2, sdg_target_id: 2, sdg_target_code: '1.2', sdg_target: 'Half poverty', select_label: '1.2 — Half poverty' }
+      ] as never[];
+      const normalized = normalizePortfolio2AlignmentGet(
+        {
+          result_sdg_targets: [
+            { sdg_target_id: 1, sdg_target: { id: 1, sdg_target_code: '1.1', sdg_target: 'Poverty', is_active: true } },
+            { sdg_target_id: 4, sdg_target: { id: 4, sdg_target_code: '1.4', sdg_target: 'Equal rights', is_active: true } }
+          ] as never
+        },
+        { sdgTargets: offered }
+      );
+
+      const [kept, removed] = normalized.result_sdg_targets ?? [];
+      expect(kept).not.toHaveProperty('is_catalog_inactive');
+      expect(removed).toEqual(
+        expect.objectContaining({ sdg_target_id: 4, sdg_target_code: '1.4', sdg_target: 'Equal rights', is_catalog_inactive: true })
+      );
+    });
+
+    it('flags no SDG target while the portfolio list is empty (not loaded)', () => {
+      const normalized = normalizePortfolio2AlignmentGet(
+        { result_sdg_targets: [{ sdg_target_id: 4, sdg_target: { id: 4, sdg_target_code: '1.4', is_active: true } }] as never },
+        { sdgTargets: [] }
+      );
+      expect(normalized.result_sdg_targets?.[0]).not.toHaveProperty('is_catalog_inactive');
+    });
+
     it('never sends the inactive flag or the catalog relation back in the PATCH', () => {
       const patch = buildPortfolio2AlignmentPatch(
         {
