@@ -85,7 +85,7 @@ describe('ResultPdfReportService', () => {
     resultsService.findMetadataResult.mockResolvedValue({
       result_id: 10,
       result_official_code: 8245,
-      indicator_id: 4,
+      indicator_id: 1,
       indicator_name: 'Capacity Sharing for Development',
       report_year: 2025,
     });
@@ -166,7 +166,7 @@ describe('ResultPdfReportService', () => {
 
     const pdfUrl = await service.buildReport(10, PdfTemplates.CAP_SHARING);
 
-    expect(indicatorSectionRegistry.buildSections).toHaveBeenCalledWith(10, 4);
+    expect(indicatorSectionRegistry.buildSections).toHaveBeenCalledWith(10, 1);
     expect(reportMsApp.getPdfReport).toHaveBeenCalledWith(
       PdfTemplates.CAP_SHARING,
       10,
@@ -204,6 +204,29 @@ describe('ResultPdfReportService', () => {
     expect(pdfViewerService.postData).not.toHaveBeenCalled();
     expect(pdfViewerService.renderPdf).not.toHaveBeenCalled();
     expect(pdfUrl).toBe('https://s3.example/pdf');
+  });
+
+  it('leaves ip_rights out of the Policy Change payload', async () => {
+    mockReportDependencies();
+    resultsService.findMetadataResult.mockResolvedValue({
+      result_official_code: 30341,
+      indicator_id: 4,
+      indicator_name: 'Policy Change',
+      report_year: 2025,
+    });
+    reportMsApp.getPdfReport.mockResolvedValue('url');
+
+    await service.buildReport(10, PdfTemplates.POLICY_CHANGE);
+
+    const payload = reportMsApp.getPdfReport.mock.calls[0][2];
+    expect(reportMsApp.getPdfReport.mock.calls[0][0]).toBe('policy_change');
+    expect(payload).not.toHaveProperty('ip_rights');
+    expect(payload.general_information).toEqual(
+      expect.objectContaining({
+        indicator_id: 4,
+        result_type: 'Policy Change',
+      }),
+    );
   });
 
   it('renders HTML via pdf viewer when isHtml is true', async () => {
