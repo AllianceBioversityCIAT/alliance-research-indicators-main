@@ -147,7 +147,15 @@
           } @else if (column.field === 'public_link') {
           <td class="{{ column.minWidth }} {{ column.maxWidth }} align-center" (click)="$event.stopPropagation()"
             (keydown.enter)="$event.stopPropagation()">
-            @if (showStarPdfReport(result)) {
+            @let cgspaceLink = publishedOicrCgspaceLink(result);
+            @if (cgspaceLink) {
+            <button type="button" data-public-link-action (click)="openPublicLink(cgspaceLink); $event.stopPropagation()"
+              pTooltip="CGSpace link" tooltipPosition="left"
+              [attr.aria-label]="'Open CGSpace link for STAR-' + result.result_official_code"
+              class="cursor-pointer border-0 bg-transparent p-0 text-[#035BA9]">
+              <i class="pi pi-external-link !text-[16px]"></i>
+            </button>
+            } @else if (showStarPdfReport(result)) {
             @if (isStarPdfReportDisabled(result)) {
             <span aria-hidden="true" class="inline-flex cursor-default opacity-40 text-[#777C83]">
               <i class="pi pi-file-pdf !text-[18px]"></i>
