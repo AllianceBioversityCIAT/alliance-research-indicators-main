@@ -10,7 +10,8 @@ import { ApiService } from '@services/api.service';
 import { rememberPfmScope } from '@shared/utils/pfm-last-scope.util';
 import {
   PFM_SCOPES,
-  PFM_TABS,
+  PFM_VISIBLE_TABS,
+  isPfmTabVisible,
   PfmChip,
   PfmFilters,
   PfmProjectsFilter,
@@ -33,7 +34,7 @@ export class PfmStoreService {
   private readonly route = inject(ActivatedRoute);
 
   readonly scope = signal<PfmScope>('mine');
-  readonly tab = signal<PfmTab>('coverage');
+  readonly tab = signal<PfmTab>(PFM_VISIBLE_TABS[0]);
   readonly filters = signal<PfmFilters>({ ...EMPTY_FILTERS });
   /** Active quick-view chip; null = none. */
   readonly chip = signal<PfmChip | null>(null);
@@ -76,12 +77,12 @@ export class PfmStoreService {
     const allowed: readonly string[] = opts.allowedScopes ?? PFM_SCOPES;
     if (allowed.includes(scope ?? '')) this.scope.set(scope as PfmScope);
     else if (opts.defaultScope) this.scope.set(opts.defaultScope);
-    if ((PFM_TABS as readonly string[]).includes(tab ?? '')) this.tab.set(tab as PfmTab);
+    if (isPfmTabVisible(tab)) this.tab.set(tab);
     const back = takePfmReturnState();
     if (back) {
       // Coming back from a result opened in the queue: the same view, projects, pages and sort.
       if (allowed.includes(back.scope)) this.scope.set(back.scope);
-      if ((PFM_TABS as readonly string[]).includes(back.tab)) this.tab.set(back.tab);
+      if (isPfmTabVisible(back.tab)) this.tab.set(back.tab);
       this.filters.set({ ...EMPTY_FILTERS, ...back.filters });
       this.chip.set(back.chip);
       this.groupViews.set(back.groupViews ?? {});
@@ -128,7 +129,7 @@ export class PfmStoreService {
   }
 
   setTab(tab: PfmTab): void {
-    if (tab === this.tab()) return;
+    if (tab === this.tab() || !isPfmTabVisible(tab)) return;
     this.tab.set(tab);
     this.syncUrl();
   }
@@ -138,6 +139,8 @@ export class PfmStoreService {
    * cleared (so the queue count equals the chart number), then the quick view and / or SP is applied.
    */
   openQueue(opts: { chip?: PfmChip | null; sp?: string | null }): void {
+    // The Results queue tab is hidden for now (PFM_HIDDEN_TABS): stay where the user is.
+    if (!isPfmTabVisible('queue')) return;
     this.filters.set({ ...EMPTY_FILTERS, sp: opts.sp ?? null });
     this.chip.set(opts.chip ?? null);
     this.resetGroups();
