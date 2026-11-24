@@ -365,7 +365,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 Shared for T-18…T-22: client only, under `client/research-indicators/`; verification `npx jest <scope> --coverage=false`, `npm run lint -- --quiet`, `npm run build` (component styles < 4 kB each, quote sizes), `tsc -p tsconfig.spec.json` with no new errors in touched files; KZ-015 (drive real clicks/keys, never set signals to reach a state), KZ-001 (assert DOM and request payloads), KZ-017 (jsdom cannot judge layout, scroll, colour or real Tab order — the Leader measures in Chrome). Baseline commit for every observed red: `db07f43dc`.
 
 ### T-21 — Shared DataTable: opt-in keyboard row selection
-- **Status:** todo · **Size:** S · **Depends:** none
+- **Status:** done (PASS attempt 2, 2026-11-24, uncommitted) · **Size:** S · **Depends:** none
 - **Requirements:** NFR-STF-004 (rows reachable by Tab, Enter/Space selects — Table view and IOB), R-STF-008 AC.2 (select from the table), R-STF-016 AC.1 (row selection fills the panel)
 - **Design:** §6.4 (`keyboardSelectable`), §6.6; D-STF-36; P-40, P-47
 - **Scope:** `shared/components/data-table/data-table.component.{ts,html,spec.ts}` only. New input `keyboardSelectable = false`. When it and `selectable` are true: each body row gets `tabindex="0"`, `keydown.enter` and `keydown.space` (Space with `preventDefault`) emitting `rowSelected` exactly as a click does, and `data-row-key="<String(row.id)>"`. Key events from interactive descendants (buttons, links, inputs) are ignored (`target !== currentTarget`). With the input false the rendered DOM is unchanged.
@@ -379,7 +379,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ### T-18 — Framework tree table (replaces the outline editor)
-- **Status:** todo · **Size:** M · **Depends:** none (T-12…T-16 done)
+- **Status:** done (PASS attempt 2, 2026-11-24, uncommitted) · **Size:** M · **Depends:** none (T-12…T-16 done)
 - **Requirements:** R-STF-007 (columns, read-only names, counts, indentation, inherited area bar, expand/collapse, search, + child, states; scenarios *Read-only names*, *Inherited area colour*, *Add a child from the tree* incl. AND IT MUST add nothing until saved; AC.1–AC.5), NFR-STF-004 (tree rows: ttRow keyboard, Enter/Space selects, `aria-selected`, chevron `aria-label`/`aria-expanded`, colour not the only cue)
 - **Design:** §6.3; D-STF-30, D-STF-34; P-38, P-39, P-45, P-48
 - **Scope:** new `framework/components/framework-tree/` (standalone, `OnPush`, `p-treeTable`): columns Name · Code · Level · Responsibles · Actions; read-only names; counts text; `rowNode.level × 28 px` indent with the page's **own** chevron button (not `p-treeTableToggler`); `--row-accent` from the depth-1 ancestor painted as an inset bar on the first cell; selected style = background + `<tr>` outline (never first-cell shadow); `[ttRow]` with no own `tabindex`, `data-p-highlight` on the selected row; Enter/Space select only when `target === currentTarget`, Space `preventDefault`; **+** stops click and Enter/Space keydown; expand state as an input/output `Set` of collapsed ids; search box (move `outline-filter.util` → `framework-tree/tree-filter.util`, with its spec); outputs `elementSelected`, `childRequested`, `expansionChanged`. Extend `framework-view.util` with tree nodes and the depth-1 ancestor index. Not wired into the page yet (T-19).
@@ -393,7 +393,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ### T-19 — Side panel layout, unsaved-changes guard and the Framework page
-- **Status:** todo · **Size:** L · **Depends:** T-18, T-21
+- **Status:** done (PASS attempt 4, owner-approved after HALT, 2026-11-24, uncommitted) · **Size:** L · **Depends:** T-18, T-21
 - **Requirements:** R-STF-016 (layout, empty state, viewport fit ≥ 1024 px, header, Delete at top, fields, Cancel/Save, unsaved changes with all nine triggers, failed save; scenarios *Select and edit*, *Unsaved changes* incl. BUT must NOT replace the form without asking, *Panel fits the viewport* incl. AND IT MUST at two heights; AC.1–AC.4 for Framework), R-STF-007 (page shell: Tree/Table toggle, New <level-1>, empty state inside the list slot), R-STF-008 (row click → panel, AC.2), NFR-STF-004 (panel region label, focus on create/Save/Cancel/delete)
 - **Design:** §6.2, §6.4, §6.5, §6.9, §13a items 3–6; D-STF-29, 31, 32, 33, 35; P-41, P-42, P-43, P-46
 - **Scope:**
@@ -414,7 +414,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
     - failed save inline.
   - `framework-tables`: drop `#rowActions` and pass `[selectable]`, `[keyboardSelectable]="true"`, string `[selectedKey]` and `(rowSelected)`; rows carry `id`.
   - Codec: Tree is the default and omitted; `editor` decodes to Tree.
-  - **Delete** `outline-editor/*`, `outline-row/*` and `overlay-escape-guard.directive.ts` with their specs.
+  - **Delete** `outline-editor/*` and `outline-row/*` with their specs; remove `OverlayEscapeGuardDirective` from `element-panel` (the directive file itself is deleted in T-20, with its last consumer `objective-panel` — execute-time edit 2026-11-24).
 - **Tests:**
   - Row click in the tree and in a level table fills the panel (header `INDICATOR · LEVEL 3`, pill, Delete at the top); empty state when nothing is selected.
   - Save → request payload, toast, and the row stays selected with the new name.
@@ -440,7 +440,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Done criteria:**
   - ods-admin jest green; falsifiers (a) and (b) executed, quoted and reverted; (c) measured in Chrome by the Leader at both heights and quoted.
   - Lint, build (style sizes quoted) and spec tsc clean.
-  - `grep -rn "p-drawer\|pFocusTrap\|OverlayEscapeGuard" client/research-indicators/src/app/pages/platform/pages/administration/ods-admin` → 0.
+  - `grep -rn "p-drawer\|pFocusTrap\|OverlayEscapeGuard" client/research-indicators/src/app/pages/platform/pages/administration/ods-admin/framework` → 0 (scoped to `framework/`: the IOB page keeps its drawer until T-20 — execute-time edit 2026-11-24).
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ### T-20 — Institutional Objectives in the side panel
@@ -456,6 +456,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
     - focus after delete by `data-row-key` (next, else previous, else **+ Add objective**);
     - `guardDiscard` on row, create, portfolio, year and Carry forward.
   - `objective-panel`: drop `p-drawer` and `pFocusTrap`; Delete at the top through the existing delete flow; `dirty` output; failed save inline.
+  - **Delete** `ods-admin/overlay-escape-guard.directive.ts` (its last consumer; moved here from T-19 — execute-time edit 2026-11-24).
 - **Tests:**
   - Row click and Enter fill the panel; empty state.
   - Save keeps the row selected **and the table stays mounted**: assert that the same `<table>` element survives, not just its text.
@@ -468,7 +469,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Disqualifier:** a test that checks the table text after save cannot tell a remount from a refresh in place; it must compare element identity.
 - **Consumers:** `institutional-objectives.component.spec.ts` and `objective-panel.component.spec.ts` are rewritten where they pin the drawer, focus trap or `edit-objective`; list every changed assertion.
 - **Review:** full.
-- **Done criteria:** ods-admin jest green; both falsifiers executed, quoted and reverted; lint, build and spec tsc clean; `grep` for `p-drawer` and `pFocusTrap` under `ods-admin` → 0.
+- **Done criteria:** ods-admin jest green; both falsifiers executed, quoted and reverted; lint, build and spec tsc clean; `grep` for `p-drawer`, `pFocusTrap` and `OverlayEscapeGuard` under `ods-admin` → 0.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ### T-22 — Docs, family F-4 and the rev-4 HITL pass
