@@ -9,6 +9,16 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
+/**
+ * Tabs hidden for now: only Stats is shown. Hidden tabs are left out of the strip, a URL or
+ * a return state cannot open them, and the page starts on the first visible tab. Empty this
+ * list to bring them back.
+ */
+export const PFM_HIDDEN_TABS: readonly PfmTab[] = ['coverage', 'queue'];
+export const PFM_VISIBLE_TABS: readonly PfmTab[] = PFM_TABS.filter(tab => !PFM_HIDDEN_TABS.includes(tab));
+export const isPfmTabVisible = (tab: string | null | undefined): tab is PfmTab =>
+  (PFM_VISIBLE_TABS as readonly string[]).includes(tab ?? '');
+
 export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved',
   // One view per journey card: the queue lists exactly what the card counts (server DD-PFM-42).
   'journey_draft', 'journey_submitted', 'journey_approved', 'journey_completed_in_tip', 'journey_not_answered', 'journey_contributes',

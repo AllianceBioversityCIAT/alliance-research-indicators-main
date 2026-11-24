@@ -591,9 +591,7 @@ export class ResultsCenterService {
         } as Result & { primaryLeverSort: string; _creatorFullName: string };
       });
 
-      if (!isLatestRequest()) {
-        return;
-      }
+      if (!isLatestRequest()) return;
 
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
       if (stillSameContext && isLatestRequest()) {
@@ -603,9 +601,7 @@ export class ResultsCenterService {
       }
     } catch (error) {
       console.error('Error loading results:', error);
-      if (!isLatestRequest()) {
-        return;
-      }
+      if (!isLatestRequest()) return;
       this.lastSuccessfulResultsFetchKey = null;
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
       if (stillSameContext) {
