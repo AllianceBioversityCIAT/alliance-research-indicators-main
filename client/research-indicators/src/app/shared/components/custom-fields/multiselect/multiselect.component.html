@@ -1,4 +1,10 @@
 @let list = this.selectedOptions();
+<ng-template #inactiveIcon>
+  <i class="pi pi-exclamation-triangle multiselect-inactive-icon" data-testid="multiselect-inactive-icon" tabindex="0"
+    aria-label="Inactive option: no longer available in the list. It is kept only because it was already selected."
+    pTooltip="This option is no longer active. It stays only because it was already selected. If you remove it, you won't be able to select it again."
+    tooltipPosition="top" tooltipEvent="both"></i>
+</ng-template>
 <div class="input-container">
   @if (label) {
   <label class="label inline-block flex items-center" for="username">{{ label }}
@@ -77,6 +83,9 @@
           </div>
           }
           }
+          @if (item?.is_catalog_inactive) {
+          <ng-container *ngTemplateOutlet="inactiveIcon"></ng-container>
+          }
         </div>
       </ng-template>
       }
@@ -92,7 +101,7 @@
   }
 
   @if (!this.hideSelected && !this.hideTemplate) {
-  @if (this.currentResultIsLoading() || !(this.optionsSig().length)) {
+  @if (this.currentResultIsLoading() || (!(this.optionsSig().length) && !selectedRowsSelfLabelled())) {
   @for (row of list; track trackSelectedOptionRow($index, row)) {
   <p-skeleton width="100%" height="41px" styleClass="mb-2" />
   }
@@ -116,6 +125,9 @@
       <div class="selected-row-main">
         <ng-container *ngTemplateOutlet="rows || defaultTemplate; context: { $implicit: row }"></ng-container>
       </div>
+      @if (row?.is_catalog_inactive) {
+      <ng-container *ngTemplateOutlet="inactiveIcon"></ng-container>
+      }
       @if (!hideRemoveIcon) {
       @if (removeCondition(row) && !this.disabled) {
       @if (!row.disabled) {

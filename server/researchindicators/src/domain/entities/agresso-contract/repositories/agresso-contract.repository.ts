@@ -399,6 +399,13 @@ export class AgressoContractRepository
         ? `AND ${effectivePoolFundingContributorSql('ac')} = ${filter.is_pool_funding_contributor ? 1 : 0}`
         : '';
 
+    // Lists offer only active contracts (agresso_contracts.is_active). A lookup by
+    // contract code still finds an inactive one, so a project already linked to a
+    // result keeps loading its page and header.
+    const activeContractsFilter = isEmpty(filter?.contract_code)
+      ? 'AND ac.is_active = TRUE'
+      : '';
+
     const dateFilterClause = this.buildDateFilterClause(filter);
     const indicators = await this.dataSource.getRepository(Indicator).find();
     const contractTotalResultsSelectSql = `, (${this.buildContractTotalResultsCountSql()}) AS contract_total_results`;
@@ -463,6 +470,7 @@ export class AgressoContractRepository
         IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
         ${userContracts(user?.sec_user_id)}
     WHERE 1=1
+    ${activeContractsFilter}
     ${userScopeSql(user?.sec_user_id, userCarnet)}
     ${validFilter(queryConditions, `AND (${queryConditions})`)}
     ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
@@ -545,6 +553,7 @@ export class AgressoContractRepository
                                               AND pfc.is_active = TRUE
         ${userContracts(user?.sec_user_id)}
         WHERE 1=1
+        ${activeContractsFilter}
         ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL` : ''}
         ${userScopeSql(user?.sec_user_id, userCarnet)}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}

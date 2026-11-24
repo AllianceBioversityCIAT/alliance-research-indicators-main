@@ -123,6 +123,10 @@ export default class PoolFundingAlignmentComponent {
   private readonly versionWatcher = inject(VersionWatcherService);
 
   readonly loadFailed = signal(false);
+  // Bumps on every alignment read. A response whose seq is no longer current
+  // (previous result, or a newer reload) must not seed the form.
+  private alignmentLoadSeq = 0;
+  private alignmentFormResultCode: string | null = null;
   readonly inlineErrors = signal<Record<string, string> | null>(null);
   // REQ-BIL-ASR-03 — SP codes rejected by the last PATCH 400 (`unknown_sp_codes`).
   // Drives both the inline message (via inlineErrors['sp_codes']) and the per-chip
@@ -454,6 +458,11 @@ export default class PoolFundingAlignmentComponent {
     return numeric ? String(numeric) : '';
   });
 
+  private sameResultCode(resultCode: string): boolean {
+    const strip = (code: string) => code.replace(/^STAR-/i, '');
+    return strip(resultCode) === strip(this.resultCode());
+  }
+
   // AC-08.4 — saved alignments that must render read-only from their snapshot:
   // explicitly stale, or whose toc_result_id no longer resolves in the live catalog.
   readonly staleSnapshots = computed<SavedTocAlignment[]>(() => {
@@ -541,9 +550,39 @@ export default class PoolFundingAlignmentComponent {
       .subscribe(() => this.handleRemoteChange());
   }
 
+  private clearAlignmentForm(): void {
+    this.formData.set({
+      has_contribution: null,
+      selected_sps: [],
+      primary_sp_code: null,
+      toc_drafts: []
+    });
+    this.inlineErrors.set(null);
+    this.rejectedSpCodes.set([]);
+    this.blockErrors.set({});
+    this.versionLockedFrom409.set(false);
+    this.loadFailed.set(false);
+    // Only when leaving a result that was already on this page. The first load
+    // has nothing of its own to drop, and a same-result refresh never calls
+    // this. `null` status is the not-loaded state the picker already hides.
+    if (this.alignmentFormResultCode !== null) {
+      this.bilateralService.sciencePrograms.set([]);
+      this.bilateralService.mappingStatus.set(null);
+    }
+  }
+
   private loadAlignment(): void {
     const resultCode = this.resultCode();
+    const loadSeq = ++this.alignmentLoadSeq;
+    if (this.alignmentFormResultCode !== resultCode) {
+      this.clearAlignmentForm();
+      this.alignmentFormResultCode = resultCode;
+    }
     void this.bilateralService.getAlignment(resultCode).then(alignment => {
+      if (loadSeq !== this.alignmentLoadSeq) return;
+      // A superseded read is neither a failure nor data: do not raise
+      // loadFailed and do not seed whatever the signal holds now.
+      if (alignment === undefined) return;
       if (!alignment) {
         this.loadFailed.set(true);
         return;
@@ -576,7 +615,11 @@ export default class PoolFundingAlignmentComponent {
 
   handleRemoteChange(): void {
     if (!this.isDirty()) {
-      void this.bilateralService.getAlignment(this.resultCode()).then(alignment => {
+      const resultCode = this.resultCode();
+      const loadSeq = ++this.alignmentLoadSeq;
+      void this.bilateralService.getAlignment(resultCode).then(alignment => {
+        if (loadSeq !== this.alignmentLoadSeq) return;
+        if (alignment === undefined) return;
         if (alignment) this.seedFromServer(alignment);
       });
       return;
@@ -989,18 +1032,22 @@ export default class PoolFundingAlignmentComponent {
     const result = await this.bilateralService.patchAlignment(this.resultCode(), body);
 
     if (result.ok) {
-      this.seedFromServer(result.data);
-      this.clarityService?.trackEvent('bilateral.alignment.saved', {
-        result_code: result.data.result_code,
-        has_contribution: result.data.has_contribution,
-        sp_count: (result.data.selected_science_programs ?? []).length,
-        toc_alignment_count: (body.toc_alignments ?? []).length
-      });
-      this.actions.showToast({
-        severity: 'success',
-        summary: 'Pool Funding Alignment',
-        detail: 'Saved'
-      });
+      // The page may have moved to another result while this PATCH was in
+      // flight. Seeding then would paint the saved result onto the new page.
+      if (this.sameResultCode(result.data.result_code)) {
+        this.seedFromServer(result.data);
+        this.clarityService?.trackEvent('bilateral.alignment.saved', {
+          result_code: result.data.result_code,
+          has_contribution: result.data.has_contribution,
+          sp_count: (result.data.selected_science_programs ?? []).length,
+          toc_alignment_count: (body.toc_alignments ?? []).length
+        });
+        this.actions.showToast({
+          severity: 'success',
+          summary: 'Pool Funding Alignment',
+          detail: 'Saved'
+        });
+      }
       return;
     }
 

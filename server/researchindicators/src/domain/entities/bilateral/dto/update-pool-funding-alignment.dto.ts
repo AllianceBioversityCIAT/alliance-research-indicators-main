@@ -252,7 +252,7 @@ export class AlignmentResponse {
   @ApiProperty({
     type: Boolean,
     description:
-      'True when the result is not Pool Funding eligible but still carries a record (is a snapshot, is synced to PRMS, or has a PRMS code). The saved alignment and ToC are returned read-only; `eligible` stays the raw contract fact.',
+      'True when the result is not Pool Funding eligible but still carries a record (snapshot, synced to PRMS, or a PRMS code). For a STAR result that record exception applies only outside the configured reporting year; a STAR result in the current reporting year is not display-only. A non-eligible TIP result with an active alignment is also display-only, in any year. The saved alignment and ToC are returned read-only; `eligible` stays the raw contract fact.',
   })
   display_only: boolean;
 

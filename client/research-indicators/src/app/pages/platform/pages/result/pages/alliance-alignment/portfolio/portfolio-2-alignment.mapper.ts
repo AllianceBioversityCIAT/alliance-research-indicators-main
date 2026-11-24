@@ -5,6 +5,13 @@ import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { PortfolioConfigItem } from '@shared/interfaces/portfolio-config.interface';
 import { Lever } from '@shared/interfaces/oicr-creation.interface';
 import { LeverSdgTargetOption, ResultLeverSdgTargetPayload } from '@shared/interfaces/lever-sdg-target.interface';
+import {
+  CatalogStatusFlag,
+  catalogDisplayFields,
+  catalogRelation,
+  catalogStatus,
+  withoutRelation
+} from '@shared/utils/catalog-relation.util';
 
 const OTHER_LEVER_ID = 9;
 
@@ -35,10 +42,34 @@ export interface Portfolio2AlignmentContractPayload {
   is_primary: boolean;
 }
 
+/**
+ * `is_primary` and `custom_lever_name` ride along so a save from this section keeps
+ * what Create OICR step 2 stored (primary vs contributing, the "Other" team name).
+ */
+export interface Portfolio2ResearchAreaPayload {
+  lever_id: string;
+  is_primary?: boolean;
+  custom_lever_name?: string;
+}
+
+/** Research Area "Other" (migration 1790688406000): carries a free-text team or area name. */
+export const OTHER_RESEARCH_AREA_ID = 18;
+
+export const isOtherResearchArea = (area: { lever_id?: number | string; id?: number | string } | null | undefined) =>
+  Number(area?.lever_id ?? area?.id) === OTHER_RESEARCH_AREA_ID;
+
+const toResearchAreaPayload = (area: GetLevers): Portfolio2ResearchAreaPayload => {
+  const payload: Portfolio2ResearchAreaPayload = { lever_id: String(area.lever_id ?? area.id) };
+  // The API may send the flag as 0/1; a catalog pick has none and the API defaults it to primary.
+  if (area.is_primary != null) payload.is_primary = Boolean(area.is_primary);
+  if (isOtherResearchArea(area)) payload.custom_lever_name = (area.custom_lever_name ?? '').trim();
+  return payload;
+};
+
 export interface Portfolio2AlignmentPatchBody {
   contracts: Portfolio2AlignmentContractPayload[];
   result_sdgs: { clarisa_sdg_id: number }[];
-  research_areas: { lever_id: string | number }[];
+  research_areas: Portfolio2ResearchAreaPayload[];
   strategic_objectives: { strategic_objective_id: number }[];
   impact_outcomes?: { impact_outcome_id: number }[];
   result_sdg_targets?: { sdg_target_id: number }[];
@@ -68,10 +99,19 @@ const normalizeResearchAreas = (areas: GetLevers[] | undefined): GetLevers[] =>
     return acc;
   }, []);
 
+/**
+ * Display fields of a selected lever / research area. The active catalog wins; when the
+ * lever is no longer offered (inactive), its `lever` relation from the GET fills in.
+ */
+const leverDisplaySource = (saved: object, match: GetLevers | undefined): Partial<GetLevers> | undefined =>
+  match ?? catalogRelation<Partial<GetLevers>>(saved, 'lever');
+
 export const enrichAlignmentLevers = (levers: Lever[] | undefined, catalog?: GetLevers[]): Lever[] =>
-  (levers ?? []).map(lever => {
+  (levers ?? []).map(rawLever => {
+    const relation = catalogRelation<Partial<GetLevers>>(rawLever, 'lever');
+    const lever: Lever = { ...withoutRelation(rawLever, 'lever'), ...catalogStatus(relation) };
     const leverKey = String(lever.lever_id);
-    const match = catalog?.find(item => String(item.lever_id ?? item.id) === leverKey);
+    const match = leverDisplaySource(rawLever, catalog?.find(item => String(item.lever_id ?? item.id) === leverKey));
 
     if (!match) {
       if (Number(lever.lever_id) !== OTHER_LEVER_ID) {
@@ -94,12 +134,19 @@ export const enrichAlignmentLevers = (levers: Lever[] | undefined, catalog?: Get
   });
 
 export const enrichResearchAreas = (areas: GetLevers[] | undefined, catalog?: GetLevers[]): GetLevers[] =>
-  normalizeResearchAreas(areas).map(area => {
+  normalizeResearchAreas(areas).map(rawArea => {
+    const relation = catalogRelation<Partial<GetLevers>>(rawArea, 'lever');
+    const area: GetLevers = { ...withoutRelation(rawArea, 'lever'), ...catalogStatus(relation) };
     const leverKey = String(area.lever_id ?? area.id);
-    const match = catalog?.find(item => String(item.lever_id ?? item.id) === leverKey);
+    const match = leverDisplaySource(
+      rawArea,
+      catalog?.find(item => String(item.lever_id ?? item.id) === leverKey)
+    );
     if (!match) return area;
+    // Spread only display fields from the relation: its own `id`/`is_active` describe the
+    // catalog row, not this selection.
     return {
-      ...match,
+      ...catalogDisplayFields(match),
       ...area,
       id: match.id ?? area.id,
       lever_id: match.lever_id ?? match.id ?? area.lever_id ?? area.id,
@@ -108,7 +155,21 @@ export const enrichResearchAreas = (areas: GetLevers[] | undefined, catalog?: Ge
     };
   });
 
-export type AlignmentSdgTargetRow = ResultLeverSdgTargetPayload & Partial<LeverSdgTargetOption>;
+export type AlignmentSdgTargetRow = ResultLeverSdgTargetPayload & Partial<LeverSdgTargetOption> & CatalogStatusFlag;
+
+type SdgTargetRelation = Partial<LeverSdgTargetOption> & { is_active?: unknown };
+
+/** Option-shaped display data from the GET's `sdg_target` relation (same label the SDG target lists build). */
+const sdgTargetFromRelation = (relation: SdgTargetRelation | undefined): Partial<LeverSdgTargetOption> | undefined => {
+  if (!relation) return undefined;
+  return {
+    id: relation.id,
+    sdg_target: relation.sdg_target,
+    sdg_target_code: relation.sdg_target_code,
+    clarisa_sdg: relation.clarisa_sdg,
+    select_label: [relation.sdg_target_code, relation.sdg_target].filter(Boolean).join(' — ')
+  };
+};
 
 const resolveSdgTargetId = (raw: unknown): number | null => {
   if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return raw;
@@ -138,8 +199,18 @@ export const enrichAlignmentSdgTargets = (
       const sdgTargetId = resolveSdgTargetId(raw);
       if (sdgTargetId == null) return null;
 
-      const saved = raw && typeof raw === 'object' ? (raw as AlignmentSdgTargetRow) : { sdg_target_id: sdgTargetId };
-      const match = catalog?.find(item => Number(item.sdg_target_id ?? item.id) === sdgTargetId);
+      // On a saved row `sdg_target` is the catalog RELATION (an object); on an option it is
+      // the target text. Read the relation, then drop it so it never shadows the text.
+      const relation = catalogRelation<SdgTargetRelation>(raw, 'sdg_target');
+      const saved: AlignmentSdgTargetRow =
+        raw && typeof raw === 'object'
+          ? {
+              ...(relation ? withoutRelation(raw as AlignmentSdgTargetRow, 'sdg_target') : (raw as AlignmentSdgTargetRow)),
+              ...catalogStatus(relation)
+            }
+          : { sdg_target_id: sdgTargetId };
+      const match =
+        catalog?.find(item => Number(item.sdg_target_id ?? item.id) === sdgTargetId) ?? sdgTargetFromRelation(relation);
 
       if (!match) {
         return { ...saved, sdg_target_id: sdgTargetId };
@@ -155,15 +226,26 @@ export const enrichAlignmentSdgTargets = (
     .filter((target): target is AlignmentSdgTargetRow => target != null);
 };
 
+/** SDG display data from the GET's `clarisa_sdg` relation, labelled like the SDG list does. */
+const sdgFromRelation = (relation: Partial<GetSdgs> | undefined): Partial<GetSdgs> | undefined => {
+  if (!relation) return undefined;
+  return { ...catalogDisplayFields(relation), select_label: `${relation.financial_code} - ${relation.short_name}` };
+};
+
 export const enrichResultSdgs = (sdgs: GetSdgs[] | undefined, catalog?: GetSdgs[]): GetSdgs[] =>
   normalizeSdgs(sdgs)
-    .map(sdg => {
+    .map(rawSdg => {
+      const relation = catalogRelation<Partial<GetSdgs>>(rawSdg, 'clarisa_sdg');
+      const sdg: GetSdgs = {
+        ...withoutRelation(rawSdg, 'clarisa_sdg'),
+        ...catalogStatus(relation)
+      };
       const sdgId = Number(sdg.id ?? sdg.clarisa_sdg_id);
       if (!Number.isFinite(sdgId) || sdgId <= 0) return null;
 
-      const match = catalog?.find(
-        item => Number(item.id) === sdgId || Number(item.clarisa_sdg_id) === sdgId
-      );
+      const match =
+        catalog?.find(item => Number(item.id) === sdgId || Number(item.clarisa_sdg_id) === sdgId) ??
+        sdgFromRelation(relation);
       const withSdgId = sdg as GetSdgs & { sdg_id?: number };
 
       return {
@@ -176,16 +258,31 @@ export const enrichResultSdgs = (sdgs: GetSdgs[] | undefined, catalog?: GetSdgs[
     })
     .filter((sdg): sdg is GetSdgs => sdg != null);
 
+const CONFIG_ITEM_RELATION = {
+  strategic_objective_id: 'strategic_objective',
+  impact_outcome_id: 'impact_outcome'
+} as const;
+
 const enrichPortfolioConfigItems = (
   items: PortfolioConfigItem[] | undefined,
   catalog: PortfolioConfigItem[] | undefined,
   idKey: 'strategic_objective_id' | 'impact_outcome_id'
 ): PortfolioConfigItem[] =>
   (items ?? [])
-    .map(item => {
+    .map(rawItem => {
+      const relationKey = CONFIG_ITEM_RELATION[idKey];
+      const relation = catalogRelation<PortfolioConfigItem>(rawItem, relationKey);
+      const item: PortfolioConfigItem = {
+        ...withoutRelation(rawItem, relationKey),
+        ...catalogStatus(relation)
+      };
       const persistedId = Number((item as PortfolioConfigItem & Record<string, unknown>)[idKey] ?? item.id);
       if (!Number.isFinite(persistedId) || persistedId <= 0) return null;
-      const match = catalog?.find(entry => entry.id === persistedId);
+      const catalogMatch = catalog?.find(entry => entry.id === persistedId);
+      let match: Partial<PortfolioConfigItem> | undefined = catalogMatch;
+      if (!match && relation) {
+        match = catalogDisplayFields(relation);
+      }
       return {
         ...match,
         ...item,
@@ -271,7 +368,13 @@ export const enrichPortfolio2Contracts = (
   catalog?: ContractCatalogItem[]
 ): GetAllianceAlignment['contracts'] =>
   (contracts ?? []).map(rawContract => {
-    const flattened = flattenAlignmentContract(rawContract);
+    // Read the agresso status BEFORE flattening: the selection row's own is_active (always
+    // true for a live selection) would otherwise overwrite the contract's.
+    const status = catalogStatus(catalogRelation(rawContract, 'agresso_contract'));
+    const flattened = {
+      ...flattenAlignmentContract(rawContract),
+      ...status
+    } as Portfolio2AlignmentContract & CatalogStatusFlag;
     const lookupKeys = contractLookupKeys(flattened);
     const catalogMatch = catalog?.find(item => catalogItemMatchesKeys(item, lookupKeys));
 
@@ -349,8 +452,23 @@ export const normalizePortfolio2AlignmentGet = (
     'strategic_objective_id'
   ),
   impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id'),
-  result_sdg_targets: enrichAlignmentSdgTargets(data?.result_sdg_targets, catalogs.sdgTargets)
+  result_sdg_targets: flagSdgTargetsMissingFrom(
+    enrichAlignmentSdgTargets(data?.result_sdg_targets, catalogs.sdgTargets),
+    catalogs.sdgTargets
+  )
 });
+
+/**
+ * SDG target lists come from SDG Management (the OICR portfolio list, or each lever's
+ * targets in Portfolio 1), not the CLARISA `is_active` flag, so a target removed there keeps
+ * an active catalog row. A saved target the list no longer offers is inactive for that
+ * field. An empty list (not loaded) flags nothing.
+ */
+export const flagSdgTargetsMissingFrom = (targets: AlignmentSdgTargetRow[], offered?: LeverSdgTargetOption[]): AlignmentSdgTargetRow[] => {
+  if (!offered?.length) return targets;
+  const offeredIds = new Set(offered.map(item => Number(item.sdg_target_id ?? item.id)));
+  return targets.map(target => (offeredIds.has(Number(target.sdg_target_id)) ? target : { ...target, is_catalog_inactive: true }));
+};
 
 export const buildPortfolio2AlignmentPatch = (
   body: GetAllianceAlignment,
@@ -370,9 +488,7 @@ export const buildPortfolio2AlignmentPatch = (
           .map(sdg => ({ clarisa_sdg_id: Number(sdg.clarisa_sdg_id ?? sdg.id) }))
           .filter(item => Number.isFinite(item.clarisa_sdg_id) && item.clarisa_sdg_id > 0)
       : [],
-    research_areas: (body.research_areas ?? [])
-      .map(area => ({ lever_id: String(area.lever_id ?? area.id) }))
-      .filter(item => item.lever_id),
+    research_areas: (body.research_areas ?? []).map(toResearchAreaPayload).filter(item => item.lever_id),
     strategic_objectives: (body.strategic_objectives ?? [])
       .map(item => ({
         strategic_objective_id: Number(

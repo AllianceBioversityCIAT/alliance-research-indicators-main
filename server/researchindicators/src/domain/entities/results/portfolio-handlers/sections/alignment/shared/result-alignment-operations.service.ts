@@ -17,9 +17,18 @@ import { PortfolioIdEnum } from '../../../enum/portfolio-id.enum';
 import { UpdateDataUtil } from '../../../../../../shared/utils/update-data.util';
 import { filterByUniqueKeyWithPriority } from '../../../../../../shared/utils/array.util';
 import { ResultLever } from '../../../../../result-levers/entities/result-lever.entity';
+import { ResultPoolFundingAlignmentRepository } from '../../../../../bilateral/repositories/result-pool-funding-alignment.repository';
+import { CurrentUserUtil } from '../../../../../../shared/utils/current-user.util';
+import { ReportingPlatformEnum } from '../../../../enum/reporting-platform.enum';
+import { LoggerUtil } from '../../../../../../shared/utils/logger.util';
+import { ResultContract } from '../../../../../result-contracts/entities/result-contract.entity';
 
 @Injectable()
 export class ResultAlignmentOperationsService {
+  private readonly logger = new LoggerUtil({
+    name: ResultAlignmentOperationsService.name,
+  });
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly resultContractsService: ResultContractsService,
@@ -31,6 +40,8 @@ export class ResultAlignmentOperationsService {
     private readonly resultImpactOutcomesService: ResultImpactOutcomesService,
     private readonly resultSdgTargetsService: ResultSdgTargetsService,
     private readonly updateDataUtil: UpdateDataUtil,
+    private readonly poolFundingAlignmentRepository: ResultPoolFundingAlignmentRepository,
+    private readonly currentUser: CurrentUserUtil,
   ) {}
 
   /**
@@ -122,6 +133,11 @@ export class ResultAlignmentOperationsService {
     const run = async (entityManager: EntityManager) => {
       const { contracts, primary_levers, contributor_levers } = alignmentData;
 
+      const [previousPrimaryContractIds, resultGate] = await Promise.all([
+        this.findActivePrimaryContractIds(entityManager, resultId),
+        this.findResultPoolFundingGate(entityManager, resultId),
+      ]);
+
       await this.resultContractsService.create<ContractRolesEnum>(
         resultId,
         contracts,
@@ -131,6 +147,28 @@ export class ResultAlignmentOperationsService {
         ['is_primary'],
         { is_primary: false },
       );
+
+      const incomingPrimaryContractId =
+        this.incomingPrimaryContractId(contracts);
+      const incomingKeepsACurrentPrimary =
+        incomingPrimaryContractId != null &&
+        previousPrimaryContractIds.includes(incomingPrimaryContractId);
+      if (
+        resultGate.platformCode === ReportingPlatformEnum.STAR &&
+        !this.isSnapshotRow(resultGate.isSnapshot) &&
+        previousPrimaryContractIds.length > 0 &&
+        !incomingKeepsACurrentPrimary
+      ) {
+        const userId = this.actingUserId();
+        await this.poolFundingAlignmentRepository.clearLivePoolFunding(
+          entityManager,
+          resultId,
+          userId,
+        );
+        this.logger._log(
+          `Cleared pool funding for result ${resultId}: primary contract ${previousPrimaryContractIds.join(',')} -> ${incomingPrimaryContractId ?? 'none'}`,
+        );
+      }
 
       const primaryLevers: Partial<ResultLever>[] =
         primary_levers?.length > 0
@@ -223,19 +261,26 @@ export class ResultAlignmentOperationsService {
   }
 
   async find(resultId: number): Promise<ResultAlignmentDto> {
+    // Every selected item comes back with its catalog row (relation), and the
+    // relation is NOT filtered by the catalog's is_active. The client lists only
+    // active options, so this is what lets a selection that was later
+    // deactivated in its control list still be shown — with its status.
     const contracts = await this.resultContractsService.find(
       resultId,
       ContractRolesEnum.ALIGNMENT,
+      { agresso_contract: true },
     );
 
     const levers = await this.resultLeversService.find(
       resultId,
       LeverRolesEnum.ALIGNMENT,
+      { lever: true },
     );
 
     const sdgTargets =
       await this.resultLeverSdgTargetsService.findByMultiplesResultLeverIds(
         levers.map((el) => el.result_lever_id),
+        { sdg_target: { clarisa_sdg: true } },
       );
 
     levers.forEach((lever) => {
@@ -249,6 +294,7 @@ export class ResultAlignmentOperationsService {
     const strategicOutcomes =
       await this.resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds(
         primaryLevers.map((el) => el.result_lever_id),
+        { lever_strategic_outcome: true },
       );
 
     primaryLevers.forEach((lever) => {
@@ -257,7 +303,9 @@ export class ResultAlignmentOperationsService {
       );
     });
 
-    const result_sdgs = await this.resultSdgsService.find(resultId);
+    const result_sdgs = await this.resultSdgsService.find(resultId, undefined, {
+      clarisa_sdg: true,
+    });
 
     return {
       contracts,
@@ -296,5 +344,70 @@ export class ResultAlignmentOperationsService {
     }
 
     return saved;
+  }
+
+  private async findActivePrimaryContractIds(
+    manager: EntityManager,
+    resultId: number,
+  ): Promise<string[]> {
+    const rows: { contract_id: string | number | null }[] = await manager.query(
+      `SELECT contract_id
+         FROM result_contracts
+        WHERE result_id = ?
+          AND is_active = TRUE
+          AND is_primary = TRUE
+          AND contract_role_id = ?`,
+      [resultId, ContractRolesEnum.ALIGNMENT],
+    );
+    return rows
+      .map((row) => row?.contract_id)
+      .filter((contractId) => contractId != null && contractId !== '')
+      .map((contractId) => String(contractId));
+  }
+
+  private async findResultPoolFundingGate(
+    manager: EntityManager,
+    resultId: number,
+  ): Promise<{ platformCode: string | null; isSnapshot: unknown }> {
+    const rows: {
+      platform_code: string | null;
+      is_snapshot: unknown;
+    }[] = await manager.query(
+      `SELECT platform_code, is_snapshot
+         FROM results
+        WHERE result_id = ?
+        LIMIT 1`,
+      [resultId],
+    );
+    return {
+      platformCode: rows[0]?.platform_code ?? null,
+      isSnapshot: rows[0]?.is_snapshot ?? null,
+    };
+  }
+
+  /** MySQL booleans arrive as 0/1 or '0'/'1'. Only an explicit snapshot flag blocks the clear. */
+  private isSnapshotRow(value: unknown): boolean {
+    return value === true || value === 1 || value === '1' || value === 'true';
+  }
+
+  private incomingPrimaryContractId(
+    contracts: ResultContract[] | undefined,
+  ): string | null {
+    const primary = (contracts ?? []).find((contract) =>
+      this.isPrimaryFlag(contract?.is_primary),
+    );
+    if (primary?.contract_id == null || primary.contract_id === '') {
+      return null;
+    }
+    return String(primary.contract_id);
+  }
+
+  private isPrimaryFlag(value: unknown): boolean {
+    return value === true || value === 1 || value === '1' || value === 'true';
+  }
+
+  private actingUserId(): number | null {
+    const userId = this.currentUser?.user_id;
+    return userId == null ? null : userId;
   }
 }

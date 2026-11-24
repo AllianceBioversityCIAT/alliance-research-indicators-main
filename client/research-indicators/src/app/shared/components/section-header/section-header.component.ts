@@ -15,6 +15,7 @@ import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DownloadOicrTemplateComponent } from '../download-oicr-template/download-oicr-template.component';
 import { RolesService } from '@shared/services/cache/roles.service';
+import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { lastPfmScope } from '@shared/utils/pfm-last-scope.util';
 import { isHomeEntryFromUrl, isPfmMonitorEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
@@ -39,6 +40,11 @@ export interface BreadcrumbItem {
   tooltip?: string;
 }
 
+/** result_status.result_status_id of Published (server ResultStatusEnum.PUBLISHED). */
+const PUBLISHED_STATUS_ID = 14;
+/** Revised (5) and Rejected (7): any user who opens the result may delete it. */
+const OPEN_DELETE_STATUS_IDS = [5, 7];
+
 @Component({
   selector: 'app-section-header',
   imports: [CommonModule, PopoverModule, ButtonModule, TooltipModule, MenuModule, RouterModule, DownloadOicrTemplateComponent],
@@ -55,6 +61,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   api = inject(ApiService);
   submissionService = inject(SubmissionService);
   whatsNewService = inject(WhatsNewService);
+  private readonly resultsCenterService = inject(ResultsCenterService);
 
   private currentProject = signal<GetProjectDetail>({});
   private contractId = signal('');
@@ -64,8 +71,11 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   private currentResultId = signal('');
   showDeleteOption = computed(() => {
     if (this.cache.isExternalResult()) return false;
-    const statusId = this.cache.currentMetadata()?.status_id;
-    return statusId === 5 || statusId === 7 || (statusId === 4 && this.cache.isMyResult()) || this.rolesService.isAdmin();
+    // Any status except Published can be deleted (the API enforces the same rule).
+    // Who may delete is unchanged: the creator or an admin, and anyone on a Revised/Rejected result.
+    const statusId = Number(this.cache.currentMetadata()?.status_id);
+    if (statusId === PUBLISHED_STATUS_ID) return false;
+    return this.cache.isMyResult() || this.rolesService.isAdmin() || OPEN_DELETE_STATUS_IDS.includes(statusId);
   });
   // H36 — every STAR result shows the PDF icon. Indicators without a report yet get it
   // greyed out with a "Coming soon" tooltip, instead of hiding it with no explanation.
@@ -79,7 +89,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     return !isStarPdfReportEligibleFromResultId(indicatorId, resultId) || isStarInnDevPdfTemporarilyDisabled(indicatorId);
   });
   readonly starPdfComingSoonTooltip = STAR_PDF_COMING_SOON_TOOLTIP;
-  /** OICR results only, and not Portfolio 2 — that portfolio has no template yet. */
+  /** OICR results only, and only when the portfolio resolves to 1 or 2. */
   showOicrTemplateDownload = computed(() => {
     const metadata = this.cache.currentMetadata();
     return metadata?.indicator_id === OICR_INDICATOR_ID && !isOicrTemplateDownloadHidden(metadata);
@@ -112,6 +122,9 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
                 try {
                   const res = await this.api.DELETE_Result(this.cache.getCurrentNumericResultId());
                   if (res.successfulRequest) {
+                    // Results Center skips a fetch whose filters match the last one, so
+                    // without this it would show the cached list with the deleted result.
+                    this.resultsCenterService.invalidateResultsListFetchCache();
                     this.actions.hideGlobalAlert(0);
                     this.actions.showToast({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
                     this.router.navigate(['/results-center']);

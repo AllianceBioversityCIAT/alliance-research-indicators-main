@@ -28,4 +28,6 @@ interface Contract {
   contract_id: string;
   contract_role_id: number;
   is_primary: boolean;
+  /** Set when the selected item's control-list entry is inactive (see catalog-relation.util). */
+  is_catalog_inactive?: boolean;
 }

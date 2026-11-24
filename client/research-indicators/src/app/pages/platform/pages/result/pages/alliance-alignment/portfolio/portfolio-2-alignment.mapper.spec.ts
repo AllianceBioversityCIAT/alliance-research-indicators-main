@@ -330,6 +330,27 @@ describe('portfolio-2-alignment.mapper', () => {
     });
   });
 
+  it('sends the "Other" team name and the primary flag of each Research Area', () => {
+    const body: GetAllianceAlignment = {
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: [],
+      research_areas: [
+        { id: 18, lever_id: 18, is_primary: true, custom_lever_name: '  ImpactSF  ' } as never,
+        { id: 12, lever_id: 12, is_primary: 0, custom_lever_name: 'ignored' } as never,
+        { id: 7, lever_id: 7 } as never
+      ],
+      strategic_objectives: []
+    };
+
+    expect(buildPortfolio2AlignmentPatch(body, false).research_areas).toEqual([
+      { lever_id: '18', is_primary: true, custom_lever_name: 'ImpactSF' },
+      { lever_id: '12', is_primary: false },
+      { lever_id: '7' }
+    ]);
+  });
+
   it('omits impact_outcomes when indicator does not use them', () => {
     const body: GetAllianceAlignment = {
       contracts: [],
@@ -1137,6 +1158,224 @@ describe('portfolio-2-alignment.mapper', () => {
         id: 45,
         lever_id: 45
       });
+    });
+  });
+  describe('selections whose catalog entry is inactive (GET returns the catalog row as a relation)', () => {
+    it('shows an inactive Research Area from its relation, flags it and drops the nested relation', () => {
+      const [area] = enrichResearchAreas(
+        [
+          {
+            result_lever_id: 7,
+            lever_id: '11',
+            is_primary: true,
+            is_active: true,
+            lever: {
+              id: 11,
+              short_name: 'Multifunctional Landscapes',
+              full_name: 'Multifunctional Landscapes and Agrobiodiversity',
+              other_names: 'MLA',
+              icon: 'https://s3.example/11.png',
+              is_active: false
+            }
+          } as never
+        ],
+        []
+      );
+
+      expect(area).toEqual(
+        expect.objectContaining({
+          lever_id: 11,
+          short_name: 'Multifunctional Landscapes',
+          full_name: 'Multifunctional Landscapes and Agrobiodiversity',
+          icon: 'https://s3.example/11.png',
+          is_catalog_inactive: true
+        })
+      );
+      expect(area).not.toHaveProperty('lever');
+    });
+
+    it('does not flag a selection whose catalog row is active', () => {
+      const [area] = enrichResearchAreas(
+        [{ lever_id: '10', lever: { id: 10, full_name: 'Food Environments', is_active: true } } as never],
+        [{ id: 10, lever_id: 10, full_name: 'Food Environments', short_name: 'FE' } as never]
+      );
+      expect(area).not.toHaveProperty('is_catalog_inactive');
+    });
+
+    it('shows an inactive Portfolio 1 lever with its CLARISA name and icon', () => {
+      const [lever] = enrichAlignmentLevers(
+        [
+          {
+            lever_id: '6',
+            is_primary: true,
+            lever: { id: 6, short_name: 'Lever 6', other_names: 'Crops', icon: 'https://s3.example/6.png', is_active: false }
+          } as never
+        ],
+        []
+      );
+      expect(lever).toEqual(
+        expect.objectContaining({ lever_id: '6', short_name: 'Lever 6', other_names: 'Crops', icon: 'https://s3.example/6.png' })
+      );
+      expect((lever as { is_catalog_inactive?: boolean }).is_catalog_inactive).toBe(true);
+      expect(lever).not.toHaveProperty('lever');
+    });
+
+    it('shows an inactive SDG with the same label the SDG list builds', () => {
+      const [sdg] = enrichResultSdgs(
+        [
+          {
+            result_sdg_id: 5,
+            clarisa_sdg_id: 4,
+            clarisa_sdg: {
+              id: 4,
+              financial_code: 'SDG 4',
+              short_name: 'Goal 4: Quality Education',
+              icon: 'https://s3.example/sdg4.png',
+              is_active: false
+            }
+          } as never
+        ],
+        []
+      );
+      expect(sdg).toEqual(
+        expect.objectContaining({
+          id: 4,
+          clarisa_sdg_id: 4,
+          short_name: 'Goal 4: Quality Education',
+          icon: 'https://s3.example/sdg4.png',
+          select_label: 'SDG 4 - Goal 4: Quality Education',
+          is_catalog_inactive: true
+        })
+      );
+      expect(sdg).not.toHaveProperty('clarisa_sdg');
+    });
+
+    it('shows inactive Strategic Objectives and Impact Outcomes from their relations', () => {
+      const normalized = normalizePortfolio2AlignmentGet(
+        {
+          strategic_objectives: [
+            {
+              strategic_objective_id: 4,
+              strategic_objective: { id: 4, name: 'Enable Healthy Food Choices', description: 'SO 4', is_active: false }
+            }
+          ] as never,
+          impact_outcomes: [
+            {
+              impact_outcome_id: 5,
+              impact_outcome: { id: 5, name: 'Leveraged Financing', description: 'IO 5', is_active: false }
+            }
+          ] as never
+        },
+        { strategicObjectives: [], impactOutcomes: [] }
+      );
+
+      expect(normalized.strategic_objectives?.[0]).toEqual(
+        expect.objectContaining({ id: 4, name: 'Enable Healthy Food Choices', description: 'SO 4', is_catalog_inactive: true })
+      );
+      expect(normalized.strategic_objectives?.[0]).not.toHaveProperty('strategic_objective');
+      expect(normalized.impact_outcomes?.[0]).toEqual(
+        expect.objectContaining({ id: 5, name: 'Leveraged Financing', is_catalog_inactive: true })
+      );
+    });
+
+    it('shows an inactive SDG target: the relation named sdg_target becomes the target text', () => {
+      const [target] = enrichAlignmentSdgTargets(
+        [
+          {
+            sdg_target_id: 9,
+            sdg_target: {
+              id: 9,
+              sdg_target_code: '2.2',
+              sdg_target: 'By 2030, end all forms of malnutrition',
+              clarisa_sdg: { id: 2, short_name: 'Goal 2: Zero Hunger' },
+              is_active: false
+            }
+          }
+        ],
+        []
+      );
+      expect(target).toEqual(
+        expect.objectContaining({
+          sdg_target_id: 9,
+          sdg_target_code: '2.2',
+          sdg_target: 'By 2030, end all forms of malnutrition',
+          select_label: '2.2 — By 2030, end all forms of malnutrition',
+          clarisa_sdg: expect.objectContaining({ short_name: 'Goal 2: Zero Hunger' }),
+          is_catalog_inactive: true
+        })
+      );
+    });
+
+    it('shows an inactive contract with its agreement and description and flags it', () => {
+      const [contract] = enrichPortfolio2Contracts(
+        [
+          {
+            contract_id: 'A1080',
+            is_primary: true,
+            is_active: true,
+            agresso_contract: { agreement_id: 'A1080', description: 'CROP TRUST long-term', is_active: false }
+          } as never
+        ],
+        []
+      );
+      expect(contract).toEqual(
+        expect.objectContaining({
+          contract_id: 'A1080',
+          select_label: 'A1080 - CROP TRUST long-term',
+          is_primary: true,
+          is_catalog_inactive: true
+        })
+      );
+    });
+
+    it('flags an SDG target removed from the portfolio list (SDG Management) even though its catalog row is active', () => {
+      const offered = [
+        { id: 1, sdg_target_id: 1, sdg_target_code: '1.1', sdg_target: 'Poverty', select_label: '1.1 — Poverty' },
+        { id: 2, sdg_target_id: 2, sdg_target_code: '1.2', sdg_target: 'Half poverty', select_label: '1.2 — Half poverty' }
+      ] as never[];
+      const normalized = normalizePortfolio2AlignmentGet(
+        {
+          result_sdg_targets: [
+            { sdg_target_id: 1, sdg_target: { id: 1, sdg_target_code: '1.1', sdg_target: 'Poverty', is_active: true } },
+            { sdg_target_id: 4, sdg_target: { id: 4, sdg_target_code: '1.4', sdg_target: 'Equal rights', is_active: true } }
+          ] as never
+        },
+        { sdgTargets: offered }
+      );
+
+      const [kept, removed] = normalized.result_sdg_targets ?? [];
+      expect(kept).not.toHaveProperty('is_catalog_inactive');
+      expect(removed).toEqual(
+        expect.objectContaining({ sdg_target_id: 4, sdg_target_code: '1.4', sdg_target: 'Equal rights', is_catalog_inactive: true })
+      );
+    });
+
+    it('flags no SDG target while the portfolio list is empty (not loaded)', () => {
+      const normalized = normalizePortfolio2AlignmentGet(
+        { result_sdg_targets: [{ sdg_target_id: 4, sdg_target: { id: 4, sdg_target_code: '1.4', is_active: true } }] as never },
+        { sdgTargets: [] }
+      );
+      expect(normalized.result_sdg_targets?.[0]).not.toHaveProperty('is_catalog_inactive');
+    });
+
+    it('never sends the inactive flag or the catalog relation back in the PATCH', () => {
+      const patch = buildPortfolio2AlignmentPatch(
+        {
+          contracts: [{ contract_id: 'A1080', is_primary: true, is_catalog_inactive: true }],
+          result_sdgs: [{ id: 4, clarisa_sdg_id: 4, is_catalog_inactive: true }],
+          primary_levers: [],
+          contributor_levers: [],
+          research_areas: [{ id: 11, lever_id: 11, is_catalog_inactive: true }],
+          strategic_objectives: [{ id: 4, name: 'SO', is_catalog_inactive: true }],
+          impact_outcomes: [{ id: 5, name: 'IO', is_catalog_inactive: true }],
+          result_sdg_targets: [{ sdg_target_id: 9, is_catalog_inactive: true }]
+        } as never,
+        true,
+        true,
+        true
+      );
+      expect(JSON.stringify(patch)).not.toContain('is_catalog_inactive');
+      expect(patch.research_areas).toEqual([{ lever_id: '11' }]);
     });
   });
 });
