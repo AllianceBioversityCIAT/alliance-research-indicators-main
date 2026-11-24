@@ -510,6 +510,10 @@ describe('SectionHeaderComponent', () => {
 
     (cacheService.currentMetadata as any).set({ indicator_id: 4, result_official_code: 8, report_year: 2026 });
     expect(component.showStarPdfReport()).toBe(true);
+    expect(component.starPdfReportDisabled()).toBe(false);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 3, result_official_code: 8, report_year: 2026 });
+    expect(component.showStarPdfReport()).toBe(true);
     expect(component.starPdfReportDisabled()).toBe(true);
 
     (cacheService.currentResultId as any).set('PRMS-8');
@@ -519,7 +523,7 @@ describe('SectionHeaderComponent', () => {
 
   it('H36: renders the greyed PDF icon with a Coming soon tooltip for an indicator without a report', () => {
     (cacheService.currentResultId as any).set('STAR-8');
-    (cacheService.currentMetadata as any).set({ indicator_id: 4, result_official_code: 8, report_year: 2026 });
+    (cacheService.currentMetadata as any).set({ indicator_id: 3, result_official_code: 8, report_year: 2026 });
     fixture.detectChanges();
     const icon: HTMLElement | null = fixture.nativeElement.querySelector('span[role="img"] .pi-file-pdf');
     expect(icon).not.toBeNull();

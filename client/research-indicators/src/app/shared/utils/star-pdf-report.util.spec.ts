@@ -5,6 +5,7 @@ import {
   getStarReportViewerUrl,
   getStarReportYear,
   INNOVATION_DEVELOPMENT_INDICATOR_ID,
+  POLICY_CHANGE_INDICATOR_ID,
   isStarPdfReportEligible,
   isStarPdfReportEligibleFromResultId,
   openStarPdfReportInNewTab
@@ -14,20 +15,23 @@ describe('star-pdf-report.util', () => {
   it('getStarPdfReportName should map supported indicators to report names', () => {
     expect(getStarPdfReportName(CAPACITY_SHARING_INDICATOR_ID)).toBe('cap_sharing');
     expect(getStarPdfReportName(INNOVATION_DEVELOPMENT_INDICATOR_ID)).toBe('inn_dev');
-    expect(getStarPdfReportName(4)).toBeNull();
+    expect(getStarPdfReportName(POLICY_CHANGE_INDICATOR_ID)).toBe('policy_change');
+    expect(getStarPdfReportName(3)).toBeNull();
   });
 
   it('isStarPdfReportEligible should require STAR platform and supported indicator', () => {
     expect(isStarPdfReportEligible({ platform_code: 'STAR', indicator_id: CAPACITY_SHARING_INDICATOR_ID })).toBe(true);
     expect(isStarPdfReportEligible({ platform_code: 'STAR', indicator_id: INNOVATION_DEVELOPMENT_INDICATOR_ID })).toBe(true);
-    expect(isStarPdfReportEligible({ platform_code: 'STAR', indicator_id: 4 })).toBe(false);
+    expect(isStarPdfReportEligible({ platform_code: 'STAR', indicator_id: POLICY_CHANGE_INDICATOR_ID })).toBe(true);
+    expect(isStarPdfReportEligible({ platform_code: 'STAR', indicator_id: 3 })).toBe(false);
     expect(isStarPdfReportEligible({ platform_code: 'PRMS', indicator_id: CAPACITY_SHARING_INDICATOR_ID })).toBe(false);
   });
 
   it('isStarPdfReportEligibleFromResultId should require STAR result id and supported indicator', () => {
     expect(isStarPdfReportEligibleFromResultId(1, 'STAR-8')).toBe(true);
     expect(isStarPdfReportEligibleFromResultId(2, 'STAR-8')).toBe(true);
-    expect(isStarPdfReportEligibleFromResultId(4, 'STAR-8')).toBe(false);
+    expect(isStarPdfReportEligibleFromResultId(4, 'STAR-8')).toBe(true);
+    expect(isStarPdfReportEligibleFromResultId(3, 'STAR-8')).toBe(false);
     expect(isStarPdfReportEligibleFromResultId(1, 'PRMS-8')).toBe(false);
     expect(isStarPdfReportEligibleFromResultId(1, null)).toBe(false);
     expect(isStarPdfReportEligibleFromResultId(1, undefined)).toBe(false);

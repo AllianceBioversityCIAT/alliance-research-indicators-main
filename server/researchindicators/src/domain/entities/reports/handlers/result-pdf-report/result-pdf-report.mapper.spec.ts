@@ -1,10 +1,14 @@
 import {
+  buildResultPdfUrl,
+  mapActorTypeIcons,
   mapAllianceAlignmentSection,
   mapCapSharingSection,
   mapGeneralInformationSection,
   mapGeographicScopeSection,
   mapInnovationDetailsSection,
   mapPartnersSection,
+  mapPolicyAmountStatus,
+  mapPolicyChangeSection,
   mapYesNoLabel,
   formatPdfGeneratedAt,
   getOrdinalDaySuffix,
@@ -96,7 +100,7 @@ describe('result-pdf-report.mapper', () => {
             name: 'Wageningen University and Research Centre',
             institution_type: { name: 'Research organizations' },
             institution_locations: [
-              { isHeadquarter: true, name: 'Netherlands' },
+              { isHeadquarter: true, name: 'Netherlands', isoAlpha2: 'NL' },
             ],
           },
         } as any,
@@ -111,6 +115,7 @@ describe('result-pdf-report.mapper', () => {
       name: 'Wageningen University and Research Centre',
       institution_type_name: 'Research organizations',
       headquarters: 'Netherlands',
+      isoAlpha2: 'NL',
     });
   });
 
@@ -462,5 +467,253 @@ describe('result-pdf-report.mapper', () => {
     expect(result.tool_function_labels).toEqual(['Decision support']);
     expect(result.knowledge_sharing_form.link_to_result).toEqual(linked);
     expect('anticipated_users_label' in result).toBe(false);
+  });
+
+  describe('mapPolicyChangeSection', () => {
+    const implementingOrganization = {
+      result_institution_id: 10948,
+      result_id: 30341,
+      institution_id: 7,
+      institution_role_id: 4,
+      is_active: true,
+      institution: {
+        acronym: 'MoALD',
+        name: 'Ministry of Agriculture and Livestock Development, Kenya',
+        institution_type: { name: 'Government (National)' },
+        institution_locations: [
+          { isHeadquarter: true, name: 'Kenya', isoAlpha2: 'KE' },
+        ],
+      },
+    } as any;
+
+    const linkedResult = {
+      result_id: '30339',
+      result_official_code: '9150',
+      platform_code: 'STAR',
+      title: 'Drought-tolerant maize',
+      report_year_id: '2025',
+      result_status: {
+        result_status_id: '6',
+        name: 'Approved',
+        config: { color: { border: '#6FA17A', text: '#6FA17A' } },
+      },
+    } as any;
+
+    it('replaces every id with complete data for a Program, Budget, or Investment', () => {
+      const section = mapPolicyChangeSection({
+        policyChange: {
+          policy_type_id: '3',
+          policy_type: { name: 'Program, Budget, or Investment' },
+          policy_stage_id: '2',
+          policy_stage: { name: 'Stage 2: Policy enacted' },
+          usd_amount: '1250000.00',
+          amount_status: 'Confirmed',
+          evidence_stage: 'Line one\nLine two',
+        } as any,
+        implementingOrganizations: [implementingOrganization],
+        innovationDevelopment: linkedResult,
+        innovationUse: null,
+      });
+
+      expect(section).toEqual({
+        policy_type_id: 3,
+        policy_type: { id: 3, name: 'Program, Budget, or Investment' },
+        policy_stage_id: 2,
+        policy_stage: { id: 2, name: 'Stage 2: Policy enacted' },
+        usd_amount: 1250000,
+        amount_status: { id: 1, name: 'Confirmed' },
+        evidence_stage: 'Line one\nLine two',
+        implementing_organization: [
+          {
+            result_institution_id: 10948,
+            result_id: 30341,
+            is_active: true,
+            institution_id: 7,
+            institution_role_id: 4,
+            acronym: 'MoALD',
+            name: 'Ministry of Agriculture and Livestock Development, Kenya',
+            institution_type_name: 'Government (National)',
+            headquarters: 'Kenya',
+            isoAlpha2: 'KE',
+          },
+        ],
+        innovation_development: {
+          result_id: 30339,
+          result_official_code: 9150,
+          platform_code: 'STAR',
+          title: 'Drought-tolerant maize',
+          report_year: 2025,
+          result_status: {
+            result_status_id: 6,
+            name: 'Approved',
+            config: { color: { border: '#6FA17A', text: '#6FA17A' } },
+          },
+        },
+        innovation_use: null,
+      });
+    });
+
+    it('keeps a zero amount', () => {
+      const section = mapPolicyChangeSection({
+        policyChange: {
+          policy_type_id: 3,
+          policy_type: { name: 'Program, Budget, or Investment' },
+          usd_amount: '0.00',
+          amount_status: 'Estimated',
+        } as any,
+        implementingOrganizations: [],
+        innovationDevelopment: null,
+        innovationUse: null,
+      });
+
+      expect(section.usd_amount).toBe(0);
+      expect(section.amount_status).toEqual({ id: 2, name: 'Estimated' });
+    });
+
+    it('leaves the amount out for any other policy type', () => {
+      const section = mapPolicyChangeSection({
+        policyChange: {
+          policy_type_id: 1,
+          policy_type: { name: 'Policy or Strategy' },
+          usd_amount: '500.00',
+          amount_status: 'Confirmed',
+        } as any,
+        implementingOrganizations: [],
+        innovationDevelopment: null,
+        innovationUse: null,
+      });
+
+      expect(section).not.toHaveProperty('usd_amount');
+      expect(section).not.toHaveProperty('amount_status');
+    });
+
+    it('returns nulls and no organizations when the result has no policy change yet', () => {
+      expect(
+        mapPolicyChangeSection({
+          policyChange: null,
+          implementingOrganizations: [
+            { ...implementingOrganization, is_active: false },
+          ],
+          innovationDevelopment: null,
+          innovationUse: null,
+        }),
+      ).toEqual({
+        policy_type_id: null,
+        policy_type: null,
+        policy_stage_id: null,
+        policy_stage: null,
+        evidence_stage: null,
+        implementing_organization: [],
+        innovation_development: null,
+        innovation_use: null,
+      });
+    });
+
+    it('sends a null title and status when the linked result lacks them', () => {
+      const section = mapPolicyChangeSection({
+        policyChange: null,
+        implementingOrganizations: [],
+        innovationDevelopment: null,
+        innovationUse: {
+          ...linkedResult,
+          title: undefined,
+          report_year_id: null,
+          result_status: undefined,
+        },
+      });
+
+      expect(section.innovation_use).toEqual(
+        expect.objectContaining({
+          title: null,
+          report_year: null,
+          result_status: null,
+        }),
+      );
+    });
+  });
+
+  describe('mapPolicyAmountStatus', () => {
+    it.each([
+      ['Confirmed', { id: 1, name: 'Confirmed' }],
+      ['Estimated', { id: 2, name: 'Estimated' }],
+      ['Unknown', { id: 3, name: 'Unknown' }],
+      ['Other', null],
+      [null, null],
+    ])('maps %p', (value, expected) => {
+      expect(mapPolicyAmountStatus(value as string | null)).toEqual(expected);
+    });
+  });
+
+  describe('mapActorTypeIcons', () => {
+    const BUCKET = 'https://alliance-files-storage.s3.us-east-1.amazonaws.com';
+
+    it('maps every catalog actor type to its image in production', () => {
+      expect(mapActorTypeIcons(`${BUCKET}/`, true, [1, 2, 3, 4, 5, 2])).toEqual(
+        {
+          1: `${BUCKET}/public/images/users-farmers.png`,
+          2: `${BUCKET}/public/images/user-researchers.png`,
+          3: `${BUCKET}/public/images/users-extension-agents.png`,
+          4: `${BUCKET}/public/images/users-policy.png`,
+          5: `${BUCKET}/public/images/users-other.png`,
+        },
+      );
+    });
+
+    it('reads the public-dev folder outside production and skips unknown or empty ids', () => {
+      expect(
+        mapActorTypeIcons(BUCKET, false, [4, 99, null, undefined]),
+      ).toEqual({ 4: `${BUCKET}/public-dev/images/users-policy.png` });
+    });
+
+    it.each([undefined, '', 'alliance-files-storage', '/images'])(
+      'sends nothing when the bucket URL is %p (not absolute)',
+      (bucketUrl) => {
+        expect(mapActorTypeIcons(bucketUrl, true, [1])).toEqual({});
+      },
+    );
+  });
+
+  describe('buildResultPdfUrl', () => {
+    const HOST = 'https://star.alliance.cgiar.org';
+    const STAR_INN_DEV = {
+      platform_code: 'STAR',
+      result_official_code: 9150,
+      indicator_id: 2,
+      report_year_id: 2025,
+    };
+
+    it('links a STAR result to its report viewer page with its version', () => {
+      expect(buildResultPdfUrl(`${HOST}/`, STAR_INN_DEV)).toBe(
+        `${HOST}/reports/result/STAR-9150?version=2025`,
+      );
+    });
+
+    it('omits the version when the result has no report year', () => {
+      expect(
+        buildResultPdfUrl(HOST, { ...STAR_INN_DEV, report_year_id: null }),
+      ).toBe(`${HOST}/reports/result/STAR-9150`);
+    });
+
+    it.each([1, 2, 4])('links indicator %p, which has a PDF template', (id) => {
+      expect(
+        buildResultPdfUrl(HOST, { ...STAR_INN_DEV, indicator_id: id }),
+      ).not.toBeNull();
+    });
+
+    it.each([
+      ['a result outside STAR', { ...STAR_INN_DEV, platform_code: 'TIP' }],
+      ['an indicator without template', { ...STAR_INN_DEV, indicator_id: 6 }],
+      ['a missing code', { ...STAR_INN_DEV, result_official_code: null }],
+      ['no result', null],
+    ])('is null for %s', (_label, result) => {
+      expect(buildResultPdfUrl(HOST, result)).toBeNull();
+    });
+
+    it.each([undefined, '', 'star.alliance.cgiar.org'])(
+      'is null when the client host is %p (not absolute)',
+      (host) => {
+        expect(buildResultPdfUrl(host, STAR_INN_DEV)).toBeNull();
+      },
+    );
   });
 });

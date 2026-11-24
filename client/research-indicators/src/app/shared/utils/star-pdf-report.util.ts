@@ -2,11 +2,12 @@ import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 export const CAPACITY_SHARING_INDICATOR_ID = 1;
 export const INNOVATION_DEVELOPMENT_INDICATOR_ID = 2;
+export const POLICY_CHANGE_INDICATOR_ID = 4;
 
 /** Tooltip on the greyed PDF icon of STAR indicators that have no report yet (H36). */
 export const STAR_PDF_COMING_SOON_TOOLTIP = 'Coming soon';
 
-export type StarPdfReportName = 'cap_sharing' | 'inn_dev';
+export type StarPdfReportName = 'cap_sharing' | 'inn_dev' | 'policy_change';
 export type StarResultCodeValue = number | string;
 export type StarResultIdValue = string | number | null;
 
@@ -23,6 +24,7 @@ export interface StarPdfReportSource {
 export function getStarPdfReportName(indicatorId: number | undefined): StarPdfReportName | null {
   if (indicatorId === CAPACITY_SHARING_INDICATOR_ID) return 'cap_sharing';
   if (indicatorId === INNOVATION_DEVELOPMENT_INDICATOR_ID) return 'inn_dev';
+  if (indicatorId === POLICY_CHANGE_INDICATOR_ID) return 'policy_change';
   return null;
 }
 

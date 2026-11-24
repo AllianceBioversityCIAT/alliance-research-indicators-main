@@ -888,7 +888,8 @@ describe('ResultsCenterTableComponent', () => {
   it('showStarPdfReport should require STAR platform and supported indicators', () => {
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 1 })).toBe(true);
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 2 })).toBe(true);
-    expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 4 })).toBe(false);
+    expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 4 })).toBe(true);
+    expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 3 })).toBe(false);
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'PRMS', indicator_id: 1 })).toBe(false);
   });
 

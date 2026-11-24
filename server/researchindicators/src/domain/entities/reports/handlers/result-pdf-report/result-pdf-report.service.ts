@@ -21,6 +21,7 @@ import { ResultImpactOutcome } from '../../../result-impact-outcomes/entities/re
 import { ResultImpactOutcomeRolesEnum } from '../../../result-impact-outcomes/enum/result-impact-outcome-roles.enum';
 import { Portfolio } from '../../../portfolios/entities/portfolio.entity';
 import { PortfoliosService } from '../../../portfolios/portfolios.service';
+import { IndicatorsEnum } from '../../../indicators/enum/indicators.enum';
 import { PortfolioIdEnum } from '../../../results/portfolio-handlers/enum/portfolio-id.enum';
 import {
   AllianceAlignmentPdfSource,
@@ -124,7 +125,9 @@ export class ResultPdfReportService {
       ),
       geographic_scope: mapGeographicScopeSection(geoLocation),
       evidence: mapEvidenceSection(evidence),
-      ip_rights: mapIpRightsSection(ipRights),
+      ...(this.sendsIpRights(metadata.indicator_id)
+        ? { ip_rights: mapIpRightsSection(ipRights) }
+        : {}),
       ...indicatorSections,
     };
 
@@ -142,6 +145,11 @@ export class ResultPdfReportService {
     const uuid = await this.pdfViewerService.postData(reportData);
     const pdf = await this.pdfViewerService.renderPdf(reportName, uuid);
     return pdf;
+  }
+
+  /** Policy Change has no IP rights block in its template. */
+  private sendsIpRights(indicatorId: number): boolean {
+    return Number(indicatorId) !== IndicatorsEnum.POLICY_CHANGE;
   }
 
   private findAlignmentContracts(resultId: number): Promise<ResultContract[]> {

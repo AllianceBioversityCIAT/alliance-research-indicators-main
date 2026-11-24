@@ -158,6 +158,8 @@ export type ResultPdfReportPartnerInstitution = {
   name?: string;
   institution_type_name?: string;
   headquarters?: string | null;
+  /** ISO alpha-2 of the headquarters; the PDF draws the flag from it. */
+  isoAlpha2?: string | null;
 };
 
 export type ResultPdfReportPartnersSection = {
@@ -235,6 +237,8 @@ export type ResultPdfReportLinkedResult = {
   result_type_label?: string;
   qa_status_label?: string;
   reporting_project_name?: string;
+  /** Absolute link to the linked result's PDF; null when it has no PDF template. */
+  pdf_url?: string | null;
 };
 
 /**
@@ -249,6 +253,8 @@ export type ResultPdfReportInnovationDetailsLabels = {
   anticipated_users_label?: string;
   is_new_or_improved_variety_label?: string;
   actor_type_labels?: Record<number, string>;
+  /** Absolute URL of the actor type's image (white PNG) by actor_type_id. */
+  actor_type_icons?: Record<number, string>;
   institution_type_labels?: Record<number, string>;
   /** CLARISA institution-type description by id; ids without one are omitted. */
   institution_type_descriptions?: Record<number, string>;
@@ -277,11 +283,57 @@ export type ResultPdfReportInnovationDetailsSection = Omit<
   > & { link_to_result?: ResultPdfReportLinkedResult[] };
 } & ResultPdfReportInnovationDetailsLabels;
 
+export type ResultPdfReportCatalogRef = { id: number; name: string };
+
+/** An `implementing_organization` row: the bridge row plus the Results Partners fields. */
+export type ResultPdfReportImplementingOrganization =
+  ResultPdfReportPartnerInstitution & {
+    result_institution_id: number;
+    result_id: number;
+    is_active: boolean;
+  };
+
+/** A linked Innovation Development / Use result, with what the STAR selector shows. */
+export type ResultPdfReportPolicyLinkedResult = {
+  result_id: number;
+  result_official_code: number;
+  platform_code: string | null;
+  /** Without a title the PDF hides the card. */
+  title: string | null;
+  report_year: number | null;
+  result_status: {
+    result_status_id: number;
+    name: string;
+    config: unknown;
+  } | null;
+  /** Absolute link to its PDF. Only sent for the Innovation Development card. */
+  pdf_url?: string | null;
+};
+
+/**
+ * `policy_change` for the `policy_change` template: the policy-change GET with every
+ * id replaced by complete data, because the PDF viewer never prints an id.
+ */
+export type ResultPdfReportPolicyChangeSection = {
+  policy_type_id: number | null;
+  policy_type: ResultPdfReportCatalogRef | null;
+  policy_stage_id: number | null;
+  policy_stage: ResultPdfReportCatalogRef | null;
+  /** Only for Program, Budget, or Investment (type 3); 0 is a valid amount. */
+  usd_amount?: number | null;
+  amount_status?: ResultPdfReportCatalogRef | null;
+  evidence_stage: string | null;
+  implementing_organization: ResultPdfReportImplementingOrganization[];
+  innovation_development: ResultPdfReportPolicyLinkedResult | null;
+  innovation_use: ResultPdfReportPolicyLinkedResult | null;
+};
+
 export type ResultPdfReportPayload = {
   general_information: ResultPdfReportGeneralInformationSection;
   alliance_alignment: ResultPdfReportAllianceAlignmentSection;
   results_partners: ResultPdfReportPartnersSection;
   geographic_scope: ResultPdfReportGeographicScopeSection;
   evidence: ResultPdfReportEvidenceSection;
-  ip_rights: ResultPdfReportIpRightsSection;
+  /** Not sent for Policy Change. */
+  ip_rights?: ResultPdfReportIpRightsSection;
 } & ResultPdfIndicatorSections;

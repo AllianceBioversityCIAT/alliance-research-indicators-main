@@ -19,6 +19,11 @@ import { IndicatorsEnum } from '../../../indicators/enum/indicators.enum';
 import { PortfolioIdEnum } from '../../../results/portfolio-handlers/enum/portfolio-id.enum';
 import { UpdateResultCapacitySharingDto } from '../../../result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import { CreateResultInnovationDevDto } from '../../../result-innovation-dev/dto/create-result-innovation-dev.dto';
+import { ResultPolicyChange } from '../../../result-policy-change/entities/result-policy-change.entity';
+import { POLICY_AMOUNT_STATUS_VALUES } from '../../../result-policy-change/enum/policy-amount-status.enum';
+import { PolicyTypesEnum } from '../../../policy-types/enum/policy-types.enum';
+import { Result } from '../../../results/entities/result.entity';
+import { ReportingPlatformEnum } from '../../../results/enum/reporting-platform.enum';
 import {
   ResultPdfReportAlignmentCatalogItem,
   ResultPdfReportAlignmentLever,
@@ -39,6 +44,9 @@ import {
   ResultPdfReportLinkedResult,
   ResultPdfReportPartnerInstitution,
   ResultPdfReportPartnersSection,
+  ResultPdfReportCatalogRef,
+  ResultPdfReportPolicyChangeSection,
+  ResultPdfReportPolicyLinkedResult,
 } from './result-pdf-report.types';
 
 const omitUndefined = <T extends Record<string, unknown>>(value: T): T =>
@@ -443,26 +451,42 @@ export const mapEvidenceSection = (
       : {}),
   });
 
+const findHeadquartersLocation = (
+  institution: ResultInstitution['institution'],
+) => {
+  const locations = institution?.institution_locations ?? [];
+  return locations.find((location) => location.isHeadquarter) ?? locations[0];
+};
+
 const resolveHeadquarters = (
   institution: ResultInstitution['institution'],
 ): string | null => {
-  const locations = institution?.institution_locations ?? [];
-  const headquarters =
-    locations.find((location) => location.isHeadquarter) ?? locations[0];
+  const headquarters = findHeadquartersLocation(institution);
   return headquarters?.name ?? headquarters?.country?.name ?? null;
 };
 
+const resolveHeadquartersIsoAlpha2 = (
+  institution: ResultInstitution['institution'],
+): string | null => {
+  const headquarters = findHeadquartersLocation(institution);
+  return headquarters?.isoAlpha2 ?? headquarters?.country?.isoAlpha2 ?? null;
+};
+
+const mapInstitutionItem = (
+  item: ResultInstitution,
+): ResultPdfReportPartnerInstitution => ({
+  institution_id: item.institution_id,
+  institution_role_id: item.institution_role_id,
+  acronym: item.institution?.acronym,
+  name: item.institution?.name,
+  institution_type_name: item.institution?.institution_type?.name,
+  headquarters: resolveHeadquarters(item.institution),
+  isoAlpha2: resolveHeadquartersIsoAlpha2(item.institution),
+});
+
 export const mapInstitutionItems = (
   institutions: ResultInstitution[],
-): ResultPdfReportPartnerInstitution[] =>
-  institutions.map((item) => ({
-    institution_id: item.institution_id,
-    institution_role_id: item.institution_role_id,
-    acronym: item.institution?.acronym,
-    name: item.institution?.name,
-    institution_type_name: item.institution?.institution_type?.name,
-    headquarters: resolveHeadquarters(item.institution),
-  }));
+): ResultPdfReportPartnerInstitution[] => institutions.map(mapInstitutionItem);
 
 export const mapPartnersSection = (
   institutions: ResultInstitution[],
@@ -505,6 +529,80 @@ export const mapYesNoLabel = (
   return value ? 'Yes' : 'No';
 };
 
+const isAbsoluteHttpUrl = (value: string | null | undefined): boolean =>
+  /^https?:\/\/\S+$/i.test(value ?? '');
+
+const withoutTrailingSlash = (value: string): string =>
+  value.replace(/\/+$/, '');
+
+/**
+ * Actor type (`clarisa_actor_types.code`) -> its image in the bucket's `images` folder.
+ * Researchers is `user-researchers.png`, singular: that is the file's name in S3.
+ */
+export const ACTOR_TYPE_ICON_FILES: Readonly<Record<number, string>> = {
+  1: 'users-farmers.png',
+  2: 'user-researchers.png',
+  3: 'users-extension-agents.png',
+  4: 'users-policy.png',
+  5: 'users-other.png',
+};
+
+/**
+ * `actor_type_icons` for the actor types the innovation uses. Production reads
+ * `public/images/`, every other environment `public-dev/images/`. Without an absolute
+ * bucket URL nothing is sent, so the PDF draws no image instead of a broken one.
+ */
+export const mapActorTypeIcons = (
+  bucketUrl: string | null | undefined,
+  isProduction: boolean,
+  actorTypeIds: (number | null | undefined)[],
+): Record<number, string> => {
+  if (!isAbsoluteHttpUrl(bucketUrl)) return {};
+  const folder = `${withoutTrailingSlash(bucketUrl as string)}/${isProduction ? 'public' : 'public-dev'}/images`;
+  const ids = [...new Set(actorTypeIds.filter((id) => id != null).map(Number))];
+  return Object.fromEntries(
+    ids
+      .filter((id) => ACTOR_TYPE_ICON_FILES[id])
+      .map((id) => [id, `${folder}/${ACTOR_TYPE_ICON_FILES[id]}`]),
+  );
+};
+
+/** Indicators with a STAR PDF template (`PdfTemplates`). */
+const INDICATORS_WITH_PDF = new Set<number>([
+  IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+  IndicatorsEnum.INNOVATION_DEV,
+  IndicatorsEnum.POLICY_CHANGE,
+]);
+
+export type ResultPdfLinkSource = {
+  platform_code?: string | null;
+  result_official_code?: number | string | null;
+  indicator_id?: number | null;
+  report_year_id?: number | null;
+};
+
+/**
+ * Absolute link to a result's PDF: the STAR report viewer page
+ * (`/reports/result/STAR-{code}?version={year}`, what the client opens), because the PDF
+ * itself is rendered on demand and has no fixed URL. Null for a result outside STAR, one
+ * whose indicator has no PDF template, or when the client host is not an absolute URL.
+ */
+export const buildResultPdfUrl = (
+  clientHost: string | null | undefined,
+  result: ResultPdfLinkSource | null | undefined,
+): string | null => {
+  if (!result || !isAbsoluteHttpUrl(clientHost)) return null;
+  if (result.platform_code !== ReportingPlatformEnum.STAR) return null;
+  if (!INDICATORS_WITH_PDF.has(Number(result.indicator_id))) return null;
+  const code = String(result.result_official_code ?? '').trim();
+  if (!code) return null;
+  const version =
+    result.report_year_id == null
+      ? ''
+      : `?version=${Number(result.report_year_id)}`;
+  return `${withoutTrailingSlash(clientHost as string)}/reports/result/${ReportingPlatformEnum.STAR}-${encodeURIComponent(code)}${version}`;
+};
+
 export const mapInnovationDetailsSection = (
   innovation: CreateResultInnovationDevDto,
   labels: ResultPdfReportInnovationDetailsLabels,
@@ -535,3 +633,109 @@ export const mapIpRightsSection = (
   formal_ip_rights_application_id:
     ipRights?.formal_ip_rights_application_id ?? null,
 });
+
+/** Ids follow the `PolicyAmountStatusEnum` order: 1 Confirmed, 2 Estimated, 3 Unknown. */
+export const mapPolicyAmountStatus = (
+  value: string | null | undefined,
+): ResultPdfReportCatalogRef | null => {
+  const index = POLICY_AMOUNT_STATUS_VALUES.indexOf(value ?? '');
+  return index === -1
+    ? null
+    : { id: index + 1, name: POLICY_AMOUNT_STATUS_VALUES[index] };
+};
+
+const mapCatalogRef = (
+  id: number | null | undefined,
+  name: string | null | undefined,
+): ResultPdfReportCatalogRef | null =>
+  id == null || !name ? null : { id: Number(id), name };
+
+export const mapPolicyLinkedResult = (
+  result: Result | null | undefined,
+  pdfUrl?: string | null,
+): ResultPdfReportPolicyLinkedResult | null => {
+  if (!result) return null;
+  const status = result.result_status;
+  return {
+    result_id: Number(result.result_id),
+    result_official_code: Number(result.result_official_code),
+    platform_code: result.platform_code ?? null,
+    title: result.title ?? null,
+    report_year:
+      result.report_year_id == null ? null : Number(result.report_year_id),
+    result_status: status
+      ? {
+          result_status_id: Number(status.result_status_id),
+          name: status.name,
+          config: status.config ?? null,
+        }
+      : null,
+    // Only the Innovation Development card links to a PDF; Innovation Use sends none.
+    ...(pdfUrl === undefined ? {} : { pdf_url: pdfUrl }),
+  };
+};
+
+export type PolicyChangePdfSource = {
+  policyChange: ResultPolicyChange | null;
+  implementingOrganizations: ResultInstitution[];
+  innovationDevelopment: Result | null;
+  innovationUse: Result | null;
+  /** Absolute link to the linked Innovation Development result's PDF. */
+  innovationDevelopmentPdfUrl?: string | null;
+};
+
+/**
+ * The amount and its status only exist for Program, Budget, or Investment (type 3);
+ * for any other type they are left out of the payload.
+ */
+export const mapPolicyChangeSection = ({
+  policyChange,
+  implementingOrganizations,
+  innovationDevelopment,
+  innovationUse,
+  innovationDevelopmentPdfUrl,
+}: PolicyChangePdfSource): ResultPdfReportPolicyChangeSection => {
+  const policyTypeId =
+    policyChange?.policy_type_id == null
+      ? null
+      : Number(policyChange.policy_type_id);
+  const policyStageId =
+    policyChange?.policy_stage_id == null
+      ? null
+      : Number(policyChange.policy_stage_id);
+  const isProgramBudgetInvestment =
+    policyTypeId === PolicyTypesEnum.PROGRAM_BUDGET_OR_INVESTMENT;
+
+  return {
+    policy_type_id: policyTypeId,
+    policy_type: mapCatalogRef(policyTypeId, policyChange?.policy_type?.name),
+    policy_stage_id: policyStageId,
+    policy_stage: mapCatalogRef(
+      policyStageId,
+      policyChange?.policy_stage?.name,
+    ),
+    ...(isProgramBudgetInvestment
+      ? {
+          usd_amount:
+            policyChange?.usd_amount == null
+              ? null
+              : Number(policyChange.usd_amount),
+          amount_status: mapPolicyAmountStatus(policyChange?.amount_status),
+        }
+      : {}),
+    evidence_stage: policyChange?.evidence_stage ?? null,
+    implementing_organization: implementingOrganizations
+      .filter((item) => item.is_active !== false)
+      .map((item) => ({
+        result_institution_id: Number(item.result_institution_id),
+        result_id: Number(item.result_id),
+        is_active: true,
+        ...mapInstitutionItem(item),
+      })),
+    innovation_development: mapPolicyLinkedResult(
+      innovationDevelopment,
+      innovationDevelopmentPdfUrl,
+    ),
+    innovation_use: mapPolicyLinkedResult(innovationUse),
+  };
+};
