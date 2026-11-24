@@ -22,6 +22,8 @@ export interface Result {
   platform_code: string;
   external_link?: string;
   public_link?: string;
+  /** OICR publication on CGSpace (result_oicrs.cgspace_link). */
+  cgspace_link?: string | null;
   description: null | string;
   indicator_id: number;
   geo_scope_id: null;

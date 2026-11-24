@@ -13,7 +13,9 @@ import {
   WritableSignal,
   OnInit,
   output,
-  DestroyRef
+  DestroyRef,
+  ElementRef,
+  ViewChild
 } from '@angular/core';
 import { MultiSelectChangeEvent, MultiSelectModule } from 'primeng/multiselect';
 import { FormsModule } from '@angular/forms';
@@ -44,6 +46,7 @@ export class MultiselectOpensearchComponent implements OnInit {
   listInstance = signal<any[]>([]);
   loadingList = signal(false);
   @ContentChild('rows') rows!: TemplateRef<any>;
+  @ViewChild('filter') private readonly openSearchFilterInput?: ElementRef<HTMLInputElement>;
 
   @Input() signal: WritableSignal<any> = signal({});
   @Input() optionLabel = '';
@@ -76,6 +79,11 @@ export class MultiselectOpensearchComponent implements OnInit {
 
   private searchSubject = new Subject<string>();
   private destroyRef = inject(DestroyRef);
+
+  // The search box is a custom header template, so PrimeNG's autofocusFilter cannot reach it.
+  focusOpenSearchFilter(): void {
+    this.openSearchFilterInput?.nativeElement.focus();
+  }
 
   ngOnInit(): void {
     this.service = this.serviceLocator.getService(this.serviceName);

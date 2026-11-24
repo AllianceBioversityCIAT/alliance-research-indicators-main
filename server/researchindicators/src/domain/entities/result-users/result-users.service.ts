@@ -20,6 +20,7 @@ import {
   DEFAULT_RESULT_OWNER_TYPES,
   ResultOwnerType,
 } from '../../shared/decorators/result-owner.decorator';
+import { normalizeSimilarityScore } from '../../shared/utils/ai-similarity.util';
 @Injectable()
 export class ResultUsersService extends BaseServiceSimple<
   ResultUser,
@@ -298,7 +299,7 @@ export class ResultUsersService extends BaseServiceSimple<
     const aceptUsers: Partial<ResultUser>[] = [];
     const pendingUsers: Partial<ResultUserAi>[] = [];
     for (const user of users) {
-      if (parseInt(user.similarity_score) >= 70 && user?.code)
+      if (normalizeSimilarityScore(user.similarity_score) >= 70 && user?.code)
         aceptUsers.push({
           user_id: user.code,
         });
@@ -307,7 +308,7 @@ export class ResultUsersService extends BaseServiceSimple<
           user_code: user?.code ? user.code : null,
           user_role_id: user_role,
           user_name: user.name,
-          score: parseInt(user.similarity_score),
+          score: normalizeSimilarityScore(user.similarity_score),
         });
     }
 

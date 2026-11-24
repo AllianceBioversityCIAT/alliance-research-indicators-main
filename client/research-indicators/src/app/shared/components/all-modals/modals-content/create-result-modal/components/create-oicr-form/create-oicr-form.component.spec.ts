@@ -972,7 +972,7 @@ describe('CreateOicrFormComponent', () => {
     await component.createResult();
     expect(mockActionsService.showGlobalAlert).toHaveBeenCalledWith(
       expect.objectContaining({
-        summary: expect.stringContaining('update')
+        summary: 'Thank you for updating your submission'
       })
     );
   });

@@ -59,6 +59,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
   private listSyncEffect?: EffectRef;
 
   @ViewChild(MultiSelect) private readonly primeMultiSelect?: MultiSelect;
+  @ViewChild('filter') private readonly openSearchFilterInput?: ElementRef<HTMLInputElement>;
 
   @ContentChild('rows') rows!: TemplateRef<any>;
   @ContentChild('selectedItems') selectedItems!: TemplateRef<any>;
@@ -144,11 +145,19 @@ export class MultiselectComponent implements OnInit, OnChanges {
 
   useDisabled = computed(() => this.optionsDisabled()?.length);
 
+  // H40 — saved result levers carry `lever_id` as a string while the control list sends a number,
+  // so a strict comparison never disabled the primary option in the contributing picker.
+  private sameOptionValue(a: any, b: any): boolean {
+    const left = a?.[this.optionValue];
+    const right = b?.[this.optionValue];
+    return left != null && right != null && String(left) === String(right);
+  }
+
   listWithDisabled = computed(() => {
     const items = this.optionsSig() ?? [];
     return items.map((item: any) => ({
       ...item,
-      disabled: this.optionsDisabled().find((option: any) => option[this.optionValue] === item[this.optionValue])
+      disabled: this.optionsDisabled().some((option: any) => this.sameOptionValue(option, item))
     }));
   });
 
@@ -205,8 +214,17 @@ export class MultiselectComponent implements OnInit, OnChanges {
     const normalized = Array.isArray(items) ? items : [];
     return normalized.map((item: any) => ({
       ...item,
-      disabled: Boolean(this.optionsDisabled().some((option: any) => option[this.optionValue] === item[this.optionValue]))
+      disabled: this.optionsDisabled().some((option: any) => this.sameOptionValue(option, item))
     }));
+  });
+  /**
+   * Selected rows normally wait for the option list (it supplies their labels). Rows whose
+   * control-list entry is inactive carry their own labels from the result GET, so when they
+   * are all that is selected an empty list (a fully deactivated catalog) must not hide them.
+   */
+  readonly selectedRowsSelfLabelled = computed(() => {
+    const selected = this.selectedOptions();
+    return selected.length > 0 && selected.every((row: any) => row?.is_catalog_inactive === true);
   });
   firstLoad = signal(true);
 
@@ -513,6 +531,8 @@ export class MultiselectComponent implements OnInit, OnChanges {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+    // The OpenSearch header is a custom template, so PrimeNG's autofocusFilter cannot reach it.
+    this.openSearchFilterInput?.nativeElement.focus();
     this.ngZone.runOutsideAngular(() => {
       requestAnimationFrame(() => this.applyMultiselectPanelMaxWidth());
     });

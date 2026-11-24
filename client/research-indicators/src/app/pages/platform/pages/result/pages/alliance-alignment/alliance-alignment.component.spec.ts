@@ -30,6 +30,10 @@ class ApiServiceMock {
 class CacheServiceMock {
   metadata = signal<Record<string, unknown>>({ indicator_id: 5 });
   currentResultId = jest.fn().mockReturnValue(1);
+  platformCode = signal('');
+  getCurrentPlatformCode() {
+    return this.platformCode();
+  }
   getCurrentNumericResultId = jest.fn().mockReturnValue(1);
   currentResultIndicatorSectionPath = jest.fn().mockReturnValue('next-section');
   currentMetadata() {
@@ -1455,6 +1459,54 @@ describe('AllianceAlignmentComponent', () => {
     });
   });
 
+  describe('lever SDG targets removed in SDG Management', () => {
+    const loadLeverWithTargets = (targetIds: number[]) =>
+      api.GET_Alignments.mockResolvedValue({
+        data: {
+          contracts: [],
+          result_sdgs: [],
+          primary_levers: [
+            {
+              lever_id: 6,
+              result_lever_id: 1,
+              result_id: 1,
+              lever_role_id: 1,
+              is_primary: true,
+              result_lever_strategic_outcomes: [],
+              result_lever_sdg_targets: targetIds.map(id => ({
+                sdg_target_id: id,
+                sdg_target: { id, sdg_target_code: `1.${id}`, sdg_target: `Target ${id}`, is_active: true }
+              }))
+            }
+          ],
+          contributor_levers: []
+        }
+      });
+
+    it('flags a saved target the lever no longer offers, even with an active CLARISA row', async () => {
+      getLeverSdgTargetsService.setCatalog([
+        { id: 12, sdg_target_id: 12, sdg_target_code: '1.12', sdg_target: 'Target 12', select_label: '1.12 — Target 12' }
+      ]);
+      loadLeverWithTargets([12, 14]);
+
+      await component.getData();
+
+      const [kept, removed] = component.getLeverSdgSignal(component.body().primary_levers[0])().result_lever_sdg_targets;
+      expect(kept).not.toHaveProperty('is_catalog_inactive');
+      expect(removed).toEqual(expect.objectContaining({ sdg_target_id: 14, sdg_target_code: '1.14', is_catalog_inactive: true }));
+    });
+
+    it('flags nothing while the lever target list is empty (not loaded)', async () => {
+      getLeverSdgTargetsService.setCatalog([]);
+      loadLeverWithTargets([14]);
+
+      await component.getData();
+
+      const [target] = component.getLeverSdgSignal(component.body().primary_levers[0])().result_lever_sdg_targets;
+      expect(target).not.toHaveProperty('is_catalog_inactive');
+    });
+  });
+
   describe('Other lever custom name', () => {
     const otherLever = {
       lever_id: 9,
@@ -1844,6 +1896,36 @@ describe('AllianceAlignmentComponent', () => {
     });
   });
 
+  describe('a single contributing project is marked Primary', () => {
+    const contract = (contract_id: string, is_primary = false) => ({ contract_id, is_primary }) as any;
+    const setContracts = (contracts: any[]) => {
+      component.body.update(current => ({ ...current, contracts }));
+      fixture.detectChanges();
+    };
+
+    it('marks the only selected project as Primary', () => {
+      setContracts([contract('A1')]);
+      expect(component.body().contracts).toEqual([expect.objectContaining({ contract_id: 'A1', is_primary: true })]);
+    });
+
+    it('leaves two or more projects for the user to choose', () => {
+      setContracts([contract('A1'), contract('A2')]);
+      expect(component.body().contracts.map(c => c.is_primary)).toEqual([false, false]);
+    });
+
+    it('marks the project left after the others are removed', () => {
+      setContracts([contract('A1'), contract('A2')]);
+      setContracts([contract('A2')]);
+      expect(component.body().contracts[0].is_primary).toBe(true);
+    });
+
+    it('does not touch a result that cannot be edited', () => {
+      submission.isEditableStatus.mockReturnValue(false);
+      setContracts([contract('A1')]);
+      expect(component.body().contracts[0].is_primary).toBe(false);
+    });
+  });
+
   describe('effects', () => {
     it('should update optionsDisabled when primary_levers change', fakeAsync(() => {
       const primaryLever = { lever_id: 1, name: 'Lever 1' };
@@ -2053,6 +2135,30 @@ describe('AllianceAlignmentComponent', () => {
 
     it('should set exclude-pooled-funding to true when indicator_id is not 5', () => {
       cache.metadata.set({ indicator_id: 4 });
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
+    });
+
+    it('lists every project for a PRMS result, from the URL id, whatever its indicator', () => {
+      cache.metadata.set({ indicator_id: 4 });
+      cache.platformCode.set('PRMS');
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(false);
+    });
+
+    it('lists every project for a PRMS result from the metadata source when the URL has no prefix', () => {
+      cache.metadata.set({ indicator_id: 1, platform_code: 'PRMS' });
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(false);
+    });
+
+    it('keeps the filtered list for a STAR or other-source result that is not an OICR', () => {
+      cache.metadata.set({ indicator_id: 4, platform_code: 'STAR' });
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
+      cache.platformCode.set('TIP');
+      expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
+    });
+
+    it('URL source wins over the metadata source', () => {
+      cache.metadata.set({ indicator_id: 4, platform_code: 'PRMS' });
+      cache.platformCode.set('STAR');
       expect(component.contractServiceParams()['exclude-pooled-funding']).toBe(true);
     });
   });
@@ -2489,6 +2595,29 @@ describe('AllianceAlignmentComponent', () => {
         { name: 'cat' },
         undefined
       ]);
+    });
+  });
+
+  describe('strategic outcomes whose catalog entry is inactive', () => {
+    it('keeps the text from the GET relation and flags the outcome as inactive', () => {
+      getLeverStrategicOutcomesService.setCatalog([]);
+      const result = (component as any).strategicOutcomesForSignal({
+        lever_id: 6,
+        result_lever_strategic_outcomes: [
+          {
+            lever_strategic_outcome_id: 41,
+            lever_strategic_outcome: { id: 41, strategic_outcome: 'SO1: Conserve', is_active: false }
+          },
+          {
+            lever_strategic_outcome_id: 42,
+            lever_strategic_outcome: { id: 42, strategic_outcome: 'SO2: Use', is_active: true }
+          }
+        ]
+      });
+      expect(result[0]).toEqual(
+        expect.objectContaining({ id: 41, strategic_outcome: 'SO1: Conserve', is_catalog_inactive: true })
+      );
+      expect(result[1]).not.toHaveProperty('is_catalog_inactive');
     });
   });
 

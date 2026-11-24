@@ -3,6 +3,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
+import { TruncatedTextTooltipDirective } from '@shared/directives/truncated-text-tooltip.directive';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { FindContracts } from '@shared/interfaces/find-contracts.interface';
@@ -18,7 +19,7 @@ import { PfmPortfolioProject, PfmProjectsFilter } from '../../pfm.interfaces';
  */
 @Component({
   selector: 'app-pfm-portfolio-projects',
-  imports: [TableModule, ButtonModule, PopoverModule, TooltipModule, CustomTagComponent, SearchExportControlsComponent],
+  imports: [TableModule, ButtonModule, PopoverModule, TooltipModule, TruncatedTextTooltipDirective, CustomTagComponent, SearchExportControlsComponent],
   templateUrl: './pfm-portfolio-projects.component.html',
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush

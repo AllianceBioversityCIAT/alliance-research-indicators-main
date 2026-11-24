@@ -80,15 +80,16 @@ export class CacheService {
   isSidebarCollapsed = signal(localStorage.getItem('isSidebarCollapsed') !== 'false');
 
   /**
-   * Bumped after profile-simulation start/end so `platform` remounts its
-   * `<router-outlet>` and the current page re-runs its loaders under the
-   * new identity — without `location.reload()` or forcing `/home`.
+   * Called after profile-simulation start/end. H18 — remounting the `<router-outlet>` in place
+   * left Home showing the previous identity's data until a manual refresh, so this now reloads
+   * the page; the simulation survives it (`ImpersonationService.restore()`, awaited by
+   * `rolesGuard`) and the user stays on the current route.
    */
-  contentReloadKey = signal(0);
-
   bumpContentReload(): void {
-    this.contentReloadKey.update(key => key + 1);
+    this.reloadPage();
   }
+
+  reloadPage = (): void => globalThis.location.reload();
 
   setCurrentSectionHeaderName(name: string) {
     this.currentSectionHeaderName.set(name);

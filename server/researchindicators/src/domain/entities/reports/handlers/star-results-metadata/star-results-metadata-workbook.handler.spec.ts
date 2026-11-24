@@ -262,12 +262,12 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const rows = dictionary?.rows ?? [];
     expect(rows).toHaveLength(STAR_RESULTS_METADATA_DICTIONARY_ROWS.length);
     expect(rows[0]).toMatchObject({
-      section: 'Section',
-      field_label: 'Field',
-      _rowFillArgb: 'FF455A64',
+      section: 'General Information',
+      field_label: 'Result Code',
+      _rowFillArgb: 'FF203C61',
     });
     // A row without its own fill inherits the band above it.
-    expect(rows[2]).toMatchObject({
+    expect(rows[1]).toMatchObject({
       section: '',
       field_label: 'Source Platform',
       _rowFillArgb: 'FF203C61',

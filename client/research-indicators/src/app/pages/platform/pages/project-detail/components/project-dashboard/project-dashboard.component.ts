@@ -491,8 +491,16 @@ export class ProjectDashboardComponent {
       return;
     }
 
-    this.executiveOverviewLoading.set(true);
     this.executiveOverviewError.set(false);
+
+    // H29 — show the summary already seen this session right away; the refresh below
+    // replaces it silently instead of holding the card on a 10–20 s spinner.
+    const cached = this.documentOverviewService.getCachedSummary(projectId);
+    if (cached) {
+      this.applyDocumentOverviewResponse(cached);
+    } else {
+      this.executiveOverviewLoading.set(true);
+    }
 
     try {
       const response = await this.documentOverviewService.fetchDocumentOverviewSummary(projectId);

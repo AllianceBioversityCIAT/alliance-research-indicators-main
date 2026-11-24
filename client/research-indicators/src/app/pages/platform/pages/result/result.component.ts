@@ -1,5 +1,5 @@
 import { Component, inject, effect, EffectRef } from '@angular/core';
-import { ActivatedRoute, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import { ResultSidebarComponent } from '../../../../shared/components/result-sidebar/result-sidebar.component';
 import { CacheService } from '../../../../shared/services/cache/cache.service';
 import { GetMetadataService } from '../../../../shared/services/get-metadata.service';
@@ -19,6 +19,7 @@ export default class ResultComponent {
   cache = inject(CacheService);
   metadata = inject(GetMetadataService);
   route = inject(ActivatedRoute);
+  router = inject(Router);
   versionWatcher = inject(VersionWatcherService);
   bilateralService = inject(BilateralService);
   versionChangeEffect: EffectRef | undefined;
@@ -32,6 +33,15 @@ export default class ResultComponent {
     effect(() => {
       const params = this.routeParams();
       const idParam = params && 'id' in params ? (params['id'] as string) : undefined;
+
+      // H14 — some entry points link with the bare number (`/result/633/…`), which left the URL
+      // and the header without the platform prefix. Results opened here are always STAR.
+      if (typeof idParam === 'string' && /^\d+$/.test(idParam)) {
+        const prefixedUrl = this.router.url.replace(new RegExp(`^/result/${idParam}(?=/|\\?|#|$)`), `/result/STAR-${idParam}`);
+        void this.router.navigateByUrl(prefixedUrl, { replaceUrl: true });
+        return;
+      }
+
       let id: number;
 
       if (typeof idParam === 'string' && idParam.includes('-')) {

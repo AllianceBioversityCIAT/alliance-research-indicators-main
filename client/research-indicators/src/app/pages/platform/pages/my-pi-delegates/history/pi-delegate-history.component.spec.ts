@@ -374,9 +374,14 @@ describe('PiDelegateHistoryComponent', () => {
       expect(result).toContain(' at ');
     });
 
-    it('contains AM or PM (12-hour format)', () => {
+    it('contains am or pm (12-hour format)', () => {
       const result = component.formatDate('2026-03-14T10:12:00.000Z');
-      expect(result).toMatch(/AM|PM/);
+      expect(result).toMatch(/am|pm/i);
+    });
+
+    it('H23: uses the configured app timezone instead of the browser zone', () => {
+      const result = component.formatDate('2026-03-14T10:12:00.000Z');
+      expect(result).toContain('(UTC)');
     });
 
     it('contains a parenthesised timezone abbreviation', () => {
@@ -516,14 +521,6 @@ describe('PiDelegateHistoryComponent', () => {
 
       expect(apiService.callCount).toBe(0);
       expect(second.componentInstance.loading()).toBe(false);
-    });
-
-    it('formatDate degrades to empty parts when Intl returns none', () => {
-      const spy = jest.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([]);
-
-      expect(component.formatDate('2026-03-14T10:12:00.000Z')).toBe('14/03/2026 at :  ()');
-
-      spy.mockRestore();
     });
   });
 

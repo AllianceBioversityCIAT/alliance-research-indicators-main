@@ -2383,7 +2383,42 @@ describe('ResultsCenterService', () => {
     });
   });
 
+  describe('H16 — Primary Lever column', () => {
+    it('shows the primary lever for 2010–2025 results', () => {
+      const result = { result_levers: [{ is_primary: 1, lever: { short_name: 'Lever 6' } }] } as any;
+      expect(service.getPrimaryLeverDisplay(result)).toBe('Lever 6');
+    });
+
+    it('falls back to the Research Areas for 2026–2030 results that have no primary lever', () => {
+      const result = { result_levers: [], result_research_areas: [{ research_area: { short_name: 'Climate Action' } }] } as any;
+      expect(service.getPrimaryLeverDisplay(result)).toBe('Climate Action');
+    });
+
+    it('shows a dash when there is neither', () => {
+      expect(service.getPrimaryLeverDisplay({} as any)).toBe('-');
+    });
+  });
+
   describe('main', () => {
+    it('should keep the newest request when an older, unfiltered one resolves last (reload race)', async () => {
+      let resolveUnfiltered!: (value: { results: Result[]; total: number }) => void;
+      const filteredResult = { ...mockResults[0], result_official_code: 'FILTERED' };
+      mockGetResultsService.fetchPaginated
+        .mockImplementationOnce(() => new Promise(resolve => (resolveUnfiltered = resolve)))
+        .mockResolvedValueOnce({ results: [filteredResult], total: 1 });
+
+      const unfiltered = service.main();
+      service.resultsFilter.update(prev => ({ ...prev, 'status-codes': [1] }));
+      await service.main();
+
+      resolveUnfiltered({ results: [{ ...mockResults[0], result_official_code: 'UNFILTERED' }], total: 99 });
+      await unfiltered;
+
+      expect(service.list().map(r => r.result_official_code)).toEqual(['FILTERED']);
+      expect(service.resultsTableTotalRecords()).toBe(1);
+      expect(service.loading()).toBe(false);
+    });
+
     it('should pass contract-codes when primaryContractId is set', async () => {
       service.primaryContractId.set('contract-123');
       await service.main();
@@ -2547,6 +2582,73 @@ describe('ResultsCenterService', () => {
   describe('buildSearchField', () => {
     it('should return the single word when only one word is provided', () => {
       expect(service.buildSearchField('Daniela')).toBe('daniela');
+    });
+  });
+
+  describe('overlapping main() calls (page load, table lazy load, search, tab switch)', () => {
+    const deferred = () => {
+      let resolve!: (value: { results: Result[]; total: number }) => void;
+      const promise = new Promise<{ results: Result[]; total: number }>(r => (resolve = r));
+      return { promise, resolve };
+    };
+    const row = (code: string) => ({ result_official_code: code, result_levers: [] }) as unknown as Result;
+
+    it('keeps the filtered list when an older, unfiltered request resolves last', async () => {
+      const unfiltered = deferred();
+      const filtered = deferred();
+      mockGetResultsService.fetchPaginated.mockReturnValueOnce(unfiltered.promise).mockReturnValueOnce(filtered.promise);
+
+      const first = service.main();
+      service.searchInput.set('maize');
+      service.resultsFilter.update(prev => ({ ...prev, 'platform-code': ['STAR'] }));
+      const second = service.main();
+
+      filtered.resolve({ results: [row('STAR-1')], total: 1 });
+      await second;
+      unfiltered.resolve({ results: [row('STAR-1'), row('PRMS-2'), row('TIP-3')], total: 3 });
+      await first;
+
+      expect(service.list().map(r => r.result_official_code)).toEqual(['STAR-1']);
+      expect(service.resultsTableTotalRecords()).toBe(1);
+      expect(service.loading()).toBe(false);
+    });
+
+    it('leaves the spinner on while the latest request is still pending', async () => {
+      const older = deferred();
+      const latest = deferred();
+      mockGetResultsService.fetchPaginated.mockReturnValueOnce(older.promise).mockReturnValueOnce(latest.promise);
+
+      const first = service.main();
+      service.searchInput.set('beans');
+      const second = service.main();
+
+      older.resolve({ results: [row('OLD-1')], total: 1 });
+      await first;
+      expect(service.loading()).toBe(true);
+      expect(service.list().map(r => r.result_official_code)).not.toContain('OLD-1');
+
+      latest.resolve({ results: [row('NEW-1')], total: 1 });
+      await second;
+      expect(service.loading()).toBe(false);
+      expect(service.list().map(r => r.result_official_code)).toEqual(['NEW-1']);
+    });
+
+    it('drops an in-flight request when the filters go back to the list already shown', async () => {
+      await service.main();
+      const shown = service.list();
+      const pending = deferred();
+      mockGetResultsService.fetchPaginated.mockReturnValueOnce(pending.promise);
+
+      service.searchInput.set('rice');
+      const changed = service.main();
+      service.searchInput.set('');
+      await service.main();
+
+      pending.resolve({ results: [row('RICE-1')], total: 1 });
+      await changed;
+
+      expect(service.list()).toBe(shown);
+      expect(service.loading()).toBe(false);
     });
   });
 });

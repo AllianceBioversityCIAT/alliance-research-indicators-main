@@ -1,4 +1,5 @@
 import { Component, computed, effect, ElementRef, inject, signal, ViewChild, WritableSignal } from '@angular/core';
+import { catalogStatus } from '@shared/utils/catalog-relation.util';
 import { GetContractsService } from '@services/control-list/get-contracts.service';
 import { GetLeversService } from '@services/control-list/get-levers.service';
 import { GetStrategicObjectivesService } from '@services/control-list/get-strategic-objectives.service';
@@ -25,6 +26,7 @@ import { VersionWatcherService } from '@shared/services/version-watcher.service'
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { getContractStatusClasses } from '@shared/constants/status-classes.constants';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { Lever, LeverStrategicOutcome } from '@shared/interfaces/oicr-creation.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { ResultLeverSdgTargetPayload } from '@shared/interfaces/lever-sdg-target.interface';
@@ -38,6 +40,7 @@ import {
   enrichAlignmentSdgTargets,
   enrichPortfolio2Contracts,
   enrichResultSdgs,
+  flagSdgTargetsMissingFrom,
   normalizePortfolio2AlignmentGet
 } from './portfolio/portfolio-2-alignment.mapper';
 
@@ -118,12 +121,12 @@ export default class AllianceAlignmentComponent {
   >();
   private readonly leverCustomNameSignals = new Map<string | number, WritableSignal<{ custom_lever_name: string }>>();
 
-  contractServiceParams = computed(() => {
-    const indicatorId = Number(this.cache.currentMetadata()?.indicator_id);
-    return {
-      'exclude-pooled-funding': indicatorId !== 5
-    };
-  });
+  // The source comes from the URL id (PRMS-123) first, so it is known before the metadata loads.
+  resultPlatformCode = computed(() => this.cache.getCurrentPlatformCode() || this.cache.currentMetadata()?.platform_code || '');
+  // PRMS results and OICRs (any source) list every project; any other result excludes pooled funding.
+  contractServiceParams = computed(() => ({
+    'exclude-pooled-funding': !(this.isOicrIndicator() || this.resultPlatformCode() === PLATFORM_CODES.PRMS)
+  }));
   isOicrIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 5);
   isPolicyChangeIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 4);
   isInnovationUseIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 6);
@@ -197,15 +200,22 @@ export default class AllianceAlignmentComponent {
     }
 
     const mapLevers = (levers: Lever[] | undefined): Lever[] =>
-      (levers ?? []).map(lever => ({
-        ...lever,
-        result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
-        result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
-        result_lever_sdg_targets: enrichAlignmentSdgTargets(
-          (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
-          this.getLeverSdgTargetsService.getList(lever.lever_id)()
-        )
-      }));
+      (levers ?? []).map(lever => {
+        // A target SDG Management took off this lever is no longer offered: flag it inactive.
+        const leverTargets = this.getLeverSdgTargetsService.getList(lever.lever_id)();
+        return {
+          ...lever,
+          result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
+          result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
+          result_lever_sdg_targets: flagSdgTargetsMissingFrom(
+            enrichAlignmentSdgTargets(
+              (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
+              leverTargets
+            ),
+            leverTargets
+          )
+        };
+      });
 
     let primary_levers = enrichAlignmentLevers(mapLevers(response.data.primary_levers), leversCatalog);
     let contributor_levers = enrichAlignmentLevers(mapLevers(response.data.contributor_levers), leversCatalog);
@@ -297,7 +307,9 @@ export default class AllianceAlignmentComponent {
         {
           id: outcomeId,
           lever_strategic_outcome_id: outcomeId,
-          strategic_outcome
+          strategic_outcome,
+          // The GET's lever_strategic_outcome relation is not filtered by is_active.
+          ...catalogStatus(saved?.lever_strategic_outcome as { is_active?: unknown } | undefined)
         }
       ];
     });
@@ -391,6 +403,24 @@ export default class AllianceAlignmentComponent {
     () => {
       const contributor = this.getContributorLeversForOptions();
       this.primaryOptionsDisabled.set(contributor);
+    },
+    { allowSignalWrites: true }
+  );
+
+  /**
+   * A lone contributing project is the Primary one: there is nothing to choose,
+   * and leaving it unmarked only fails validation. Runs on load and after every
+   * selection change, for both portfolios (the P2 view shares this `body`).
+   * With two or more projects the user still picks, and nothing is unmarked here.
+   */
+  autoPrimarySingleContractEffect = effect(
+    () => {
+      const contracts = this.body().contracts ?? [];
+      if (contracts.length !== 1 || contracts[0].is_primary || !this.submission.isEditableStatus()) return;
+      this.body.update(current => ({
+        ...current,
+        contracts: current.contracts.map(contract => ({ ...contract, is_primary: true }))
+      }));
     },
     { allowSignalWrites: true }
   );

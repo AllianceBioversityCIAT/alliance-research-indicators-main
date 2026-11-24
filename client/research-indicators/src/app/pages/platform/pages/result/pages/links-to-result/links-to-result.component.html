@@ -68,7 +68,7 @@
                   [iconName]="result.result_status?.config?.icon?.name ?? ''"
                   [iconColor]="result.result_status?.config?.icon?.color ?? ''"
                   [tooltip]="result.result_status?.description ?? ''" class="pr-1.5"
-                  [maxWidth]="'150px'"></app-custom-tag>
+                  [maxWidth]="'180px'"></app-custom-tag>
                 }
                 @if (result.result_contracts?.contract_id) {
                 <span class="text-[#8D9299] font-normal text-[12px] !font-['Space_Grotesk']">
@@ -97,7 +97,7 @@
           <img [src]="'images/no-results-found.png' | s3ImageUrl" alt="No linked results" class="w-[180px] mb-6" />
           <span
             class="text-[#153C71] text-[14px] !font-['Space_Grotesk'] leading-[20px] font-bold tracking-[0.03em] uppercase">
-            THERE ARE NOT LINKED RESULTS YET
+            THERE ARE NO LINKED RESULTS YET
           </span>
           <p class="text-[#777C83] text-[15px] leading-[20px] mt-1 max-w-[600px]">
             Search for results to associate with this one.

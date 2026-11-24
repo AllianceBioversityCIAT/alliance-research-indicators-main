@@ -167,6 +167,16 @@ describe('ResultsCenterTableComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('getCellTooltip gives the full title to the title column only', () => {
+    const result = { title: 'A very long result title' } as any;
+    const title = { field: 'title', path: 'title', header: 'Title', getValue: (r: any) => r.title } as any;
+    const years = { field: 'snapshot_years', path: 'snapshot_years', header: 'Years', getValue: () => [2025, 2026] } as any;
+    expect(component.getCellTooltip(title, result)).toBe('A very long result title');
+    expect(component.getCellTooltip({ ...title, getValue: () => ['a', 'b'] }, result)).toBe('a, b');
+    expect(component.getCellTooltip({ ...title, getValue: undefined }, result)).toBe('');
+    expect(component.getCellTooltip(years, result)).toBe('');
+  });
+
   it('setSearchInputFilter should update service searchInput and reset paginator to first page', () => {
     mockService.resultsTablePaginatorFirst.set(40);
     component.setSearchInputFilter('q');
@@ -880,6 +890,18 @@ describe('ResultsCenterTableComponent', () => {
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 2 })).toBe(true);
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 4 })).toBe(false);
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'PRMS', indicator_id: 1 })).toBe(false);
+  });
+
+  it('publishedOicrCgspaceLink returns the CGSpace link only for a published STAR OICR', () => {
+    const published = { result_status_id: 14, name: 'Published' } as any;
+    const oicr = { ...mockResult, platform_code: 'STAR', indicator_id: 5, result_status: published, cgspace_link: ' https://hdl.handle.net/10568/1 ' };
+
+    expect(component.publishedOicrCgspaceLink(oicr)).toBe('https://hdl.handle.net/10568/1');
+    expect(component.publishedOicrCgspaceLink({ ...oicr, result_status: { result_status_id: 6, name: 'Approved' } as any })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, platform_code: 'PRMS' })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, indicator_id: 1 })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, cgspace_link: '  ' })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, cgspace_link: null })).toBeNull();
   });
 
   it('isStarPdfReportDisabled should disable inn_dev PDF temporarily', () => {

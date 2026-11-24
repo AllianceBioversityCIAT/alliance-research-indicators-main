@@ -25,9 +25,12 @@ import {
 
 export const UNCategorized_FILTER = '__UNCATEGORIZED__';
 
+/** Variables the app reads but nobody should edit here; they are not listed in Environment variables. */
+export const HIDDEN_APP_CONFIG_KEYS: readonly string[] = ['PORTFOLIO_2026_SDG_TARGET_CODES'];
+
 function extractAppConfigListItems(payload: AppConfigListResponse | AppConfigListItem[] | null | undefined): AppConfigListItem[] {
-  if (Array.isArray(payload)) return payload;
-  return payload?.data ?? [];
+  const items = Array.isArray(payload) ? payload : (payload?.data ?? []);
+  return items.filter(item => !HIDDEN_APP_CONFIG_KEYS.includes(item.key));
 }
 
 @Injectable({

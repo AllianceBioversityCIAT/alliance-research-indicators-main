@@ -369,6 +369,12 @@ export class ResultsService {
       );
       if (!deleteResultsByParameters.testing) {
         await this._queryService.deleteFullResultById(result_id);
+        // H13 — like deleteResult(): without this the global search keeps
+        // offering a result that no longer opens ("Result not found").
+        this._openSearchResultApi.uploadSingleToOpenSearch(
+          { result_id },
+          ElasticOperationEnum.DELETE,
+        );
       }
     }
     return results;

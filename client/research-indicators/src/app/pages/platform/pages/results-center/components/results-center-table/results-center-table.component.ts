@@ -24,6 +24,8 @@ import { PLATFORM_CODES } from '../../../../../../shared/constants/platform-code
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 import { TooltipModule } from 'primeng/tooltip';
+import { TruncatedTextTooltipDirective } from '@shared/directives/truncated-text-tooltip.directive';
+import { TableColumn } from '../../result-center.interface';
 import { openPublicLink } from '@shared/utils/public-link.util';
 import { buildResultLink, ResultLink } from '@shared/utils/result-link.util';
 import {
@@ -32,6 +34,10 @@ import {
   isStarPdfReportEligible,
   openStarPdfReportInNewTab
 } from '@shared/utils/star-pdf-report.util';
+/** OICR indicator and its Published status (same id the OICR header uses). */
+const OICR_INDICATOR_ID = 5;
+const PUBLISHED_STATUS_ID = 14;
+
 @Component({
   selector: 'app-results-center-table',
   imports: [
@@ -44,6 +50,7 @@ import {
     MenuModule,
     RouterLink,
     TooltipModule,
+    TruncatedTextTooltipDirective,
     CustomTagComponent,
     FiltersActionButtonsComponent,
     SearchExportControlsComponent,
@@ -152,6 +159,13 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
     return columns;
   }
 
+  // Full title for the tooltip of a clamped title cell; other columns get none.
+  getCellTooltip(column: TableColumn, result: Result): string {
+    if (column.field !== 'title' || !column.getValue) return '';
+    const value = column.getValue(result);
+    return Array.isArray(value) ? value.join(', ') : (value ?? '');
+  }
+
   shouldShowPaginator(): boolean {
     return !(this.hideFiltersToolbar && this.resultsCenterService.resultsTableTotalRecords() === 0);
   }
@@ -176,10 +190,15 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
     return `STAR_results_metadata_${yyyymmdd}_${hhmm}_${initials}.xlsx`;
   }
 
+  // H42 — one export at a time across every table instance, so a single click can never
+  // produce two workbooks even if the action reaches more than one handler.
+  private static exportInFlight = false;
+
   async exportTable() {
-    if (this.isExporting()) {
+    if (this.isExporting() || ResultsCenterTableComponent.exportInFlight) {
       return;
     }
+    ResultsCenterTableComponent.exportInFlight = true;
     this.isExporting.set(true);
     try {
       const blob = await this.apiService.GET_ResultCenterXlsx(
@@ -209,6 +228,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
         console.error('Error details:', error.message, error.stack);
       }
     } finally {
+      ResultsCenterTableComponent.exportInFlight = false;
       this.isExporting.set(false);
     }
   }
@@ -216,6 +236,18 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   openStarPdfReport(result: Result): void {
     if (this.isStarPdfReportDisabled(result)) return;
     openStarPdfReportInNewTab(this.getStarReportViewerUrl(result));
+  }
+
+  /**
+   * A published STAR OICR links to its CGSpace publication (the same link as the OICR
+   * header's "CGSpace link" button) instead of a PDF. Null for anything else, or when
+   * the OICR has no link.
+   */
+  publishedOicrCgspaceLink(result: Result): string | null {
+    const isStarOicr = result.platform_code === PLATFORM_CODES.STAR && Number(result.indicator_id) === OICR_INDICATOR_ID;
+    const isPublished = Number(result.result_status?.result_status_id) === PUBLISHED_STATUS_ID;
+    const link = result.cgspace_link?.trim();
+    return isStarOicr && isPublished && link ? link : null;
   }
 
   showStarPdfReport(result: Result): boolean {

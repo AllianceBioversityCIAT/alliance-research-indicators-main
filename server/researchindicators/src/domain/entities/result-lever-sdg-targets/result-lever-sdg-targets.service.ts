@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ResultLeverSdgTarget } from './entities/result-lever-sdg-target.entity';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, FindOptionsRelations, In, Repository } from 'typeorm';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 
 @Injectable()
@@ -23,9 +23,11 @@ export class ResultLeverSdgTargetsService extends BaseServiceSimple<
 
   async findByMultiplesResultLeverIds(
     result_lever_ids: number[],
+    relations?: FindOptionsRelations<ResultLeverSdgTarget>,
   ): Promise<ResultLeverSdgTarget[]> {
     return this.mainRepo.find({
       where: { result_lever_id: In(result_lever_ids), is_active: true },
+      relations,
     });
   }
 }
