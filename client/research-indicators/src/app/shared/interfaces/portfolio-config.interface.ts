@@ -11,4 +11,6 @@ export interface PortfolioConfigItem {
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
+  /** Set when the selected item's control-list entry is inactive (see catalog-relation.util). */
+  is_catalog_inactive?: boolean;
 }

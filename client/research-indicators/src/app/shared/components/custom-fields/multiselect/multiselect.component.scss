@@ -90,3 +90,14 @@
     width: 32.3%;
   }
 }
+
+// A selected option whose control-list entry was deactivated (see catalog-relation.util).
+// Small and muted on purpose: a quiet note, not an error or a call to action.
+.multiselect-inactive-icon {
+  flex-shrink: 0;
+  align-self: center;
+  margin-inline: 6px;
+  color: var(--ac-grey-500);
+  font-size: 12px;
+  cursor: help;
+}

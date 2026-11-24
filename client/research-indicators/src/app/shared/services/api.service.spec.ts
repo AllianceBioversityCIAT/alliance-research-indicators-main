@@ -2449,6 +2449,7 @@ describe('ApiService — Innovation Use Details methods (HttpTestingController)'
     currentResultIsLoading: ReturnType<typeof signal<boolean>>;
     greenChecks: ReturnType<typeof signal<GreenChecks>>;
     getCurrentNumericResultId: () => number;
+    currentResultId: ReturnType<typeof signal<string | number>>;
     skipResultVersionParam: ReturnType<typeof signal<boolean>>;
   };
 
@@ -2457,6 +2458,7 @@ describe('ApiService — Innovation Use Details methods (HttpTestingController)'
       currentResultIsLoading: signal(false),
       greenChecks: signal<GreenChecks>({}),
       getCurrentNumericResultId: () => 123,
+      currentResultId: signal<string | number>('STAR-123'),
       // Down outside the create-result flow, which is what these outgoing-URL
       // expectations describe.
       skipResultVersionParam: signal(false)

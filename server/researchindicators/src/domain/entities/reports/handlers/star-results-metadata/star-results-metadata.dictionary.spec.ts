@@ -1,14 +1,20 @@
-import { STAR_RESULTS_METADATA_RAW_COLUMNS } from './star-results-metadata.columns';
+import {
+  STAR_RESULTS_METADATA_DICTIONARY_COLUMNS,
+  STAR_RESULTS_METADATA_RAW_COLUMNS,
+} from './star-results-metadata.columns';
 import { STAR_RESULTS_METADATA_DICTIONARY_ROWS } from './star-results-metadata.dictionary';
 
-const [HEADER_ROW, ...FIELD_ROWS] = STAR_RESULTS_METADATA_DICTIONARY_ROWS;
+const FIELD_ROWS = STAR_RESULTS_METADATA_DICTIONARY_ROWS;
 
 describe('STAR_RESULTS_METADATA_DICTIONARY_ROWS', () => {
-  it('starts with the Section / Field / Explanation header row', () => {
-    expect(HEADER_ROW).toMatchObject({
+  it('H43: leaves the header to the sheet columns instead of repeating it as a row', () => {
+    const headers = STAR_RESULTS_METADATA_DICTIONARY_COLUMNS.map(
+      (c) => c.header,
+    );
+    expect(headers).toEqual(['Section', 'Field', 'Explanation']);
+    expect(FIELD_ROWS[0]).not.toMatchObject({
       section: 'Section',
       field_label: 'Field',
-      explanation: 'Explanation',
     });
   });
 

@@ -3,6 +3,8 @@ import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, injec
 import { CacheService } from '@services/cache/cache.service';
 import { ImpersonationService } from '@services/impersonation.service';
 import { ActionsService } from '@services/actions.service';
+import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { formatUtcWithConfigParts } from '@shared/utils/date-format.util';
 import { WebsocketService } from '@sockets/websocket.service';
 
 /**
@@ -29,6 +31,7 @@ export class SimulationBannerComponent {
   cache = inject(CacheService);
   impersonation = inject(ImpersonationService);
   actions = inject(ActionsService);
+  private readonly dateFormatConfig = inject(DateFormatConfigService);
   // Defensive: WebsocketService depends on ngx-socket-io's `Socket`, which is not
   // provided in every test/host environment (see PoolFundingAlignmentComponent for
   // the same precedent). `configUser` re-run on end is best-effort UX, never a
@@ -89,10 +92,10 @@ export class SimulationBannerComponent {
     });
   }
 
+  // H23 — show the start time in the configured app timezone, labelled, like every other timestamp.
   private formatStartedTime(startedAt: string | undefined): string {
     if (!startedAt) return '';
-    const date = new Date(startedAt);
-    if (Number.isNaN(date.getTime())) return '';
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    const parts = formatUtcWithConfigParts(startedAt, this.dateFormatConfig.config());
+    return parts ? `${parts.time} (${parts.timezoneLabel})` : '';
   }
 }

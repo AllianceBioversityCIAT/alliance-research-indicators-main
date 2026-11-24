@@ -149,6 +149,12 @@ describe('mapV2ResultListItemToResult', () => {
     const r = mapV2ResultListItemToResult({ ...minimal, public_link: url });
     expect(r.public_link).toBe(url);
   });
+
+  it('maps cgspace_link from v2 list row, null when absent', () => {
+    const url = 'https://hdl.handle.net/10568/182058';
+    expect(mapV2ResultListItemToResult({ ...minimal, cgspace_link: url }).cgspace_link).toBe(url);
+    expect(mapV2ResultListItemToResult(minimal).cgspace_link).toBeNull();
+  });
 });
 
 describe('normalizeSnapshotYears', () => {

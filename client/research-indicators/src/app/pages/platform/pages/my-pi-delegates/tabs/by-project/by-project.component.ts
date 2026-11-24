@@ -369,7 +369,8 @@ export class ByProjectComponent {
     if (value == null) return '—';
     const date = value instanceof Date ? value : new Date(value);
     if (isNaN(date.getTime())) return String(value);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    // H24 — dd/mm/yyyy, the platform-wide date format.
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────────

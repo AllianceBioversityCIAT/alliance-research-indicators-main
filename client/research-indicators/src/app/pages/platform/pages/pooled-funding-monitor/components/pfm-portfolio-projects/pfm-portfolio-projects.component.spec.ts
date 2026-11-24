@@ -1,3 +1,5 @@
+import { By } from '@angular/platform-browser';
+import { Tooltip } from 'primeng/tooltip';
 import { TestBed } from '@angular/core/testing';
 import { PfmPortfolioProjectsComponent } from './pfm-portfolio-projects.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -37,6 +39,16 @@ describe('PfmPortfolioProjectsComponent', () => {
     const codes = () => Array.from(el.querySelectorAll('[data-testid^="pfm-project-row-"]')).map(r => r.getAttribute('data-testid')!.replace('pfm-project-row-', ''));
     return { fixture, el, q, codes };
   }
+
+  it('a clamped project name shows the full name in the PrimeNG tooltip, not the native title', () => {
+    const { fixture, q } = render();
+    q('pfm-projects-chip-all')!.click();
+    fixture.detectChanges();
+    const name = q('pfm-project-row-A357')!.querySelector('[data-testid="pfm-project-name"]') as HTMLElement;
+    const tip = fixture.debugElement.queryAll(By.directive(Tooltip)).find(d => d.nativeElement === name);
+    expect(name.getAttribute('title')).toBeNull();
+    expect(tip?.injector.get(Tooltip).content).toBe('Genetic improvement in Cassava');
+  });
 
   it('opens on the projects without results, the stage 1 action', () => {
     const { codes } = render();

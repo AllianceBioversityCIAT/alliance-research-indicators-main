@@ -14,7 +14,7 @@ import { RolesService } from '@shared/services/cache/roles.service';
 import { PfmCoverageTabComponent } from './components/pfm-coverage-tab/pfm-coverage-tab.component';
 import { PfmQueueTabComponent } from './components/pfm-queue-tab/pfm-queue-tab.component';
 import { PfmStatsTabComponent } from './components/pfm-stats-tab/pfm-stats-tab.component';
-import { PFM_TABS, PfmScope, PfmTab } from './pfm.interfaces';
+import { isPfmTabVisible, PfmScope, PfmTab } from './pfm.interfaces';
 import { PfmStoreService } from './services/pfm-store.service';
 
 @Component({
@@ -83,7 +83,7 @@ export default class PooledFundingMonitorComponent implements OnInit {
     { value: 'coverage', label: 'Portfolio coverage' },
     { value: 'queue', label: 'Results queue' },
     { value: 'stats', label: 'Stats' }
-  ];
+  ].filter((tab): tab is { value: PfmTab; label: string } => isPfmTabVisible(tab.value));
 
   /** PI scope, summary loaded, and the viewer is PI of nothing: show the empty state, never portfolio data. */
   readonly piEmpty = computed(() => {
@@ -105,7 +105,7 @@ export default class PooledFundingMonitorComponent implements OnInit {
 
   /** WAI-ARIA tabs: arrows move + activate, Home/End jump. */
   onTabKeydown(event: KeyboardEvent, index: number): void {
-    const last = PFM_TABS.length - 1;
+    const last = this.tabs.length - 1;
     let next: number;
     switch (event.key) {
       case 'ArrowRight':
@@ -124,7 +124,8 @@ export default class PooledFundingMonitorComponent implements OnInit {
         return;
     }
     event.preventDefault();
-    this.store.setTab(PFM_TABS[next]);
-    this.host.nativeElement.querySelector<HTMLElement>(`#pfm-tab-${PFM_TABS[next]}`)?.focus();
+    const tab = this.tabs[next].value;
+    this.store.setTab(tab);
+    this.host.nativeElement.querySelector<HTMLElement>(`#pfm-tab-${tab}`)?.focus();
   }
 }

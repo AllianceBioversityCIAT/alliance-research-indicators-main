@@ -14,9 +14,9 @@
     <label class="relative xl:max-w-[250px] flex flex-col items-center p-6 rounded-lg text-center {{
             option.disabled 
               ? 'cursor-not-allowed opacity-50' 
-              : 'cursor-pointer focus-within:outline-none focus-within:ring-2 focus-within:ring-[#1689CA] focus-within:ring-offset-2'
+              : 'cursor-pointer has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#1689CA] has-[:focus-visible]:ring-offset-2'
           }} {{
-            option.selected ? 'border-[#1689CA]/20 border-1 bg-[#79D9FF]/8' : 'bg-white'
+            option.selected ? 'border-[#1689CA]/20 border-1 bg-[#79D9FF]/8' : 'border-transparent border-1 bg-white'
           }}" [attr.data-option-key]="option.key" [attr.aria-label]="option.label + ': ' + option.description"
       [attr.aria-disabled]="option.disabled" (keydown)="onOptionKeydown($event, option, i)"
       (click)="selectOption(option)" (focus)="onOptionFocus(option)">
@@ -38,6 +38,12 @@
     }
   </div>
 
+  <!-- H54 — the modal is centred vertically, so content that appears on selection (message, comment box)
+       made it grow and jump. The space they need is reserved up front. For the OICR review the tallest
+       option is "Accepted" (expert select + OICR No + SharePoint link with their required notices, 261px
+       measured) — reserving only the comment box's 200px still let it jump. For Review Result the tallest
+       are Revise/Reject (message + comment box, 239.4px measured). -->
+  <div [class]="allModalsService.submitResultOrigin() !== 'latest' ? 'min-h-[240px]' : 'min-h-[262px]'">
   @if (submissionService.statusSelected()?.message && allModalsService.submitResultOrigin() !== 'latest') {
   <p class="text-[15px] text-[#4c5158] my-5">
     {{ submissionService.statusSelected()?.message }}
@@ -77,4 +83,5 @@
     class="w-full border-1 border-gray-500 rounded-md resize-none" [value]="submissionService.comment()"
     [placeholder]="submissionService.statusSelected()?.placeholder || ''" (input)="setComment($event)"></textarea>
   }
+  </div>
 </div>

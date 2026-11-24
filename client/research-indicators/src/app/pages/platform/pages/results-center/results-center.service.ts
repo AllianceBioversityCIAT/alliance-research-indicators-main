@@ -138,15 +138,7 @@ export class ResultsCenterService {
       path: 'primaryLeverSort',
       header: 'Primary Lever',
       maxWidth: 'max-w-[100px]',
-      getValue: (result: Result) => {
-        if (!result.result_levers || !Array.isArray(result.result_levers)) return '-';
-        const primaryLevers = result.result_levers.filter(rl => rl.is_primary === 1);
-        if (primaryLevers.length === 0) return '-';
-        return primaryLevers
-          .map(rl => rl.lever?.short_name)
-          .filter(Boolean)
-          .join(', ');
-      }
+      getValue: (result: Result) => this.getPrimaryLeverDisplay(result)
     },
     {
       field: 'year',
@@ -198,6 +190,16 @@ export class ResultsCenterService {
       .filter(column => column.filter)
       .flatMap(column => column.filterPaths ?? [column.path])
   );
+
+  /**
+   * H16 — 2026–2030 results align to Research Areas instead of levers, so the column was blank
+   * for them. Primary levers first (2010–2025); otherwise the result's Research Areas.
+   */
+  getPrimaryLeverDisplay(result: Result): string {
+    const primaryLevers = Array.isArray(result.result_levers) ? result.result_levers.filter(rl => rl.is_primary === 1) : [];
+    const leverNames = primaryLevers.map(row => this.getPortfolioItemLabel(row)).filter(Boolean);
+    return leverNames.length ? leverNames.join(', ') : this.getResearchAreasDisplay(result);
+  }
 
   private getResearchAreasDisplay(result: Result): string {
     const directRows = this.asArray(result.result_research_areas ?? result.research_areas);
@@ -262,6 +264,13 @@ export class ResultsCenterService {
   resultsTablePaginatorRows = signal(10);
   resultsTableTotalRecords = signal(0);
   private lastSuccessfulResultsFetchKey: string | null = null;
+  /**
+   * Bumped by every `main()` call. A response is applied only when its call is still the
+   * latest one: `main()` runs from the page load, the table's lazy load, the search box and
+   * the tab switch, so an older, unfiltered request that resolves last must not overwrite
+   * the list of the filters the chips and the search box already show.
+   */
+  private resultsRequestSeq = 0;
   resultsTableSortField = signal<string>('result_official_code');
   resultsTableSortOrder = signal<-1 | 1>(-1);
 
@@ -494,6 +503,8 @@ export class ResultsCenterService {
   }
 
   async main() {
+    const requestSeq = ++this.resultsRequestSeq;
+    const isLatestRequest = () => requestSeq === this.resultsRequestSeq;
     this.loading.set(true);
     const primaryContractIdAtRequest = this.primaryContractId();
     const activeTabIdAtRequest = this.myResultsFilterItem()?.id;
@@ -580,22 +591,26 @@ export class ResultsCenterService {
         } as Result & { primaryLeverSort: string; _creatorFullName: string };
       });
 
+      if (!isLatestRequest()) return;
+
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
-      if (stillSameContext) {
+      if (stillSameContext && isLatestRequest()) {
         this.resultsTableTotalRecords.set(total);
         this.list.set(enhancedResults);
         this.lastSuccessfulResultsFetchKey = fetchKey;
       }
     } catch (error) {
       console.error('Error loading results:', error);
-      this.lastSuccessfulResultsFetchKey = null;
+      if (!isLatestRequest()) return;
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
-      if (stillSameContext) {
+      if (stillSameContext && isLatestRequest()) {
+        this.lastSuccessfulResultsFetchKey = null;
         this.resultsTableTotalRecords.set(0);
         this.list.set([]);
       }
     } finally {
-      this.loading.set(false);
+      // A superseded call leaves the spinner to the call that replaced it.
+      if (isLatestRequest()) this.loading.set(false);
     }
   }
   handleResultsTableLazyLoad(event: TableLazyLoadEvent): void {

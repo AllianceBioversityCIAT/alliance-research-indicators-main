@@ -82,6 +82,21 @@ export default class CapacitySharingComponent {
     return new Date(start_date as string | number | Date).getTime() > new Date(end_date as string | number | Date).getTime();
   });
 
+  // H8 — the participants split by sex never adds up to more than the total: on save the
+  // total is raised to the split instead of blocking the save.
+  protected alignParticipantsTotalWithSplit() {
+    const current = this.body();
+    const group = current?.group;
+    if (current?.session_format_id !== 2 || !group) return;
+    const split =
+      Number(group.session_participants_female ?? 0) +
+      Number(group.session_participants_male ?? 0) +
+      Number(group.session_participants_non_binary ?? 0);
+    if (split > Number(group.session_participants_total ?? 0)) {
+      this.body.set({ ...current, group: { ...group, session_participants_total: split } });
+    }
+  }
+
   protected clearDegreeIdIfNotLongTerm() {
     const current = this.body();
     if (current?.degree_id) {
@@ -118,6 +133,7 @@ export default class CapacitySharingComponent {
     };
 
     if (this.submission.isEditableStatus()) {
+      this.alignParticipantsTotalWithSplit();
       const payload = {
         ...this.body(),
         start_date: this.toISOTimestamp(this.body().start_date),

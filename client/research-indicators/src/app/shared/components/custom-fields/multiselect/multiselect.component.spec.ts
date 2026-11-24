@@ -565,9 +565,21 @@ describe('MultiselectComponent', () => {
     const result = component.listWithDisabled();
 
     expect(result).toEqual([
-      { id: 1, name: 'Option 1', disabled: { id: 1 } },
-      { id: 2, name: 'Option 2', disabled: undefined }
+      { id: 1, name: 'Option 1', disabled: true },
+      { id: 2, name: 'Option 2', disabled: false }
     ]);
+  });
+
+  it('H40: disables an option whose id arrives as a string (saved primary lever vs numeric control list)', () => {
+    component.optionsDisabled.set([{ id: '1' }]);
+    mockService.list.mockReturnValue([
+      { id: 1, name: 'Option 1' },
+      { id: 2, name: 'Option 2' }
+    ]);
+    component.ngOnInit();
+    TestBed.flushEffects();
+
+    expect(component.listWithDisabled().map((o: { disabled: boolean }) => o.disabled)).toEqual([true, false]);
   });
 
   it('should handle listWithDisabled when service.list() returns undefined (optional chain map)', () => {
@@ -1160,6 +1172,19 @@ describe('MultiselectComponent', () => {
       component.onMultiselectPanelShow();
 
       expect(applySpy).toHaveBeenCalled();
+      jest.restoreAllMocks();
+    });
+
+    it('onMultiselectPanelShow focuses the OpenSearch search box so one click is enough', () => {
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      (component as any).openSearchFilterInput = { nativeElement: input };
+      jest.spyOn(component as any, 'applyMultiselectPanelMaxWidth').mockImplementation(() => {});
+
+      component.onMultiselectPanelShow();
+
+      expect(document.activeElement).toBe(input);
+      input.remove();
       jest.restoreAllMocks();
     });
 
@@ -1955,6 +1980,68 @@ describe('MultiselectComponent', () => {
 
         expect(onFilterSpy).not.toHaveBeenCalled();
       });
+    });
+  });
+  describe('a selected item whose control-list entry is inactive', () => {
+    const active = { id: 1, name: 'Active option' };
+    const inactive = { id: 9, name: 'Retired option', is_catalog_inactive: true };
+
+    const render = (selected: unknown[]) => {
+      const fixture = TestBed.createComponent(MultiselectComponent);
+      const comp = fixture.componentInstance;
+      comp.optionValue = 'id';
+      comp.optionLabel = 'name';
+      comp.signalOptionValue = 'testField';
+      mockService.list.mockReturnValue([active]);
+      mockCacheService.currentResultIsLoading.set(false);
+      mockUtilsService.getNestedProperty.mockReturnValue(selected);
+      comp.ngOnInit();
+      (comp as any).optionsSig = signal([active]);
+      comp.signal = signal({ testField: selected });
+      fixture.detectChanges();
+      return { fixture, comp };
+    };
+
+    it('is offered as an option only while it is selected', () => {
+      const { comp } = render([active, inactive]);
+      expect(comp.availableOptions().map((o: any) => o.id)).toEqual([1, 9]);
+
+      mockUtilsService.getNestedProperty.mockReturnValue([active]);
+      comp.signal.set({ testField: [active] });
+      expect(comp.availableOptions().map((o: any) => o.id)).toEqual([1]);
+    });
+
+    it('still shows the selected rows when the whole catalog is inactive and the list comes back empty', () => {
+      const fixture = TestBed.createComponent(MultiselectComponent);
+      const comp = fixture.componentInstance;
+      comp.optionValue = 'id';
+      comp.optionLabel = 'name';
+      comp.signalOptionValue = 'testField';
+      mockService.list.mockReturnValue([]);
+      mockCacheService.currentResultIsLoading.set(false);
+      mockUtilsService.getNestedProperty.mockReturnValue([inactive]);
+      comp.ngOnInit();
+      (comp as any).optionsSig = signal([]);
+      comp.signal = signal({ testField: [inactive] });
+      fixture.detectChanges();
+
+      const rows = fixture.nativeElement.querySelectorAll('.selected-items .item');
+      expect(rows).toHaveLength(1);
+      expect(rows[0].textContent).toContain('Retired option');
+      expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
+    });
+
+    it('marks only the inactive selected row with a small warning icon that explains it', () => {
+      const { fixture } = render([active, inactive]);
+      const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.selected-items .item'));
+
+      expect(rows).toHaveLength(2);
+      expect(rows[0].querySelector('[data-testid="multiselect-inactive-icon"]')).toBeNull();
+      expect(rows[1].textContent).toContain('Retired option');
+      const icon = rows[1].querySelector('[data-testid="multiselect-inactive-icon"]') as HTMLElement;
+      expect(icon).not.toBeNull();
+      expect(icon.classList).toContain('pi-exclamation-triangle');
+      expect(icon.getAttribute('aria-label')).toContain('Inactive');
     });
   });
 });

@@ -16,6 +16,7 @@
       [loading]="this.loadingList()"
       [options]="this.listInstance()"
       [filter]="!this.service?.isOpenSearch()"
+      [autofocusFilter]="true"
       [filterBy]="this.optionLabel"
       [optionLabel]="this.optionLabel"
       [showToggleAll]="false"
@@ -25,7 +26,8 @@
       (onChange)="this.setValue($event)"
       [virtualScroll]="true"
       [virtualScrollItemSize]="41"
-      [emptyMessage]="'No results found. Try different keywords.'">
+      [emptyMessage]="'No results found. Try different keywords.'"
+      (onPanelShow)="focusOpenSearchFilter()">
       <ng-template pTemplate="header">
         <div class="p-dropdown-header">
           <div class="p-input-icon-left p-fluid">
@@ -44,7 +46,7 @@
           <i class="pi pi-spin pi-spinner" style="font-size: 1.5rem; margin-left: 10px; color: #007bff"></i>
         }
       </ng-template>
-      <ng-template let-value pTemplate="selectedItems"> {{ this.body().value?.length }} items selected </ng-template>
+      <ng-template let-value pTemplate="selectedItems"> {{ this.body().value?.length }} {{ this.body().value?.length === 1 ? 'item' : 'items' }} selected </ng-template>
 
       @if (!this.hideSelected) {
         <ng-template let-item pTemplate="item"><span [innerHTML]="item[this.optionLabel]"></span></ng-template>
