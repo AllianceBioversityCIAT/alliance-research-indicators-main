@@ -1455,6 +1455,54 @@ describe('AllianceAlignmentComponent', () => {
     });
   });
 
+  describe('lever SDG targets removed in SDG Management', () => {
+    const loadLeverWithTargets = (targetIds: number[]) =>
+      api.GET_Alignments.mockResolvedValue({
+        data: {
+          contracts: [],
+          result_sdgs: [],
+          primary_levers: [
+            {
+              lever_id: 6,
+              result_lever_id: 1,
+              result_id: 1,
+              lever_role_id: 1,
+              is_primary: true,
+              result_lever_strategic_outcomes: [],
+              result_lever_sdg_targets: targetIds.map(id => ({
+                sdg_target_id: id,
+                sdg_target: { id, sdg_target_code: `1.${id}`, sdg_target: `Target ${id}`, is_active: true }
+              }))
+            }
+          ],
+          contributor_levers: []
+        }
+      });
+
+    it('flags a saved target the lever no longer offers, even with an active CLARISA row', async () => {
+      getLeverSdgTargetsService.setCatalog([
+        { id: 12, sdg_target_id: 12, sdg_target_code: '1.12', sdg_target: 'Target 12', select_label: '1.12 — Target 12' }
+      ]);
+      loadLeverWithTargets([12, 14]);
+
+      await component.getData();
+
+      const [kept, removed] = component.getLeverSdgSignal(component.body().primary_levers[0])().result_lever_sdg_targets;
+      expect(kept).not.toHaveProperty('is_catalog_inactive');
+      expect(removed).toEqual(expect.objectContaining({ sdg_target_id: 14, sdg_target_code: '1.14', is_catalog_inactive: true }));
+    });
+
+    it('flags nothing while the lever target list is empty (not loaded)', async () => {
+      getLeverSdgTargetsService.setCatalog([]);
+      loadLeverWithTargets([14]);
+
+      await component.getData();
+
+      const [target] = component.getLeverSdgSignal(component.body().primary_levers[0])().result_lever_sdg_targets;
+      expect(target).not.toHaveProperty('is_catalog_inactive');
+    });
+  });
+
   describe('Other lever custom name', () => {
     const otherLever = {
       lever_id: 9,
