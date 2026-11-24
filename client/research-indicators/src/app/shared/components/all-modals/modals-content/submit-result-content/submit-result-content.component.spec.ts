@@ -695,8 +695,8 @@ describe('SubmitResultContentComponent', () => {
 
   it.each([
     [10, 'backstopping from the MELP team'],
-    [11, 'now Postponed'],
-    [15, 'now Not Accepted']
+    [11, 'now <b>Postponed</b>'],
+    [15, 'now <b>Not Accepted</b>']
   ])('H20: the OICR review confirmation matches the decision (status %i)', (statusId: number, fragment: string) => {
     expect((component as any).oicrReviewOutcomeMessage(statusId)).toContain(fragment);
   });
@@ -735,7 +735,7 @@ describe('SubmitResultContentComponent', () => {
       severity: 'success',
       summary: 'Review submitted successfully',
       hasNoCancelButton: true,
-      detail: 'Your review has been submitted. The OICR is now Postponed and can be reported again in a later reporting year.',
+      detail: 'Your review has been submitted. The OICR is now <b>Postponed</b> and can be reported again in a later reporting year.',
       confirmCallback: {
         label: 'Done',
         event: expect.any(Function)
