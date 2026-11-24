@@ -7,6 +7,7 @@ import { ResultInstitution } from '../../../../../result-institutions/entities/r
 import { LinkResult } from '../../../../../link-results/entities/link-result.entity';
 import { InstitutionRolesEnum } from '../../../../../institution-roles/enums/institution-roles.enum';
 import { LinkResultRolesEnum } from '../../../../../link-result-roles/enum/link-result-roles.enum';
+import { AppConfig } from '../../../../../../shared/utils/app-config.util';
 
 describe('PolicyChangePdfSectionHandler', () => {
   let handler: PolicyChangePdfSectionHandler;
@@ -14,6 +15,7 @@ describe('PolicyChangePdfSectionHandler', () => {
   const policyChangeRepo = { findOne: jest.fn() };
   const institutionRepo = { find: jest.fn() };
   const linkResultRepo = { find: jest.fn() };
+  const appConfig = { ARI_CLIENT_HOST: 'https://star.example.org' };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -31,6 +33,7 @@ describe('PolicyChangePdfSectionHandler', () => {
             }),
           },
         },
+        { provide: AppConfig, useValue: appConfig },
       ],
     }).compile();
 
@@ -133,6 +136,61 @@ describe('PolicyChangePdfSectionHandler', () => {
         report_year: 2026,
       }),
     );
+  });
+
+  it('links only the Innovation Development card to its PDF', async () => {
+    policyChangeRepo.findOne.mockResolvedValue(null);
+    institutionRepo.find.mockResolvedValue([]);
+    linkResultRepo.find.mockResolvedValue([
+      {
+        other_result: {
+          result_id: 1,
+          result_official_code: 9150,
+          indicator_id: IndicatorsEnum.INNOVATION_DEV,
+          platform_code: 'STAR',
+          title: 'Dev',
+          report_year_id: 2025,
+        },
+      },
+      {
+        other_result: {
+          result_id: 2,
+          result_official_code: 9301,
+          indicator_id: IndicatorsEnum.INNOVATION_USE,
+          platform_code: 'STAR',
+          title: 'Use',
+          report_year_id: 2026,
+        },
+      },
+    ]);
+
+    const { policy_change } = await handler.buildSections(30341);
+
+    expect(policy_change.innovation_development.pdf_url).toBe(
+      'https://star.example.org/reports/result/STAR-9150?version=2025',
+    );
+    expect(policy_change.innovation_use).not.toHaveProperty('pdf_url');
+  });
+
+  it('sends a null pdf_url for an Innovation Development result outside STAR', async () => {
+    policyChangeRepo.findOne.mockResolvedValue(null);
+    institutionRepo.find.mockResolvedValue([]);
+    linkResultRepo.find.mockResolvedValue([
+      {
+        other_result: {
+          result_id: 1,
+          result_official_code: 77,
+          indicator_id: IndicatorsEnum.INNOVATION_DEV,
+          platform_code: 'TIP',
+          title: 'Dev in TIP',
+          report_year_id: 2025,
+        },
+      },
+    ]);
+
+    const { policy_change } = await handler.buildSections(30341);
+
+    expect(policy_change.innovation_development.pdf_url).toBeNull();
   });
 
   it('sends null links when nothing is linked', async () => {

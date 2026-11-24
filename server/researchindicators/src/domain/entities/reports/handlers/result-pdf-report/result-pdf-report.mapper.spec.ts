@@ -1,4 +1,6 @@
 import {
+  buildResultPdfUrl,
+  mapActorTypeIcons,
   mapAllianceAlignmentSection,
   mapCapSharingSection,
   mapGeneralInformationSection,
@@ -640,5 +642,78 @@ describe('result-pdf-report.mapper', () => {
     ])('maps %p', (value, expected) => {
       expect(mapPolicyAmountStatus(value as string | null)).toEqual(expected);
     });
+  });
+
+  describe('mapActorTypeIcons', () => {
+    const BUCKET = 'https://alliance-files-storage.s3.us-east-1.amazonaws.com';
+
+    it('maps every catalog actor type to its image in production', () => {
+      expect(mapActorTypeIcons(`${BUCKET}/`, true, [1, 2, 3, 4, 5, 2])).toEqual(
+        {
+          1: `${BUCKET}/public/images/users-farmers.png`,
+          2: `${BUCKET}/public/images/user-researchers.png`,
+          3: `${BUCKET}/public/images/users-extension-agents.png`,
+          4: `${BUCKET}/public/images/users-policy.png`,
+          5: `${BUCKET}/public/images/users-other.png`,
+        },
+      );
+    });
+
+    it('reads the public-dev folder outside production and skips unknown or empty ids', () => {
+      expect(
+        mapActorTypeIcons(BUCKET, false, [4, 99, null, undefined]),
+      ).toEqual({ 4: `${BUCKET}/public-dev/images/users-policy.png` });
+    });
+
+    it.each([undefined, '', 'alliance-files-storage', '/images'])(
+      'sends nothing when the bucket URL is %p (not absolute)',
+      (bucketUrl) => {
+        expect(mapActorTypeIcons(bucketUrl, true, [1])).toEqual({});
+      },
+    );
+  });
+
+  describe('buildResultPdfUrl', () => {
+    const HOST = 'https://star.alliance.cgiar.org';
+    const STAR_INN_DEV = {
+      platform_code: 'STAR',
+      result_official_code: 9150,
+      indicator_id: 2,
+      report_year_id: 2025,
+    };
+
+    it('links a STAR result to its report viewer page with its version', () => {
+      expect(buildResultPdfUrl(`${HOST}/`, STAR_INN_DEV)).toBe(
+        `${HOST}/reports/result/STAR-9150?version=2025`,
+      );
+    });
+
+    it('omits the version when the result has no report year', () => {
+      expect(
+        buildResultPdfUrl(HOST, { ...STAR_INN_DEV, report_year_id: null }),
+      ).toBe(`${HOST}/reports/result/STAR-9150`);
+    });
+
+    it.each([1, 2, 4])('links indicator %p, which has a PDF template', (id) => {
+      expect(
+        buildResultPdfUrl(HOST, { ...STAR_INN_DEV, indicator_id: id }),
+      ).not.toBeNull();
+    });
+
+    it.each([
+      ['a result outside STAR', { ...STAR_INN_DEV, platform_code: 'TIP' }],
+      ['an indicator without template', { ...STAR_INN_DEV, indicator_id: 6 }],
+      ['a missing code', { ...STAR_INN_DEV, result_official_code: null }],
+      ['no result', null],
+    ])('is null for %s', (_label, result) => {
+      expect(buildResultPdfUrl(HOST, result)).toBeNull();
+    });
+
+    it.each([undefined, '', 'star.alliance.cgiar.org'])(
+      'is null when the client host is %p (not absolute)',
+      (host) => {
+        expect(buildResultPdfUrl(host, STAR_INN_DEV)).toBeNull();
+      },
+    );
   });
 });

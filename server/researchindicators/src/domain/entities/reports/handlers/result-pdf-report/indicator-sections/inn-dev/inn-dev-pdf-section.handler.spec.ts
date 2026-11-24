@@ -16,6 +16,7 @@ import { ClarisaInnovationReadinessLevel } from '../../../../../../tools/clarisa
 import { ClarisaActorType } from '../../../../../../tools/clarisa/entities/clarisa-actor-types/entities/clarisa-actor-type.entity';
 import { ClarisaInstitutionType } from '../../../../../../tools/clarisa/entities/clarisa-institution-types/entities/clarisa-institution-type.entity';
 import { ClarisaInstitution } from '../../../../../../tools/clarisa/entities/clarisa-institutions/entities/clarisa-institution.entity';
+import { AppConfig } from '../../../../../../shared/utils/app-config.util';
 
 const repo = () => ({ findOne: jest.fn(), find: jest.fn() });
 
@@ -23,6 +24,11 @@ describe('InnDevPdfSectionHandler', () => {
   let handler: InnDevPdfSectionHandler;
 
   const resultInnovationDevService = { findOne: jest.fn() };
+  const appConfig = {
+    BUCKET_URL: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com',
+    ARI_IS_PRODUCTION: false,
+    ARI_CLIENT_HOST: 'https://star.example.org',
+  };
   const repos = new Map<unknown, ReturnType<typeof repo>>(
     [
       ResultInnovationDev,
@@ -81,6 +87,7 @@ describe('InnDevPdfSectionHandler', () => {
           provide: DataSource,
           useValue: { getRepository: jest.fn((entity) => repoOf(entity)) },
         },
+        { provide: AppConfig, useValue: appConfig },
       ],
     }).compile();
 
@@ -221,6 +228,9 @@ describe('InnDevPdfSectionHandler', () => {
         other_result: {
           title: 'A holistic framework',
           result_official_code: 9001,
+          platform_code: 'STAR',
+          indicator_id: 2,
+          report_year_id: 2025,
           indicator: { name: 'Innovation Development' },
           result_status: { name: 'Approved' },
         },
@@ -249,8 +259,47 @@ describe('InnDevPdfSectionHandler', () => {
         result_type_label: 'Innovation Development',
         qa_status_label: 'Approved',
         reporting_project_name: 'CIFOR Hosted - HQ (A1048)',
+        pdf_url:
+          'https://star.example.org/reports/result/STAR-9001?version=2025',
       },
     ]);
+  });
+
+  it('sends the image of each actor type the innovation uses, from the dev folder outside production', async () => {
+    repoOf(ResultInnovationDev).findOne.mockResolvedValue({ result_id: 10 });
+    resultInnovationDevService.findOne.mockResolvedValue(INNOVATION);
+
+    const { innovation_details } = await handler.buildSections(10);
+
+    expect(innovation_details.actor_type_icons).toEqual({
+      1: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/public-dev/images/users-farmers.png',
+      5: 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/public-dev/images/users-other.png',
+    });
+  });
+
+  it('links a linked result without a PDF template to nothing', async () => {
+    repoOf(ResultInnovationDev).findOne.mockResolvedValue({ result_id: 10 });
+    resultInnovationDevService.findOne.mockResolvedValue(INNOVATION);
+    repoOf(LinkResult).find.mockResolvedValue([
+      {
+        link_result_id: 147,
+        other_result_id: 26054,
+        link_result_role_id: 2,
+        other_result: {
+          title: 'A knowledge product',
+          result_official_code: 9002,
+          platform_code: 'STAR',
+          indicator_id: 3,
+          report_year_id: 2025,
+        },
+      },
+    ]);
+
+    const { innovation_details } = await handler.buildSections(10);
+
+    expect(
+      innovation_details.knowledge_sharing_form.link_to_result[0].pdf_url,
+    ).toBeNull();
   });
 
   it('skips catalog queries for answers that were never given', async () => {
