@@ -459,12 +459,12 @@ export const normalizePortfolio2AlignmentGet = (
 });
 
 /**
- * The OICR SDG Targets list is the portfolio's own selection (SDG Management), not the
- * CLARISA `is_active` flag, so a target removed there keeps an active catalog row. A saved
- * target the list no longer offers is inactive for this field. An empty list (not loaded)
- * flags nothing.
+ * SDG target lists come from SDG Management (the OICR portfolio list, or each lever's
+ * targets in Portfolio 1), not the CLARISA `is_active` flag, so a target removed there keeps
+ * an active catalog row. A saved target the list no longer offers is inactive for that
+ * field. An empty list (not loaded) flags nothing.
  */
-const flagSdgTargetsMissingFrom = (targets: AlignmentSdgTargetRow[], offered?: LeverSdgTargetOption[]): AlignmentSdgTargetRow[] => {
+export const flagSdgTargetsMissingFrom = (targets: AlignmentSdgTargetRow[], offered?: LeverSdgTargetOption[]): AlignmentSdgTargetRow[] => {
   if (!offered?.length) return targets;
   const offeredIds = new Set(offered.map(item => Number(item.sdg_target_id ?? item.id)));
   return targets.map(target => (offeredIds.has(Number(target.sdg_target_id)) ? target : { ...target, is_catalog_inactive: true }));
