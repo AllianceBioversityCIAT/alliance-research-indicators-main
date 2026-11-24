@@ -2,14 +2,16 @@
 
 - **Module:** institutional-performance — server `domain/entities/strategy-framework/` + client *ODS Admin* pages
 - **Spec id:** 2026-11-strategy-framework
-- **Status:** not-started — approved by the dev lead 2026-11-17 (Phase 3 gate); ready for `/akili-execute`
+- **Status:** rev 4 amendment drafted 2026-11-24 (T-18…T-22, Phase 3 gate pending). T-01…T-16 done; T-17 in progress
 - **Owner:** Hector F. Tobón (requester) · dev lead
-- **Linked requirements:** [`./requirements.md`](requirements.md) (rev 3.1)
-- **Linked design:** [`./design.md`](design.md) (r7, Judgment Day lineage 2 approved — [`judgment.md`](judgment.md))
+- **Linked requirements:** [`./requirements.md`](requirements.md) (rev 4)
+- **Linked design:** [`./design.md`](design.md) (r9, Judgment Day lineage 3 approved — [`judgment.md`](judgment.md))
 - **Baseline commit for every observed red below:** `64a39c26`; every baseline grep re-observed unchanged (`0`) at `29b97978`, after merging `origin/staging` (2026-11-17)
-- **Last updated:** 2026-11-17
+- **Last updated:** 2026-11-24 (rev 4: T-18…T-22)
 
-> **Answer first.** 17 tasks in 3 phases: server foundation (T-01…T-04), server behaviour (T-05…T-10), client (T-11…T-16), then the Dev/HITL pass (T-17). Two PRs recommended: **PR 1 server** (T-01…T-10), **PR 2 client** (T-11…T-17). Mid-run tripwire after **T-05**: server actuals vs 2,000 LOC (design §14).
+> **Rev 4 (2026-11-24).** Five client tasks rework the layout (tree table + side panel), from requirements rev 4 / design r9. Run order: **T-21** (DataTable opt-in) and **T-18** (tree) first and independent → **T-19** (Framework layout + panel) → **T-20** (IOB) → **T-22** (docs + HITL). One PR on top of the pushed `795c30084` (no history rewrite). T-17's visual/keyboard parts move to T-22; its Dev role, timing and seed-review checks stay in T-17.
+
+> **Answer first (rev 3).** 17 tasks in 3 phases: server foundation (T-01…T-04), server behaviour (T-05…T-10), client (T-11…T-16), then the Dev/HITL pass (T-17). Two PRs recommended: **PR 1 server** (T-01…T-10), **PR 2 client** (T-11…T-17). Mid-run tripwire after **T-05**: server actuals vs 2,000 LOC (design §14).
 
 **Shared rules for every task**
 - **Test DB rule (org-structure precedent):** never run `migration:test:bootstrap` or `baseline:test:load`; integration runs use the local `ARI_TEST_MYSQL_*` database; each suite cleans up the rows it creates and never touches seeded rows of other modules.
@@ -47,7 +49,15 @@ graph TD
   T10 --> T17[T-17 Dev + HITL pass]
   T15 --> T17
   T16 --> T17
+  T21[T-21 DataTable keyboardSelectable opt-in] --> T19
+  T18[T-18 Framework tree table] --> T19[T-19 Side panel layout + Framework panel]
+  T19 --> T20[T-20 IOB side panel]
+  T21 --> T20
+  T19 --> T22[T-22 Docs, family F-4, rev-4 HITL]
+  T20 --> T22
 ```
+
+Rev 4: T-18 and T-21 touch different files and may run in parallel **for editing** only if the Leader re-runs the client suite after both; by default run them one after the other (same package).
 
 Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10. Never two tasks of the same package at once.
 
@@ -337,6 +347,7 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Scope:**
   - **Before merge (dev lead):** P-17 and P-31 read-only queries on Dev; results quoted in `execution.md`.
   - **After the Dev deploy:** a user given role 11 out of band — `req.user.roles` contains 11 (P-3), a write returns `200`, the menu shows *ODS Admin* with both items; the same user gets `403` on a Center admin `@Roles` endpoint.
+  - *(Rev 4, 2026-11-24: the outline/drawer visual and keyboard checks below are superseded by T-22; T-17 keeps the role, timing and seed-review checks.)*
   - HITL in a real browser, light and dark, two widths (≥ 1280 px and 800 px): outline geometry, indentation, accent visibility (≥ 3:1), focus order, drawer trap, side-by-side with the Framework mockup and artboard 4; requester review of the seeded framework and the unmatched-responsibles list.
   - NFR-STF-001 re-timed on Dev (3 runs).
   - Design route: load impeccable-bridge → design-routing.md; playbook critique, audit; ENV-2; mode Operate; polish light; motion none
@@ -348,6 +359,142 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 - **Review:** checklist — the evidence is the recorded observations.
 - **Done criteria:** each check quoted in `execution.md` with who, when and what it covered; any P-3 failure escalated before `/akili-test`.
 - **Skills:** `impeccable-bridge`, `playwright-cli`
+
+### Phase E — Rev 4 layout amendment (2026-11-24)
+
+Shared for T-18…T-22: client only, under `client/research-indicators/`; verification `npx jest <scope> --coverage=false`, `npm run lint -- --quiet`, `npm run build` (component styles < 4 kB each, quote sizes), `tsc -p tsconfig.spec.json` with no new errors in touched files; KZ-015 (drive real clicks/keys, never set signals to reach a state), KZ-001 (assert DOM and request payloads), KZ-017 (jsdom cannot judge layout, scroll, colour or real Tab order — the Leader measures in Chrome). Baseline commit for every observed red: `db07f43dc`.
+
+### T-21 — Shared DataTable: opt-in keyboard row selection
+- **Status:** todo · **Size:** S · **Depends:** none
+- **Requirements:** NFR-STF-004 (rows reachable by Tab, Enter/Space selects — Table view and IOB), R-STF-008 AC.2 (select from the table), R-STF-016 AC.1 (row selection fills the panel)
+- **Design:** §6.4 (`keyboardSelectable`), §6.6; D-STF-36; P-40, P-47
+- **Scope:** `shared/components/data-table/data-table.component.{ts,html,spec.ts}` only. New input `keyboardSelectable = false`. When it and `selectable` are true: each body row gets `tabindex="0"`, `keydown.enter` and `keydown.space` (Space with `preventDefault`) emitting `rowSelected` exactly as a click does, and `data-row-key="<String(row.id)>"`. Key events from interactive descendants (buttons, links, inputs) are ignored (`target !== currentTarget`). With the input false the rendered DOM is unchanged.
+- **Tests:** (1) `keyboardSelectable` true: Tab-focusable rows (`tabindex="0"`), Enter and Space on a row emit `rowSelected` with that row, Space's default prevented, `data-row-key` present; a key on a button inside a cell emits nothing. (2) default (input absent): no `tabindex`, no `data-row-key` on rows, and Enter emits nothing — **the existing `data-table.component.spec.ts` assertions stay unchanged**.
+- **Falsifier:** (a) drop the `keydown.enter` binding → test 1's Enter assertion red; (b) render `tabindex` unconditionally → test 2's "no tabindex by default" assertion red.
+- **Red run:** predicted — greenfield artifact (observed in T-21): the new tests are written first against the current component and must fail on the Enter/tabindex assertions, quoted in `execution.md`.
+- **Disqualifier:** a test that calls the component's handler method directly instead of dispatching a `KeyboardEvent` on the `<tr>` proves nothing about the binding; a green default-path test that renders no selectable table at all (`selectable` false) does not prove "unchanged when opted out".
+- **Consumers:** every `app-data-table` user, by `grep -rln "app-data-table" client/research-indicators/src` (2026-11-24): `organizational-structure.component.html`, `control-lists.component.html`, `framework-tables.component.html`, `institutional-objectives.component.html`; specs pinning the component: `data-table.component.spec.ts`, `control-lists.component.spec.ts`. All except the two ods-admin pages keep the default; their specs run unchanged in the verification.
+- **Review:** full — shared component used by four screens.
+- **Done criteria:** the scoped jest run covering `shared/components/data-table`, `configuration/control-lists`, `center-admin/organizational-structure` and `ods-admin` green; both falsifiers executed and reverted with the failing lines quoted; `git diff --stat` shows only the three data-table files.
+- **Skills:** `angular-developer`, `ui-ux-pro-max`
+
+### T-18 — Framework tree table (replaces the outline editor)
+- **Status:** todo · **Size:** M · **Depends:** none (T-12…T-16 done)
+- **Requirements:** R-STF-007 (columns, read-only names, counts, indentation, inherited area bar, expand/collapse, search, + child, states; scenarios *Read-only names*, *Inherited area colour*, *Add a child from the tree* incl. AND IT MUST add nothing until saved; AC.1–AC.5), NFR-STF-004 (tree rows: ttRow keyboard, Enter/Space selects, `aria-selected`, chevron `aria-label`/`aria-expanded`, colour not the only cue)
+- **Design:** §6.3; D-STF-30, D-STF-34; P-38, P-39, P-45, P-48
+- **Scope:** new `framework/components/framework-tree/` (standalone, `OnPush`, `p-treeTable`): columns Name · Code · Level · Responsibles · Actions; read-only names; counts text; `rowNode.level × 28 px` indent with the page's **own** chevron button (not `p-treeTableToggler`); `--row-accent` from the depth-1 ancestor painted as an inset bar on the first cell; selected style = background + `<tr>` outline (never first-cell shadow); `[ttRow]` with no own `tabindex`, `data-p-highlight` on the selected row; Enter/Space select only when `target === currentTarget`, Space `preventDefault`; **+** stops click and Enter/Space keydown; expand state as an input/output `Set` of collapsed ids; search box (move `outline-filter.util` → `framework-tree/tree-filter.util`, with its spec); outputs `elementSelected`, `childRequested`, `expansionChanged`. Extend `framework-view.util` with tree nodes and the depth-1 ancestor index. Not wired into the page yet (T-19).
+- **Tests:** natural order and counts (`1.2` before `1.10`); no `input`/`textarea` inside the tree; click and Enter/Space on a row emit `elementSelected`; Enter on **+** emits `childRequested` and **not** `elementSelected`; chevron click toggles `aria-expanded` and hides descendants; search by code prefix and by name shows matches plus ancestors, shows the no-match text, and restores the collapse set when cleared (ported from the outline specs); every descendant row's `--row-accent` equals its area's token; indent style grows by level; selected row has `aria-selected="true"` and `data-p-highlight`.
+- **Falsifier:** (a) compute `--row-accent` from the row's own index instead of the depth-1 ancestor → the inherited-colour test red; (b) remove the `target === currentTarget` check → the "Enter on + does not select" test red.
+- **Red run:** predicted — greenfield artifact (observed in T-18).
+- **Disqualifier:** the accent test must read the rendered `style`/custom property of descendant rows, not the view-model field; the indent test proves the style value only — the rendered step, bar continuity and outline are judged in Chrome (KZ-017, T-22).
+- **Consumers:** `outline-filter.util.spec.ts` moves with the util; no consumer outside `ods-admin/` (P-44).
+- **Review:** full — new component, accessibility-critical.
+- **Done criteria:** `npx jest src/app/pages/platform/pages/administration/ods-admin --coverage=false` green; both falsifiers executed, reds quoted, reverted; lint, build (style size quoted), spec tsc clean for touched files.
+- **Skills:** `angular-developer`, `ui-ux-pro-max`
+
+### T-19 — Side panel layout, unsaved-changes guard and the Framework page
+- **Status:** todo · **Size:** L · **Depends:** T-18, T-21
+- **Requirements:** R-STF-016 (layout, empty state, viewport fit ≥ 1024 px, header, Delete at top, fields, Cancel/Save, unsaved changes with all nine triggers, failed save; scenarios *Select and edit*, *Unsaved changes* incl. BUT must NOT replace the form without asking, *Panel fits the viewport* incl. AND IT MUST at two heights; AC.1–AC.4 for Framework), R-STF-007 (page shell: Tree/Table toggle, New <level-1>, empty state inside the list slot), R-STF-008 (row click → panel, AC.2), NFR-STF-004 (panel region label, focus on create/Save/Cancel/delete)
+- **Design:** §6.2, §6.4, §6.5, §6.9, §13a items 3–6; D-STF-29, 31, 32, 33, 35; P-41, P-42, P-43, P-46
+- **Scope:**
+  - **First step — settle P-46 (Leader, before the brief is final):** live measurement in Chrome of the built page at 1280×800 and 1280×650. With a row selected, check `.content` `scrollHeight == clientHeight` and the panel bottom ≤ `innerHeight`. Quote the header, summary and banner heights, and confirm or replace the 280 px target.
+  - New `ods-admin/side-panel-layout/`: slots, empty text, viewport-fit column, stack below 1024 px.
+  - New `ods-admin/unsaved-changes.util.ts`: `guardDiscard` through `showGlobalAlert`, no stacked prompts.
+  - `framework.component.*`:
+    - selection, create request, `refreshToken` guard over both views;
+    - Tree/Table toggle with the chip-follow rule;
+    - level-chip, portfolio and view triggers;
+    - the empty state inside the list slot;
+    - focus after delete by next visible row, through `FrameworkDeleteHandler`'s `resolveElement`/`prepareFocus`.
+  - `element-panel`:
+    - drop `p-drawer` and `pFocusTrap`;
+    - Delete at the top, edit mode only;
+    - `dirty` output against the opened values;
+    - create token for the stale guard;
+    - failed save inline.
+  - `framework-tables`: drop `#rowActions` and pass `[selectable]`, `[keyboardSelectable]="true"`, string `[selectedKey]` and `(rowSelected)`; rows carry `id`.
+  - Codec: Tree is the default and omitted; `editor` decodes to Tree.
+  - **Delete** `outline-editor/*`, `outline-row/*` and `overlay-escape-guard.directive.ts` with their specs.
+- **Tests:**
+  - Row click in the tree and in a level table fills the panel (header `INDICATOR · LEVEL 3`, pill, Delete at the top); empty state when nothing is selected.
+  - Save → request payload, toast, and the row stays selected with the new name.
+  - Dirty plus another row click → the prompt is shown. **Keep editing** keeps the form text and the old selection; **Discard** selects the new row. Repeat for create, level chip, portfolio and view.
+  - Click on the already-selected row → no prompt.
+  - A stale response for a previous selection is ignored.
+  - Failed save keeps the typed values and shows the message.
+  - Delete from the panel uses the existing handler (messages, Close-only blocked dialog) and moves focus to the next visible row.
+  - Tree → Table keeps the selection and sets its level chip.
+  - `+ Dimension` opens create with the parent and A3 code, and adds nothing to the tree until saved.
+  - No `p-drawer` in the page DOM.
+- **Falsifier:**
+  - (a) Route the row click straight to selection, bypassing `guardDiscard` → the *Keep editing* test goes red.
+  - (b) Remove the stale-response check → the stale test goes red.
+  - (c) Measured, not jsdom: remove the fixed-height column (let the page flow) → in Chrome at 1280×650 `.content` `scrollHeight > clientHeight`, quoted.
+- **Red run:** predicted — greenfield artifact (observed in T-19) for (a) and (b); (c) observed live by the Leader.
+- **Disqualifier:**
+  - Any viewport-fit claim from jsdom is not evidence (KZ-017).
+  - A live measurement taken without a selected tall element, or at a single window height, does not discharge AC.4.
+  - If the two heights disagree with the 280 px target, report the numbers; do not tune silently.
+- **Consumers:** the deleted outline specs. `framework.component.spec.ts`, `framework-tables.component.spec.ts` and `element-panel.component.spec.ts` are rewritten where they pin the drawer, `#rowActions` or inline drafts; list every changed assertion and why. `framework-url.codec.spec.ts` keeps its `editor` cases. `FrameworkDeleteHandler`'s contract is unchanged.
+- **Review:** full — data-loss guard and the largest diff.
+- **Done criteria:**
+  - ods-admin jest green; falsifiers (a) and (b) executed, quoted and reverted; (c) measured in Chrome by the Leader at both heights and quoted.
+  - Lint, build (style sizes quoted) and spec tsc clean.
+  - `grep -rn "p-drawer\|pFocusTrap\|OverlayEscapeGuard" client/research-indicators/src/app/pages/platform/pages/administration/ods-admin` → 0.
+- **Skills:** `angular-developer`, `ui-ux-pro-max`
+
+### T-20 — Institutional Objectives in the side panel
+- **Status:** todo · **Size:** M · **Depends:** T-19, T-21
+- **Requirements:** R-STF-009 rev 4 (row click → panel, no row edit action, + Add objective → create), R-STF-016 for IOB (header `INSTITUTIONAL OBJECTIVE` / `IOB-6 · 2026`, Delete at top following `deletable`, Cancel/Save, unsaved-changes guard incl. year and Carry forward, failed save; AC.1–AC.3), R-STF-010 (Carry forward unchanged, now guarded), NFR-STF-004
+- **Design:** §6.6, §6.9, §13a items 1–3; D-STF-29, 32, 33, 36
+- **Scope:**
+  - Page:
+    - split layout with `side-panel-layout`;
+    - table with `[selectable]`, `[keyboardSelectable]="true"`, string `[selectedKey]`, `(rowSelected)`, and no `#rowActions`;
+    - refresh in place after Save, Delete and Carry forward (skeleton only on first load and on portfolio or year change);
+    - selection cleared when the portfolio or year change proceeds;
+    - focus after delete by `data-row-key` (next, else previous, else **+ Add objective**);
+    - `guardDiscard` on row, create, portfolio, year and Carry forward.
+  - `objective-panel`: drop `p-drawer` and `pFocusTrap`; Delete at the top through the existing delete flow; `dirty` output; failed save inline.
+- **Tests:**
+  - Row click and Enter fill the panel; empty state.
+  - Save keeps the row selected **and the table stays mounted**: assert that the same `<table>` element survives, not just its text.
+  - Year change while dirty → prompt; **Keep editing** keeps the year and the form.
+  - Delete in the panel: same confirm text and request as before; when not `deletable` it is `aria-disabled` and shows the reason; focus goes to the next row by key.
+  - Carry forward while dirty → prompt.
+  - No `p-drawer` in the DOM.
+- **Falsifier:** (a) set `loading` on save again → the "same table element" test goes red; (b) leave the year change unguarded → its prompt test goes red.
+- **Red run:** predicted — greenfield artifact (observed in T-20).
+- **Disqualifier:** a test that checks the table text after save cannot tell a remount from a refresh in place; it must compare element identity.
+- **Consumers:** `institutional-objectives.component.spec.ts` and `objective-panel.component.spec.ts` are rewritten where they pin the drawer, focus trap or `edit-objective`; list every changed assertion.
+- **Review:** full.
+- **Done criteria:** ods-admin jest green; both falsifiers executed, quoted and reverted; lint, build and spec tsc clean; `grep` for `p-drawer` and `pFocusTrap` under `ods-admin` → 0.
+- **Skills:** `angular-developer`, `ui-ux-pro-max`
+
+### T-22 — Docs, family F-4 and the rev-4 HITL pass
+- **Status:** todo · **Size:** S · **Depends:** T-19, T-20
+- **Requirements:** requirements §0b B-3 (F-4 exception withdrawn), §10 rendered rows (tree geometry, indentation, inherited bars, panel fit), R-STF-016 AC.4, NFR-STF-004 manual keyboard pass, visual fidelity to Organizational Structure
+- **Design:** §6.3 (28 px step tuned live), §6.9, D-STF-30, D-STF-31; P-42, P-46
+- **Scope:**
+  - `family.md`: remove the F-4 child-3 exception and record the rev-4 note.
+  - `docs/ux-ui/design.md`: add a decisions-log row for the ODS Admin tree table plus side panel pattern and its viewport-fit rule.
+  - The client README styles row, only if a token changed (none expected).
+  - **HITL (Leader in Chrome, then the owner):**
+    - light and dark;
+    - 1280×800, 1280×650 and 800 px wide;
+    - measure the panel bottom against `innerHeight` at rest and scrolled;
+    - check the rendered indent step, bar continuity under a selected row, and the outline;
+    - keyboard pass: Tab to the tree, arrows, Enter/Space, **+**, panel fields, Save focus return, Table view rows by Tab/Enter, IOB rows;
+    - side by side with Organizational Structure.
+- **Tests:** manual, recorded in `execution.md`.
+- **Falsifier:** at 1280×650 with a tall Indicator selected, a panel bottom greater than `innerHeight` is the failure this pass exists to catch. Quote the number either way.
+- **Red run:** n/a — live measurement; the values are quoted as observed.
+- **Disqualifier:** a pass done without a selected tall element, at one height only, or without naming what was compared does not count (KZ-002).
+- **Consumers:** n/a.
+- **Review:** checklist — the evidence is the recorded measurements and the owner's verdict.
+- **Done criteria:** the measurements, keyboard pass and owner verdict are quoted in `execution.md`; `family.md` and `docs/ux-ui/design.md` are updated; no commit of UI before the owner's visual approval.
+- **Skills:** `ui-ux-pro-max`, `cognitive-doc-design`
+
 
 ---
 
@@ -383,12 +530,20 @@ Parallel-safe pairs (different packages): T-09 with T-04…T-07; T-11 with T-10.
 | NFR-STF-003 | T-08 |
 | NFR-STF-004 | T-11, T-13, T-15, T-16, T-17 |
 | NFR-STF-005 | T-08 |
+| **Rev 4** — R-STF-007 rewritten: columns, read-only names, counts, indentation, inherited bar, expand/collapse, search, + child · scenarios *Read-only names* (BUT no editable field, AND IT MUST text), *Inherited area colour*, *Add a child* (AND IT MUST add nothing until saved) · AC.1–AC.4 | T-18 (component), T-19 (+ child → create panel, adds nothing until saved), T-22 (rendered) |
+| R-STF-007 rev 4 states (loading, empty with + Add, error) · AC.5 · Tree/Table toggle · New <level-1> | T-19 |
+| R-STF-008 rev 4 row click → panel, delete in panel · AC.2 | T-19, T-21 |
+| R-STF-009 rev 4 row click → panel, no row edit action, + Add objective | T-20, T-21 |
+| R-STF-016 layout, empty state, header, Delete at top, fields, buttons, failed save · AC.1, AC.2 | T-19 (Framework), T-20 (IOB) |
+| R-STF-016 unsaved changes (row, create, portfolio, year, view, level chip, Carry forward) · scenario *Unsaved changes* BUT must NOT replace without asking · AC.3 | T-19 (row, create, portfolio, view, level chip), T-20 (row, create, portfolio, year, Carry forward) |
+| R-STF-016 fits the viewport ≥ 1024 px · scenario AND IT MUST two heights · AC.4 | T-19 (measured), T-22 (HITL) |
+| NFR-STF-004 rev 4 (tree keyboard, table keyboard, panel region, focus rules) | T-18, T-19, T-20, T-21, T-22 (manual pass) |
 
-**Premise ownership:** P-1 → T-02 · P-3 → T-17 (scheduled by T-01) · P-11 → T-01 · P-15, P-16 → T-09 · P-17, P-31 → T-01 (record) / T-17 (result) · P-25 → T-11 · P-26 → T-09 / T-10 · P-30 → T-02 · P-32 → T-09 / T-10 · P-33 → T-15, T-16 · P-34 → T-11 · P-35 → T-02, T-03 · P-36 → T-12. `consumer` rows P-14, P-23, P-25, P-36 appear in the `Consumers` fields of T-11, T-12 and T-14.
+**Premise ownership:** P-1 → T-02 · P-3 → T-17 (scheduled by T-01) · P-11 → T-01 · P-15, P-16 → T-09 · P-17, P-31 → T-01 (record) / T-17 (result) · P-25 → T-11 · P-26 → T-09 / T-10 · P-30 → T-02 · P-32 → T-09 / T-10 · P-33 → T-15, T-16 · P-34 → T-11 · P-35 → T-02, T-03 · P-36 → T-12. `consumer` rows P-14, P-23, P-25, P-36 appear in the `Consumers` fields of T-11, T-12 and T-14. **Rev 4:** P-46 → T-19 (first step) · P-42, P-46 → T-22 (HITL) · P-44 → T-18, T-19 `Consumers` · P-47 → T-21 `Consumers`.
 
 ## 4. Review classification
 
-No task is `skip-eligible`. `full`: T-01, T-02, T-05, T-06, T-08, T-09, T-10, T-11, T-13, T-15. `checklist`: T-03, T-04, T-07, T-12, T-14, T-16, T-17.
+No task is `skip-eligible`. `full`: T-01, T-02, T-05, T-06, T-08, T-09, T-10, T-11, T-13, T-15, **T-18, T-19, T-20, T-21**. `checklist`: T-03, T-04, T-07, T-12, T-14, T-16, T-17, **T-22**.
 
 ## 5. Risks & blockers log
 
@@ -402,5 +557,6 @@ No task is `skip-eligible`. `full`: T-01, T-02, T-05, T-06, T-08, T-09, T-10, T-
 
 - [ ] All tasks `done` with evidence in `execution.md`.
 - [ ] T-17 performed in the running product **before** `/akili-validate` (KZ-007).
+- [ ] Rev 4: T-18…T-22 done; T-22's measurements and the owner's visual approval recorded before any UI commit.
 - [ ] Every requirement-level AC checked; Swagger documents every endpoint; coverage thresholds green.
 - [ ] Rollout note: Dev pre-merge checks, role assignment owner, backout (design §11).

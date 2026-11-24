@@ -2,7 +2,7 @@
 
 - **Module:** institutional-performance — server + client
 - **Spec id:** 2026-11-strategy-framework
-- **Status:** rev 3.1, 2026-11-17 — rev 2 approved at the Phase 1 gate; rev 3 amended by the dev lead at the Phase 2 gate (§0, A-6…A-10); rev 3.1 carries the Judgment Day lineage 2 clarifications (R-STF-003 cap and AC.2, R-STF-006 IOB blocking, R-STF-007 title and empty state, R-STF-011 email source, R-STF-012 registry, R-STF-013 AC.2, R-STF-014 machine tokens); **approved 2026-11-17**
+- **Status:** **rev 4 (layout amendment), 2026-11-24 — draft at the Phase 1 gate** (§0b; proposal [`proposal-layout-amendment.md`](proposal-layout-amendment.md)). Previous: rev 3.1, 2026-11-17 — rev 2 approved at the Phase 1 gate; rev 3 amended by the dev lead at the Phase 2 gate (§0, A-6…A-10); rev 3.1 carries the Judgment Day lineage 2 clarifications (R-STF-003 cap and AC.2, R-STF-006 IOB blocking, R-STF-007 title and empty state, R-STF-011 email source, R-STF-012 registry, R-STF-013 AC.2, R-STF-014 machine tokens); **approved 2026-11-17**
 - **Depth:** **Full** — new role, five new tables (the strategy in **one** self-referencing table), a seed from three workbooks, a cross-module contract (KPIs and mapping attach to Indicators later)
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh. Scope decisions 2026-11-17 by the dev lead
 - **Parent spec:** [`../family.md`](../family.md) — child 3 of 5. Shared rules **F-2 … F-9** apply and are cited, not restated. **F-1, F-3 and F-8 carry child-3 exceptions** (family amendment 2026-11-17)
@@ -10,9 +10,9 @@
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — admin tools
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
 - **Proposal:** [`proposal.md`](proposal.md) — revision 6 (2026-11-17)
-- **Visual reference:** (1) **Framework page:** the dev lead's mockup *Strategy 2026–2030 – Monitoring framework*, shared 2026-11-17 (inline outline editor; screenshot only). (2) **Sidebar:** the *Institutional Indicators* canvas https://claude.ai/artifact/8tak5qfvNbBhfaH8DvWDpg (group *ODS Admin*). (3) **Institutional Objectives page:** artboard 4, [`../mockup/InstitutionalObjectives.dc.html`](../mockup/InstitutionalObjectives.dc.html). Known drift: the Framework mockup shows 14 dimensions · 32 indicators (pre-merge innovation rows, A-6), KPI counts (only once child 4 exists, R-STF-012) and no detail panel, portfolio selector or table view (A-8, A-9); artboard 4 shows an owner unit (removed, A-3)
+- **Visual reference:** (1) **Framework page:** the dev lead's mockup *Strategy 2026–2030 – Monitoring framework*, shared 2026-11-17 (inline outline editor; screenshot only). (2) **Sidebar:** the *Institutional Indicators* canvas https://claude.ai/artifact/8tak5qfvNbBhfaH8DvWDpg (group *ODS Admin*). (3) **Institutional Objectives page:** artboard 4, [`../mockup/InstitutionalObjectives.dc.html`](../mockup/InstitutionalObjectives.dc.html). Known drift: the Framework mockup shows 14 dimensions · 32 indicators (pre-merge innovation rows, A-6), KPI counts (only once child 4 exists, R-STF-012) and no detail panel, portfolio selector or table view (A-8, A-9); artboard 4 shows an owner unit (removed, A-3). **(4) Rev 4:** the live *Organizational Structure* page (C-12) is the layout reference for the tree table and the side panel; the mockups remain the reference for the panel content only
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-11-17
+- **Last updated:** 2026-11-24 (rev 4)
 
 ## 0. Revisions — what changed (dev lead, 2026-11-17)
 
@@ -29,6 +29,18 @@
 | A-9 | Rev 3 — description and responsibles are edited in a **panel opened from the row** | R-STF-004, 007 |
 | A-10 | Rev 3 — keep the **table view** with F-7 and export beside the editor | R-STF-008 |
 
+## 0b. Revisions — rev 4, layout amendment (owner, 2026-11-24, T-17 HITL)
+
+The owner asked both pages to work like *Organizational Structure*. Proposal: [`proposal-layout-amendment.md`](proposal-layout-amendment.md) (decisions Q-1…Q-5 in its §12).
+
+| # | Decision | Effect here |
+| --- | --- | --- |
+| B-1 | The Framework tree becomes an **expandable tree table** like Organizational Structure, replacing the card outline (supersedes A-6's layout; the A-6 structure and counts stand) | R-STF-007 rewritten |
+| B-2 | Editing moves from the modal drawer to a **details panel beside the list**, filled by clicking a row, on **both** pages (supersedes A-9's "panel opened from the row" as a drawer) | New R-STF-016; R-STF-008, R-STF-009, NFR-STF-004 amended |
+| B-3 | The element **name is read-only text** outside the panel; the inline name editor and inline draft rows are removed | R-STF-007; `family.md` F-4 child-3 exception withdrawn |
+| B-4 | Q-1 ask before discarding unsaved edits · Q-2 keep the search · Q-3 keep the area colours, **inherited by every descendant row**, with clearly larger indentation than Organizational Structure · Q-4 **Delete at the top** of the panel · Q-5 the panel **always fits the viewport** and scrolls internally | R-STF-007, R-STF-016 |
+| B-5 | Organizational Structure is **not** changed, including its panel-height defect (Q-5); a separate fix is the owner's call | §12 |
+
 ---
 
 ## 1. Executive summary
@@ -37,8 +49,8 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 
 | Page | What it holds |
 | --- | --- |
-| **Framework** | The monitoring framework of a portfolio as an inline outline editor (Area → Dimension → Indicator, colour-coded per area), with a **Table** view per level and `.xlsx` export. A details panel per row edits the description and, on Indicators, the **responsible people** |
-| **Institutional Objectives** | Objectives (IOB) per year 2026–2030, each linked to one or more Indicators. *Carry forward* copies a year into the next |
+| **Framework** | The monitoring framework of a portfolio as an expandable **tree table** (Area → Dimension → Indicator, colour-coded per area), with a **Table** view per level and `.xlsx` export. Clicking a row opens it in a **details panel beside the list**, where the name, description, parent and, on Indicators, the **responsible people** are edited (rev 4) |
+| **Institutional Objectives** | Objectives (IOB) per year 2026–2030, each linked to one or more Indicators, edited in the same side details panel. *Carry forward* copies a year into the next |
 
 | Rule | Meaning |
 | --- | --- |
@@ -75,11 +87,14 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 | C-8 | The shared client `DataTable` (F-7) renders text cells only; `exportRowsToXlsx` writes one sheet | `data-table.component.ts:12,57-70`; `xlsx-export.util.ts:46-52` |
 | C-9 | Portfolio 2 is `id = 2`, years 2026–2030 | `portfolio-id.enum.ts:6`; migration `1782328490591:14` |
 | C-10 | `2026_Strategic-Objectives-Tracking-Tool.xlsx` (same folder, 2026-11-17), sheet *Institutional Objectives 2026*: 4 areas, 14 dimensions (one, *4.6 Powering Impact Through Knowledge and Data*, with no indicator) and **31** numbered indicators (`1.2.4`-style numbering). Its *Control Lists* sheet maps the 28 objectives to indicators in 36 rows; two rows still name pre-merge indicators (*3.2.1 Innovation development*, *4.1.1 Uptake of innovations for system change*). The 28 objective texts equal the MMF's exactly | read with `openpyxl` on 2026-11-17; text comparison of the 28 objectives → 0 differences |
+| C-12 | *Organizational Structure* (rev 4 reference): a `p-treeTable` with columns Name (chevron, indent `level × 16` px, read-only name, unit count), Code, Level, Responsible director, Status (holding the **+** add-child button); a click on a row selects it; a sticky `<aside>` at 40 % width holds the details form, with *"Select an entry to see its details."* when nothing is selected; Delete and Inactivate sit at the top of the form | `center-admin/organizational-structure/components/org-tree/org-tree.component.html:1-80`; `organizational-structure.component.html:150-176` |
+| C-13 | *Organizational Structure*'s panel is sized for its stuck position only: `max-height: calc(100vh - (navbar + header + 32px))`, with `top` = navbar + header + 16 px. Whether this is why its end is out of view at rest is `UNVERIFIED — confirm at source before relying on it` (owner observation 2026-11-24; measured live in design) | `organizational-structure.component.ts:83-84` |
+| C-14 | Today (rev 3, built T-11…T-16): Framework edits names inline in a card outline and opens a modal `p-drawer` from a pencil icon; Institutional Objectives opens a `p-drawer` from a row action | `ods-admin/framework/components/outline-row/`, `element-panel/`; `institutional-objectives/components/objective-panel/` |
 | C-11 | The dev lead's Framework mockup: header *ADMIN · ODS*, title *Strategy 2026–2030 – Monitoring framework*; a summary line (*4 areas · 14 dimensions · 32 indicators*) and an info banner; one card per area with a coloured left border; rows *AREA* / *DIMENSION* / indented indicators, each with a code badge (`1`, `1.1`, `1.1.1`), an inline name field, counts (*6 dimensions · 18 indicators · 46 KPIs*), **+ Dimension** / **+ Indicator** buttons and a delete icon (red when deletable, grey otherwise); **+ Add performance area** at the end | screenshot shared 2026-11-17 |
 
 **Affected surface (what renders on the routes):** the shared sidebar (one new group, two items), the two new pages, the shared `DataTable`, the shared modal/alert host.
 
-**In scope:** framework levels and elements in one table; responsibles; IOBs and their links; the outline editor, details panel and table view; delete protection; codes; carry forward; `.xlsx` export; the ODS Admin role, menu and access; the read contract; the seed.
+**In scope:** framework levels and elements in one table; responsibles; IOBs and their links; the tree table, side details panel and table view (rev 4); delete protection; codes; carry forward; `.xlsx` export; the ODS Admin role, menu and access; the read contract; the seed.
 
 **Not changing:** Impact Outcomes, Strategic Objectives and their endpoints; result alignment; the Center admin and System admin menus; the org structure; control lists; existing tables (family §5); how roles are assigned to users (C-3).
 
@@ -156,7 +171,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 - An indicator-level element has zero or more **responsibles**, chosen from the Alliance staff list (as the org-structure director, C-7): a search by name or email, at least 2 characters, **active** staff only, up to 20 hits. Each is stored by staff ID; name and email are always read from the staff list, never typed.
 - No person twice on one Indicator. The order shown is the order chosen.
 - A responsible who later becomes inactive in the staff list stays and is shown as inactive.
-- Edited in the details panel (R-STF-007).
+- Edited in the details panel (R-STF-016).
 
 #### Scenario: Two responsibles
 - GIVEN Indicator `1.1.1` *Process efficiency* with no responsibles
@@ -207,35 +222,71 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 - [ ] AC.1 — Blocked and free cases for: children, IOB link, registered dependant.
 - [ ] AC.2 — A deleted element is gone from every read and its code is free again.
 
-### R-STF-007 — Framework page: outline editor
+### R-STF-007 — Framework page: tree table
 
-- **As an** authorized user **I want** to edit the framework as an outline, as in the mockup **so that** I see and change the whole structure in one place.
+*Rewritten in rev 4 (B-1, B-3, B-4). Rev 3 was an inline outline editor.*
+
+- **As an** authorized user **I want** to see the framework as an expandable tree table, as in *Organizational Structure* **so that** I see the whole structure at a glance and open any element to edit it.
 
 **Details**
-- Header: eyebrow *ADMIN · ODS*, title `Strategy <start year>–<end year> – Monitoring framework` from the selected portfolio, subtitle, portfolio selector. Toolbar: **Editor | Table** toggle and **Export .xlsx**.
+- Header: eyebrow *ADMIN · ODS*, title `Strategy <start year>–<end year> – Monitoring framework` from the selected portfolio, subtitle, portfolio selector. Toolbar: **Tree | Table** toggle and **Export .xlsx**.
 - Summary line per level (*4 performance areas · 13 dimensions · 31 indicators*) and an info banner: *"Changes apply to every module that uses the framework. Items in use cannot be deleted."*
-- One card per level-1 element with a distinct accent colour on its left border. Inside, each element is a row: level label, code badge, **inline name field**, counts of its descendants per level (plus registered dependants such as *KPIs* once they exist), **+ <next level>** (absent on the deepest level), a **details** icon, and a delete icon (R-STF-006). Deeper levels are indented.
-- **Inline name:** Enter or leaving the field saves; Escape restores the previous value; an empty name is rejected inline. **+ <next level>** adds an empty row marked *New* with focus in the name field; it is stored on the first save, receiving the next free code, and discarded by Escape. **+ Add <level 1 name>** at the end adds a root.
-- **Details panel** (from the icon): code, name, description, parent (move), and on indicator-level elements the responsibles. Buttons **Save**, **Cancel**, **Delete** only (F-4).
-- States: loading; empty ("This portfolio has no framework yet" with the add button, on **any** portfolio — the default levels are created with its first element); load error with retry; a failed inline save keeps the typed value and shows the error under the field.
+- **Tree table** with the details panel beside it (R-STF-016). Columns:
+  - **Name:** a chevron on rows that have children, the name as **read-only text**, and the counts of its descendants per level (*6 dimensions · 18 indicators*, plus registered dependants such as *KPIs* once they exist).
+  - **Code:** a pill.
+  - **Level:** the level name, e.g. *Dimension*.
+  - **Responsibles:** indicator level only.
+  - **Actions:** **+ <next level>**, absent on the deepest level.
+  - Rows are ordered by code (natural sort).
+- **Indentation:** each level is indented by a clearly larger step than *Organizational Structure* (C-12), so the level of a row reads at a glance.
+- **Area colour:** each level-1 element has its own accent colour, shown as a thin bar on the left edge of its row. **Every descendant row carries the same bar**, so a whole area reads as one colour band. The code and the Level column also mark the level, so colour is never the only cue.
+- **Expand / collapse:** all rows start expanded. The state survives a refresh of the view.
+- **Search** *Find by code or name* above the tree:
+  - It matches a code prefix or a name substring (case-insensitive).
+  - Matches show together with their ancestors, which are force-expanded.
+  - No match shows *No elements match "<term>"*.
+  - Clearing the search restores the previous expand state.
+- **Selecting:** clicking a row, or pressing Enter or Space on it, selects it. The row is highlighted and the panel shows it (R-STF-016).
+- **+ <next level>** opens the panel in create mode with that row as the parent. **+ Add <level 1 name>** in the empty state, and **New <level 1 name>** in the toolbar, open it with no parent.
+- **No inline editing:** no input field anywhere in the tree. The rev-3 inline name, its save-on-blur and the inline *New* draft rows are removed (B-3).
+- States: loading; empty (*"This portfolio has no framework yet"* with the add button, on **any** portfolio — the default levels are created with its first element); load error with retry.
+
+#### Scenario: Read-only names
+- GIVEN the seeded framework in the tree
+- WHEN the user clicks the name of Dimension `1.2`
+- THEN the row is selected and its fields appear in the panel
+- BUT it must NOT show an editable field in the row
+- AND IT MUST show the name only as text
+
+#### Scenario: Inherited area colour
+- GIVEN area `1` with accent 1 and area `2` with accent 2
+- WHEN the tree is fully expanded
+- THEN every row under area `1` (dimensions and indicators) shows the accent-1 bar, and every row under area `2` shows the accent-2 bar
+
+#### Scenario: Add a child from the tree
+- GIVEN Area `1` with six dimensions
+- WHEN the user clicks **+ Dimension** on Area `1`
+- THEN the panel opens in create mode with Parent = `1` and Code proposed as `1.7`
+- AND IT MUST add nothing to the tree until the panel is saved
 
 **Acceptance criteria**
 - [ ] AC.1 — The seeded framework renders in code order (natural sort: `1.2` before `1.10`) with the right counts per row and in the summary line.
-- [ ] AC.2 — Inline rename saves on Enter and on blur, reverts on Escape, rejects an empty name.
-- [ ] AC.3 — **+ Dimension** on Area `1` adds a *New* row that is stored as `1.7`; Escape removes it unsaved.
-- [ ] AC.4 — Loading, empty, error and failed-save states each render.
+- [ ] AC.2 — No `input` or `textarea` exists inside the tree; names are text.
+- [ ] AC.3 — Collapse hides descendants and flips `aria-expanded`; the state survives a refresh; search shows matches plus ancestors and restores the state when cleared.
+- [ ] AC.4 — Each descendant row carries its level-1 ancestor's accent bar; each level is indented more than the one above it.
+- [ ] AC.5 — Loading, empty and error states each render.
 
 ### R-STF-008 — Framework page: table view (F-7)
 
 - **As an** authorized user **I want** a table per level **so that** I can search, sort and export.
 
 **Details**
-- Level chips from the levels (*Performance Areas (4)*, *Dimensions (13)*, *Indicators (31)*). Each table meets F-7 and has edit (opens the details panel) and delete actions plus a **+ <Level>** button. Columns: code, name, parent code and the codes of every higher level; Indicators also show the responsibles.
+- Level chips from the levels (*Performance Areas · 4*, *Dimensions · 13*, *Indicators · 31*). Each table meets F-7. **Clicking a row selects it and opens it in the side details panel (R-STF-016, rev 4)**; delete is in the panel; a **+ <Level>** button opens the panel in create mode. Columns: code, name, parent code and the codes of every higher level; Indicators also show the responsibles.
 - **Export .xlsx** (toolbar) writes one workbook with one sheet per level, all elements of the selected portfolio, sorted by code.
 
 **Acceptance criteria**
 - [ ] AC.1 — Each level's table passes the F-7 checks with the shared `DataTable`.
-- [ ] AC.2 — Edit and delete from the table behave as in the editor.
+- [ ] AC.2 — Selecting a row and deleting from the panel behave as in the tree.
 - [ ] AC.3 — The workbook has one sheet per level with the seeded counts.
 
 ### R-STF-009 — Institutional Objectives page
@@ -245,8 +296,8 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 **Details**
 - Its own page under ODS Admin, with the same portfolio selector.
 - Year selector over the portfolio's years (2026–2030 for Portfolio 2), labelled "YYYY · N objectives", defaulting to the current year when in range, else the first year.
-- Table (F-7): Code, Statement, Linked indicators (codes and names), actions; search over code and statement; export.
-- Side form: **Code\*** (unique per portfolio and year), **Year\***, **Statement\***, Linked indicators (optional, multi, indicator-level elements of the same portfolio). **No owner and no responsible** on an objective (A-3).
+- Table (F-7): Code, Statement, Linked indicators (codes and names); search over code and statement; export. **Clicking a row selects it and opens it in the side details panel (R-STF-016, rev 4)**; there is no row edit action. **+ Add objective** opens the panel in create mode.
+- Panel form: **Code\*** (unique per portfolio and year), **Year\***, **Statement\***, Linked indicators (optional, multi, indicator-level elements of the same portfolio). **No owner and no responsible** on an objective (A-3).
 
 **Acceptance criteria**
 - [ ] AC.1 — CRUD of an IOB with and without linked Indicators.
@@ -350,6 +401,62 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 
 ---
 
+### R-STF-016 — Side details panel (both pages)
+
+*New in rev 4 (B-2, B-4).*
+
+- **As an** authorized user **I want** an element's fields next to the list when I click it, as in *Organizational Structure* **so that** I can edit without losing sight of the structure.
+
+**Details**
+- **Layout:** the list (tree or table) and a details panel side by side. The panel is part of the page, not a modal overlay. From 1024 px wide it sits on the right; below 1024 px it stacks under the list.
+- **Empty state:** *"Select an entry to see its details."* when nothing is selected.
+- **Fits the viewport (from 1024 px wide; owner decision 2026-11-24):** at every scroll position of the page, the whole panel (top to bottom edge) is inside the viewport, and its content scrolls inside the panel. The user never has to scroll the page to reach the panel's bottom. *Organizational Structure* has this defect (C-13); these pages must not.
+- **Header:** eyebrow `<LEVEL NAME> · LEVEL <depth>` (Framework) or `INSTITUTIONAL OBJECTIVE`, then the code pill and title. Create mode reads `New <level name>` / `New institutional objective`.
+- **Delete:** in edit mode, a red outlined **Delete** at the **top** of the panel, under the header.
+  - It follows the delete rules (R-STF-006) and the existing delete flow.
+  - When blocked, it is muted, with `aria-disabled` and the reason.
+  - There is no Delete in create mode.
+- **Fields:**
+  - **Framework:** Code\*, Name\*, Description, Parent (one level up; absent at depth 1), read-only derived ancestors, and, on indicators, Responsibles (R-STF-004).
+  - **Objectives:** as R-STF-009.
+- **Buttons:** **Cancel** and **Save** at the bottom (F-4).
+  - Save → toast *"<code> saved"*; the list refreshes and the saved element stays selected.
+  - Cancel in edit mode → discards edits and keeps the row selected with its saved values.
+  - Cancel in create mode → returns to the previous selection, or to the empty state.
+- **Unsaved changes (Q-1):** while the form has unsaved edits, these actions first ask *"Discard changes?"*:
+  - selecting another row;
+  - starting a create;
+  - changing the portfolio, year or view;
+  - changing the level chip (Table view) or running *Carry forward*.
+  - **Discard** proceeds. **Keep editing** leaves everything as it was.
+- **Errors:** a failed save keeps the typed values and shows the message in the panel (D-STF-26).
+
+#### Scenario: Select and edit
+- GIVEN the Framework tree with nothing selected
+- WHEN the user clicks Indicator `1.1.1`
+- THEN the panel shows `INDICATOR · LEVEL 3`, the pill `1.1.1`, its fields and Delete at the top
+- AND WHEN the user changes the name and clicks Save
+- THEN the row shows the new name and stays selected
+
+#### Scenario: Unsaved changes
+- GIVEN Indicator `1.1.1` selected with an edited, unsaved description
+- WHEN the user clicks Indicator `1.1.2`
+- THEN *"Discard changes?"* is asked
+- AND choosing **Keep editing** keeps `1.1.1` selected with the edited text
+- BUT it must NOT replace the form without asking
+
+#### Scenario: Panel fits the viewport
+- GIVEN a window at least 1024 px wide and an Indicator whose panel content is taller than the window
+- WHEN the page is at rest (not scrolled) and when it is scrolled to the end
+- THEN the panel's bottom edge is inside the viewport in both cases, and the content scrolls inside the panel
+- AND IT MUST hold at two window heights (e.g. 800 and 650 px)
+
+**Acceptance criteria**
+- [ ] AC.1 — Both pages: row click fills the panel; empty state when nothing is selected; no `p-drawer` remains.
+- [ ] AC.2 — Delete at the top, edit mode only, follows `deletable` and the existing flow.
+- [ ] AC.3 — The unsaved-changes prompt guards row change, create, portfolio/year/view change, level chip and Carry forward; both answers behave as stated.
+- [ ] AC.4 — At ≥ 1024 px wide, the panel bottom is within the viewport at rest and scrolled, at two window heights (measured in a real browser). Below 1024 px the panel stacks under the list and the page scrolls.
+
 ## 6. Non-functional requirements
 
 | ID | Category | Target | How verified |
@@ -357,7 +464,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 | NFR-STF-001 | performance | Framework read of one portfolio (≤ 500 elements): p95 ≤ 300 ms on Dev; staff search ≤ 300 ms | integration timing, 3 runs; inconclusive if runs vary more than 30 % |
 | NFR-STF-002 | integrity | Carry forward and the seed are each one transaction; a failure leaves zero rows | integration test with an injected failure |
 | NFR-STF-003 | security | Every write declares `@Roles(ODS_ADMIN, SYSTEM_ADMIN)`; Center Admin is denied | unit tests per handler |
-| NFR-STF-004 | a11y | Outline rows reachable by keyboard; inline fields labelled with level and code; icon buttons have `aria-label`; sort headers expose `aria-sort`; dialogs and panels trap focus; the staff picker is a labelled combobox; area accent colours are not the only cue (the code and label carry the level) | component tests + manual keyboard pass at HITL |
+| NFR-STF-004 | a11y | *(rev 4)* Tree and table rows reachable by keyboard (Tab), Enter/Space selects, the selected row exposes `aria-selected`; chevrons have `aria-label` and `aria-expanded`; icon buttons have `aria-label`; sort headers expose `aria-sort`; the side panel is a labelled region; creating moves focus to the panel's first field and Save/Cancel return focus to the selected row (or the opener); dialogs trap focus; the staff picker is a labelled combobox; area accent colours are not the only cue (code and Level column carry the level) | component tests + manual keyboard pass at HITL |
 | NFR-STF-005 | dx | Swagger on every endpoint | code review |
 | Inherited | — | `ServerResponseDto`, `AuditableEntity`, `GlobalExceptions`, unversioned `/api/...` routes (root `CLAUDE.md` §4.1) | existing gates |
 
@@ -386,7 +493,7 @@ Agresso, indirectly: responsibles read the staff table that the existing staff s
 | **Delete protection bypassed** | Unit test per blocker kind, blocked and free |
 | **Code proposal / uniqueness wrong** (prefix scan, gaps, moved element, case, deleted codes) | Table-driven unit tests |
 | **Responsible typed, duplicated, unknown, on a non-indicator element, or inactive one dropped** | Unit tests both ways; DTO rejects name/email fields |
-| **Inline edit loses or duplicates data** (blur after Enter saves twice; Escape after a failed save) | Component tests of the row field state machine |
+| **Panel loses or misplaces data** (row change discards unsaved edits; save shows another row's values; a stale response lands on a newer selection) — *rev 4, replaces the inline-edit class* | Component tests driving real row clicks and the discard prompt; out-of-order response test |
 | **Carry forward partial or source changed** | Integration test with an injected failure; source rows unchanged |
 | **Seed: wrong IOB–IND link or wrong structure** (name drift, the pre-merge names) | Seed test asserts the 36 pairs and the 3/4/13/31 structure from a fixture derived from the Tracking Tool, including both pre-merge names mapping to `4.1.1` and dimension `4.6` absent |
 | **Seed: wrong person as responsible** | Seed test: ambiguous or inactive name → left out and listed; only email or exact full-name single matches stored |
@@ -394,7 +501,8 @@ Agresso, indirectly: responsibles read the staff table that the existing staff s
 | **Natural sort / export content** | Reused `DataTable` tests + one page test with `1.2`/`1.10`; workbook sheet and row count test |
 | **Type/compile errors hidden by the runner** | `npm run build` (server), `ng build` (client) — each observed failing once (K-004) |
 | **Sidebar regression** | Existing `alliance-sidebar` suite + DOM assertions on the new group |
-| **Outline geometry, indentation, accent colours, column resize** (rendered) | **No automated check in jsdom.** Substitute: manual check in a real browser at the HITL pause |
+| **Tree geometry, indentation, inherited accent bars, column resize** (rendered) | **No automated check in jsdom.** Substitute: Leader measures in a real browser (Chrome extension) and the owner checks at the HITL pause |
+| **Panel not fitting the viewport** (rev 4, Q-5) | **No automated check in jsdom.** Substitute: rendered measurement in a real browser — panel `getBoundingClientRect().bottom ≤ innerHeight` at rest and scrolled, two window heights |
 | **Visual fidelity to the mockups** | **No automated check.** Substitute: side-by-side review against the Framework mockup and artboard 4 at the HITL pause, accounting for the drift in Document Control |
 | **Seed content matches the workbooks** (texts) | No automated check against the workbooks. Substitute: requester review of the seeded framework at the HITL pause. Every seeded value is editable |
 
@@ -424,6 +532,7 @@ Agresso, indirectly: responsibles read the staff table that the existing staff s
 - Extending Impact Outcomes / Strategic Objectives, Enablers and the Strategy tree; *Copy framework to a new portfolio*.
 - A guard on the existing `DELETE /api/impact-outcomes/:id` and `DELETE /api/strategic-objectives/:id`, which today soft-delete an IO/SO even when results are aligned to it (`impact-outcomes.service.ts:78-90`, `strategic-objectives.service.ts:118-134`). Suggested as its own bugfix.
 - A screen or API to assign roles (C-3).
+- *(rev 4)* The same panel-height defect in *Organizational Structure* (C-13) — the owner decides whether to fix it separately.
 
 ## 13. Requirement ID index
 
@@ -435,7 +544,7 @@ Agresso, indirectly: responsibles read the staff table that the existing staff s
 | R-STF-004 | Responsibles of indicators |
 | R-STF-005 | Codes (F-6) |
 | R-STF-006 | Delete protection (F-5) |
-| R-STF-007 | Framework page: outline editor |
+| R-STF-007 | Framework page: tree table (rev 4) |
 | R-STF-008 | Framework page: table view (F-7) |
 | R-STF-009 | Institutional Objectives page |
 | R-STF-010 | Carry forward |
@@ -444,6 +553,7 @@ Agresso, indirectly: responsibles read the staff table that the existing staff s
 | R-STF-013 | New role: ODS Admin |
 | R-STF-014 | Access control |
 | R-STF-015 | Navigation |
+| R-STF-016 | Side details panel (rev 4) |
 | NFR-STF-001…005 | Performance, integrity, security, a11y, dx |
 
 ## 14. Sign-off
