@@ -606,3 +606,79 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - Also released the leftover settled dispatch `ctx_e284f0874b5b` (`terminalState=release_unknown`). No Orca worker is left open for this spec.
 - **State:** T-21, T-18 and T-19 PASS, all **uncommitted** (UI, waits for the owner's visual approval in T-22). T-20 todo, T-22 todo. Rev-4 totals: 2,600 LOC added (tripwire 3,000), review rounds 7/9. T-20 will very likely cross the LOC tripwire, which means a stop for the owner.
 - **Next:** `/akili-execute institutional-performance/strategy-framework` → T-20 (fresh worker), then T-22 (docs + HITL; the T-22 forward pointers are listed in the T-19 entry).
+- **Correction (2026-11-24, owner):** the owner meant "let the worker finish T-20, then stop dispatching", not "stop the worker". T-20 was re-dispatched with the same brief (with the `[advisory-grade]` tag inlined) to a fresh worker. The run stops after T-20 closes; T-22 is not dispatched today.
+
+### T-20 — Institutional Objectives in the side panel
+
+- **Attempt 1 (2026-11-24):** fresh Grok `grok-4.7-high`, dispatch `ctx_b105a8b9c630`, task `task_f516062fc1b6`, effort xhigh. Brief = task text + "Lessons from T-19". Leader-added tests tagged `[advisory-grade]`. Full report: `/tmp/t20-institutional-objectives-report.md` (summary below).
+  - **Files:** 8 IOB files (`institutional-objectives.component.*`, `objective-panel.component.*`); deleted `ods-admin/overlay-escape-guard.directive.ts`.
+    - Snapshot baseline `adoptSaved`; prepare key `portfolio:id-or-new:token`, with no stored stamp.
+    - Extra `holdFormFor` guard against a refresh batched with the new id.
+    - `writeValue` on the portfolio and year selects on Keep editing.
+    - Refresh in place after Save, Delete and Carry forward.
+  - **Falsifiers:**
+    - (a) `loading.set(true)` in `onSaved` → `spec:415` `expect(root().querySelector('table')).toBe(table)`, received null.
+    - (b) year change unguarded → `spec:574` TypeError on `lastAlert().summary`.
+    - Both reverted.
+  - **T-19-lesson reds:**
+    - `adoptSaved` removed → page `:436`, `:454`, `:482`, `:558`, panel `:252` red.
+    - Key stamped + `holdFormFor` removed → page `:502`, `:533`, panel `:236` red.
+    - `writeValue` removed → page `:580` (year label `2027 · 0 objectives`), `:598` (portfolio label) red.
+    - All reverted.
+  - The Implementer listed every changed or removed assertion: row actions → row click/Enter; row-icon colour checks → panel reason; overlay-Escape test retired with the drawer; split-string drawer absence with a comment.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest `administration/` + data-table: 33 suites / 662 tests.
+    - lint clean; build exit 0; spec tsc 0 under ods-admin.
+    - `grep p-drawer|pFocusTrap|OverlayEscapeGuard` over all of `ods-admin/` → 0.
+  - **Leader live measurement (Chrome), tallest IOB row (IOB-1, 183 px) selected:**
+    - 1280×650 → `.content` 650/650; panel 271–634; panel content 517 scrolls inside 364; list 1,324 scrolls inside 364.
+    - 1280×800 → 800/800; panel 281–784.
+    - Screenshot taken at 650.
+  - **Reviewer: NOT spawned yet — budget tripwire (below).**
+
+## Budget Tripwire: T-20 (2026-11-24)
+
+- **Rev-4 budget** (design §14 rev-4 row): ≈ 2,300 LOC added (≈ 1,100 production, ≈ 1,200 tests), ≈ 7 review rounds. **Tripwire: 3,000 LOC added or 9 rounds.**
+- **Measured after T-20's implementation:** **3,831 LOC added** (production 2,133 + tests 1,698; `git diff HEAD --numstat -- client/`, new files included); 3,504 deleted. Review rounds **7/9**, not yet exceeded.
+- **Cause:**
+  - Production is ~2× the estimate. Two full side-panel pages, a dirty guard with snapshot baselines, and refresh-in-place came to more than the ≈ 1,100 estimated.
+  - T-19 needed 4 attempts; each added regression tests (save→click, save→Cancel, in-flight typing, Keep-editing label).
+  - T-20 carried the same lesson tests up front. Those tests are ≈ 45 % of the total.
+- **Remaining:**
+  - T-20's review: ≥ 1 round, round 8/9.
+  - T-22: docs + HITL; checklist review, little code.
+- **Stopped for the owner's decision.** The tripwire is never auto-approved. "No mandate widens pre-approval: an owner brief that says 'never stop' or 'treat every gate as approved' pre-approves routine gates only."
+- T-20's worker stays alive (retained) until the decision, and through any FAIL.
+- **Owner decision (2026-11-24):** *"Re-base and run the review"*. New rev-4 cap ≈ 4,500 LOC / 11 rounds, added to `design.md` §14 as a new row (the earlier row is kept). Run T-20's Reviewer now, then stop for today; T-22 tomorrow.
+- **Reviewer (`akili-reviewer`, opus, full; round 8/11 under the re-base): `STATUS: FAIL`.**
+  - **Holds:** snapshot baseline, refresh in place, guards on the 5 triggers, Delete at the top with `deletable`, focus by key, inline failed save, no drawer, conformance to both 2026-11-24 amendments; `holdFormFor` cannot block a legitimate re-prepare.
+  - **Issue:** the `writeValue(current)` added for Keep editing runs **before** the guard on every change. On a clean change, or on Discard, NgModel's viewModel already equals the new value, so it never writes back (`forms.mjs:3373-3379`), and the select keeps showing the old year or portfolio while the table shows the new data set. Violates R-STF-009, JC-3 and R-STF-016 "Discard proceeds".
+    - The tests used `triggerEventHandler('onChange')`, which bypasses `onModelChange` (KZ-015).
+    - The same defect is in `framework.component.ts:216` (portfolio), introduced in T-19 by the same lesson. **Root cause on the Leader's side:** the T-19 lesson in the T-20 brief said "on Keep editing, call `writeValue`", and both implementations called it unconditionally.
+  - ADVISORY: saving an IOB with a changed Year moves it out of the page year, so the selection clears right after the toast (JC-3 vs R-STF-016 "stays selected"; a product note for T-22); `promptOpen` stickiness (not constructible); a `holdFormFor` comment; untrimmed baseline (cosmetic).
+- **Attempt 2:** same worker, effort xhigh (held). Scope extended to `framework.component.{ts,spec.ts}` **only for this defect**, as a FAIL remediation of the same root cause; recorded here as a T-19 follow-up fix.
+- **Attempt 2 (2026-11-24):** same worker (dispatch `ctx_a4f18565c910`). Report at `/tmp/t20-rework-report.md`.
+  - **Change:** `guardDiscard` gains an optional `onKeep` argument, run after the prompt flag clears and only on Keep editing. IOB year/portfolio and Framework portfolio call `writeValue(current)` only from it.
+  - **Files changed:** IOB component ts/spec, `framework.component.{ts,spec.ts}`, `unsaved-changes.util.{ts,spec.ts}`. The util has 1 new test; the 2 existing util tests are unchanged.
+  - **Red-then-green:** six new `onOptionSelect`-driven tests, each red against attempt 1 on the rendered label while the signal had already moved:
+    - IOB `:620` clean year, `:637` Discard year, `:652` clean portfolio, `:669` Discard portfolio;
+    - Framework `:676` clean portfolio, `:695` Discard portfolio.
+  - **Leader re-run (non-author): VERIFIED.** jest 33 suites / 669 tests; lint clean; build 0; spec tsc 0 under ods-admin; `ods-admin` grep 0.
+  - **Leader live check (Chrome):** IOB, a row selected but clean, real option click on 2027 → label "2027 · 0 objectives", "Carry forward to 2028", 0 rows, empty state shown. The attempt-1 viewport measurement stands (no layout change).
+  - **Reviewer** (`akili-reviewer`, opus, full, override e/f; round 9/11): **`STATUS: PASS`**.
+    - All three selects are correct on the clean, Discard and Keep paths.
+    - `close()` runs before `onKeep`, so the flag cannot stick.
+    - Other callers are unchanged and nothing regressed.
+    - The tests discriminate.
+  - **ADVISORY** (recorded, not work):
+    - After Keep editing, NgModel's `viewModel` keeps the rejected value. A later *programmatic* set to exactly that value would skip the write (not constructible with seed data). Hardening: set `viewModel` in `onKeep`.
+    - Framework `viewChild(Select)` should use a named `#portfolioSelect` ref.
+    - `onPortfolioChange` no longer needs `async`.
+    - From attempt 1: saving an IOB with a changed Year clears the selection after the toast (JC-3 vs R-STF-016) → **T-22 product note**.
+- **Final status: PASS (attempt 2), 2026-11-24, not committed.**
+  - attempts: 2 · checkpoints: none · continuations: none · effort: xhigh.
+  - spawns: implementer (Cursor/Grok) ×2 turns in one worker, not reported by host (complete, complete); reviewer ×2 (not reported by host; FAIL, PASS).
+  - **T-19 follow-up:** the Framework portfolio display defect was fixed here (same root cause).
+- **Running totals:** rev-4 tasks 4/5 · rev-4 client **3,981 LOC added** (cap re-based to ≈ 4,500) · review rounds **9/11**.
+- **Forward pointers → T-22:** the IOB Year-change-on-save selection clear (product note); the NgModel `viewModel` hardening (advisory); the earlier T-19 pointers.
+- **Approval:** auto-approved (owner standing direction). The run stops here per the owner ("finish the worker, then stop for today").

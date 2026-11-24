@@ -444,7 +444,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ### T-20 — Institutional Objectives in the side panel
-- **Status:** todo · **Size:** M · **Depends:** T-19, T-21
+- **Status:** done (PASS attempt 2, 2026-11-24, uncommitted) · **Size:** M · **Depends:** T-19, T-21
 - **Requirements:** R-STF-009 rev 4 (row click → panel, no row edit action, + Add objective → create), R-STF-016 for IOB (header `INSTITUTIONAL OBJECTIVE` / `IOB-6 · 2026`, Delete at top following `deletable`, Cancel/Save, unsaved-changes guard incl. year and Carry forward, failed save; AC.1–AC.3), R-STF-010 (Carry forward unchanged, now guarded), NFR-STF-004
 - **Design:** §6.6, §6.9, §13a items 1–3; D-STF-29, 32, 33, 36
 - **Scope:**
