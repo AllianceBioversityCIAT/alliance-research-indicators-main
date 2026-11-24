@@ -17,7 +17,10 @@ import { ClarisaInnovationReadinessLevel } from '../../../../../../tools/clarisa
 import { ClarisaActorType } from '../../../../../../tools/clarisa/entities/clarisa-actor-types/entities/clarisa-actor-type.entity';
 import { ClarisaInstitutionType } from '../../../../../../tools/clarisa/entities/clarisa-institution-types/entities/clarisa-institution-type.entity';
 import { ClarisaInstitution } from '../../../../../../tools/clarisa/entities/clarisa-institutions/entities/clarisa-institution.entity';
+import { AppConfig } from '../../../../../../shared/utils/app-config.util';
 import {
+  buildResultPdfUrl,
+  mapActorTypeIcons,
   mapInnovationDetailsSection,
   mapYesNoLabel,
 } from '../../result-pdf-report.mapper';
@@ -45,6 +48,7 @@ export class InnDevPdfSectionHandler
   constructor(
     private readonly resultInnovationDevService: ResultInnovationDevService,
     private readonly dataSource: DataSource,
+    private readonly appConfig: AppConfig,
   ) {}
 
   async buildSections(resultId: number) {
@@ -151,6 +155,11 @@ export class InnDevPdfSectionHandler
         innovation.is_new_or_improved_variety,
       ),
       actor_type_labels: this.toLabelMap(actorTypes, 'code'),
+      actor_type_icons: mapActorTypeIcons(
+        this.appConfig.BUCKET_URL,
+        this.appConfig.ARI_IS_PRODUCTION,
+        (innovation.actors ?? []).map((actor) => actor.actor_type_id),
+      ),
       institution_type_labels: this.toLabelMap(institutionTypeRows, 'code'),
       institution_type_descriptions: this.toDescriptionMap(
         institutionTypeRows,
@@ -186,7 +195,7 @@ export class InnDevPdfSectionHandler
 
   /**
    * Linked results with what the PDF card prints: title, code, indicator, STAR status
-   * and the primary project as "description (agreement)".
+   * the primary project as "description (agreement)" and the link to its PDF.
    */
   private async findLinkedResults(
     resultId: number,
@@ -235,6 +244,10 @@ export class InnDevPdfSectionHandler
       qa_status_label: link.other_result?.result_status?.name,
       reporting_project_name: projectByResultId.get(
         Number(link.other_result_id),
+      ),
+      pdf_url: buildResultPdfUrl(
+        this.appConfig.ARI_CLIENT_HOST,
+        link.other_result,
       ),
     }));
   }

@@ -6,7 +6,11 @@ import { ResultInstitution } from '../../../../../result-institutions/entities/r
 import { InstitutionRolesEnum } from '../../../../../institution-roles/enums/institution-roles.enum';
 import { LinkResult } from '../../../../../link-results/entities/link-result.entity';
 import { LinkResultRolesEnum } from '../../../../../link-result-roles/enum/link-result-roles.enum';
-import { mapPolicyChangeSection } from '../../result-pdf-report.mapper';
+import { AppConfig } from '../../../../../../shared/utils/app-config.util';
+import {
+  buildResultPdfUrl,
+  mapPolicyChangeSection,
+} from '../../result-pdf-report.mapper';
 import { ResultPdfIndicatorSectionHandler } from '../result-pdf-indicator-section.types';
 
 /**
@@ -20,7 +24,10 @@ export class PolicyChangePdfSectionHandler
 {
   readonly indicatorId = IndicatorsEnum.POLICY_CHANGE;
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly appConfig: AppConfig,
+  ) {}
 
   async buildSections(resultId: number) {
     const [policyChange, implementingOrganizations, links] = await Promise.all([
@@ -55,12 +62,20 @@ export class PolicyChangePdfSectionHandler
       links.find((link) => link.other_result?.indicator_id === indicatorId)
         ?.other_result ?? null;
 
+    const innovationDevelopment = linkedByIndicator(
+      IndicatorsEnum.INNOVATION_DEV,
+    );
+
     return {
       policy_change: mapPolicyChangeSection({
         policyChange,
         implementingOrganizations,
-        innovationDevelopment: linkedByIndicator(IndicatorsEnum.INNOVATION_DEV),
+        innovationDevelopment,
         innovationUse: linkedByIndicator(IndicatorsEnum.INNOVATION_USE),
+        innovationDevelopmentPdfUrl: buildResultPdfUrl(
+          this.appConfig.ARI_CLIENT_HOST,
+          innovationDevelopment,
+        ),
       }),
     };
   }
