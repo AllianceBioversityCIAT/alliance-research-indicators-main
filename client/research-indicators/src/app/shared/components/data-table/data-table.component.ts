@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, ContentChild, EventEmitter, Input, Output, signal, TemplateRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, ContentChild, EventEmitter, Input, OnInit, Output, signal, TemplateRef } from '@angular/core';
 import { TableModule, TablePageEvent } from 'primeng/table';
 import { CustomProgressBarComponent } from '../custom-progress-bar/custom-progress-bar.component';
 import { naturalCompare } from '@shared/utils/natural-compare.util';
@@ -53,7 +53,7 @@ interface SortEvent {
   styleUrl: './data-table.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class DataTableComponent<T extends object> {
+export class DataTableComponent<T extends object> implements OnInit {
   @Input({ required: true }) columns: DataTableColumn<T>[] = [];
   @Input() loading = false;
   @Input() exportFileName = 'export.xlsx';
