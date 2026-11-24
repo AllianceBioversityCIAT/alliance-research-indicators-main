@@ -43,9 +43,8 @@ export class ResultQuantificationsService extends BaseServiceSimple<
    * @sdd-spec docs/specs/changes/measure-number-signed-decimal — T-03 / DD-13, R-MSD-011
    * OICR signed-decimal extension (2026-09-24): roles 1 (ACTUAL_COUNT) and
    * 2 (EXTRAPOLATE_ESTIMATES) are now validated by the same signed-scaled
-   * rule as role 3 (INNOVATION_USE), enabling up to 4 decimal places for the
-   * OICR Quantification fields. Negatives were allowed until H9 (2026-10-30),
-   * when the product owner ruled them out.
+   * rule as role 3 (INNOVATION_USE), enabling negative values and up to 4
+   * decimal places for the OICR Quantification fields.
    *
    * Per-role rule map, keyed on the `dataRole` PARAMETER — never on a
    * `quantification_role_id` found on the payload. `update-oicr.dto.ts`
@@ -57,7 +56,7 @@ export class ResultQuantificationsService extends BaseServiceSimple<
    * argument, which the client cannot reach.
    *
    * Roles 1, 2, 3 (ACTUAL_COUNT, EXTRAPOLATE_ESTIMATES, INNOVATION_USE):
-   * non-negative (H9), at most 4 decimal places, within DD-14's derived bound.
+   * signed, at most 4 decimal places, within DD-14's derived bound.
    *
    * Default entry (any future role): non-negative integer (conservative
    * fallback preserving the original tightening from DD-8/RK-14).
@@ -110,13 +109,6 @@ export class ResultQuantificationsService extends BaseServiceSimple<
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       throw new BadRequestException(
         `quantification_number must be a finite number, received ${value}`,
-      );
-    }
-
-    // H9 — product ruling: the Number field takes decimals but never a negative.
-    if (value < 0) {
-      throw new BadRequestException(
-        `quantification_number must not be negative, received ${value}`,
       );
     }
 

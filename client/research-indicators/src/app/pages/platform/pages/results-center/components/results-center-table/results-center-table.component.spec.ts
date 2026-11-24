@@ -885,6 +885,18 @@ describe('ResultsCenterTableComponent', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('publishedOicrCgspaceLink returns the CGSpace link only for a published STAR OICR', () => {
+    const published = { result_status_id: 14, name: 'Published' } as any;
+    const oicr = { ...mockResult, platform_code: 'STAR', indicator_id: 5, result_status: published, cgspace_link: ' https://hdl.handle.net/10568/1 ' };
+
+    expect(component.publishedOicrCgspaceLink(oicr)).toBe('https://hdl.handle.net/10568/1');
+    expect(component.publishedOicrCgspaceLink({ ...oicr, result_status: { result_status_id: 6, name: 'Approved' } as any })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, platform_code: 'PRMS' })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, indicator_id: 1 })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, cgspace_link: '  ' })).toBeNull();
+    expect(component.publishedOicrCgspaceLink({ ...oicr, cgspace_link: null })).toBeNull();
+  });
+
   it('showStarPdfReport should require STAR platform and supported indicators', () => {
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 1 })).toBe(true);
     expect(component.showStarPdfReport({ ...mockResult, platform_code: 'STAR', indicator_id: 2 })).toBe(true);

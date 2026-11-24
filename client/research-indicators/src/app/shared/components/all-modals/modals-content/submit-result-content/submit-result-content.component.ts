@@ -463,10 +463,10 @@ export class SubmitResultContentComponent {
   // H20 — the confirmation must describe what the chosen decision actually does to the OICR.
   private oicrReviewOutcomeMessage(statusId: number | undefined): string {
     if (statusId === 11) {
-      return 'Your review has been submitted. The OICR is now Postponed and can be reported again in a later reporting year.';
+      return 'Your review has been submitted. The OICR is now <b>Postponed</b> and can be reported again in a later reporting year.';
     }
     if (statusId === 15) {
-      return 'Your review has been submitted. The OICR is now Not Accepted and will not continue in the OICR development process.';
+      return 'Your review has been submitted. The OICR is now <b>Not Accepted</b> and will not continue in the OICR development process.';
     }
     return 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.';
   }

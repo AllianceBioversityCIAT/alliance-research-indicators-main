@@ -33,6 +33,10 @@ import {
   isStarPdfReportEligible,
   openStarPdfReportInNewTab
 } from '@shared/utils/star-pdf-report.util';
+/** OICR indicator and its Published status (same id the OICR header uses). */
+const OICR_INDICATOR_ID = 5;
+const PUBLISHED_STATUS_ID = 14;
+
 @Component({
   selector: 'app-results-center-table',
   imports: [
@@ -230,6 +234,18 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
 
   openStarPdfReport(result: Result): void {
     openStarPdfReportInNewTab(this.getStarReportViewerUrl(result));
+  }
+
+  /**
+   * A published STAR OICR links to its CGSpace publication (the same link as the OICR
+   * header's "CGSpace link" button) instead of a PDF. Null for anything else, or when
+   * the OICR has no link.
+   */
+  publishedOicrCgspaceLink(result: Result): string | null {
+    const isStarOicr = result.platform_code === PLATFORM_CODES.STAR && Number(result.indicator_id) === OICR_INDICATOR_ID;
+    const isPublished = Number(result.result_status?.result_status_id) === PUBLISHED_STATUS_ID;
+    const link = result.cgspace_link?.trim();
+    return isStarOicr && isPublished && link ? link : null;
   }
 
   showStarPdfReport(result: Result): boolean {
