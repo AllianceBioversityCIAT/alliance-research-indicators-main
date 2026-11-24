@@ -237,6 +237,8 @@ export type ResultPdfReportLinkedResult = {
   result_type_label?: string;
   qa_status_label?: string;
   reporting_project_name?: string;
+  /** Absolute link to the linked result's PDF; null when it has no PDF template. */
+  pdf_url?: string | null;
 };
 
 /**
@@ -251,6 +253,8 @@ export type ResultPdfReportInnovationDetailsLabels = {
   anticipated_users_label?: string;
   is_new_or_improved_variety_label?: string;
   actor_type_labels?: Record<number, string>;
+  /** Absolute URL of the actor type's image (white PNG) by actor_type_id. */
+  actor_type_icons?: Record<number, string>;
   institution_type_labels?: Record<number, string>;
   /** CLARISA institution-type description by id; ids without one are omitted. */
   institution_type_descriptions?: Record<number, string>;
@@ -302,6 +306,8 @@ export type ResultPdfReportPolicyLinkedResult = {
     name: string;
     config: unknown;
   } | null;
+  /** Absolute link to its PDF. Only sent for the Innovation Development card. */
+  pdf_url?: string | null;
 };
 
 /**

@@ -23,6 +23,7 @@ import { ResultPolicyChange } from '../../../result-policy-change/entities/resul
 import { POLICY_AMOUNT_STATUS_VALUES } from '../../../result-policy-change/enum/policy-amount-status.enum';
 import { PolicyTypesEnum } from '../../../policy-types/enum/policy-types.enum';
 import { Result } from '../../../results/entities/result.entity';
+import { ReportingPlatformEnum } from '../../../results/enum/reporting-platform.enum';
 import {
   ResultPdfReportAlignmentCatalogItem,
   ResultPdfReportAlignmentLever,
@@ -528,6 +529,80 @@ export const mapYesNoLabel = (
   return value ? 'Yes' : 'No';
 };
 
+const isAbsoluteHttpUrl = (value: string | null | undefined): boolean =>
+  /^https?:\/\/\S+$/i.test(value ?? '');
+
+const withoutTrailingSlash = (value: string): string =>
+  value.replace(/\/+$/, '');
+
+/**
+ * Actor type (`clarisa_actor_types.code`) -> its image in the bucket's `images` folder.
+ * Researchers is `user-researchers.png`, singular: that is the file's name in S3.
+ */
+export const ACTOR_TYPE_ICON_FILES: Readonly<Record<number, string>> = {
+  1: 'users-farmers.png',
+  2: 'user-researchers.png',
+  3: 'users-extension-agents.png',
+  4: 'users-policy.png',
+  5: 'users-other.png',
+};
+
+/**
+ * `actor_type_icons` for the actor types the innovation uses. Production reads
+ * `public/images/`, every other environment `public-dev/images/`. Without an absolute
+ * bucket URL nothing is sent, so the PDF draws no image instead of a broken one.
+ */
+export const mapActorTypeIcons = (
+  bucketUrl: string | null | undefined,
+  isProduction: boolean,
+  actorTypeIds: (number | null | undefined)[],
+): Record<number, string> => {
+  if (!isAbsoluteHttpUrl(bucketUrl)) return {};
+  const folder = `${withoutTrailingSlash(bucketUrl as string)}/${isProduction ? 'public' : 'public-dev'}/images`;
+  const ids = [...new Set(actorTypeIds.filter((id) => id != null).map(Number))];
+  return Object.fromEntries(
+    ids
+      .filter((id) => ACTOR_TYPE_ICON_FILES[id])
+      .map((id) => [id, `${folder}/${ACTOR_TYPE_ICON_FILES[id]}`]),
+  );
+};
+
+/** Indicators with a STAR PDF template (`PdfTemplates`). */
+const INDICATORS_WITH_PDF = new Set<number>([
+  IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+  IndicatorsEnum.INNOVATION_DEV,
+  IndicatorsEnum.POLICY_CHANGE,
+]);
+
+export type ResultPdfLinkSource = {
+  platform_code?: string | null;
+  result_official_code?: number | string | null;
+  indicator_id?: number | null;
+  report_year_id?: number | null;
+};
+
+/**
+ * Absolute link to a result's PDF: the STAR report viewer page
+ * (`/reports/result/STAR-{code}?version={year}`, what the client opens), because the PDF
+ * itself is rendered on demand and has no fixed URL. Null for a result outside STAR, one
+ * whose indicator has no PDF template, or when the client host is not an absolute URL.
+ */
+export const buildResultPdfUrl = (
+  clientHost: string | null | undefined,
+  result: ResultPdfLinkSource | null | undefined,
+): string | null => {
+  if (!result || !isAbsoluteHttpUrl(clientHost)) return null;
+  if (result.platform_code !== ReportingPlatformEnum.STAR) return null;
+  if (!INDICATORS_WITH_PDF.has(Number(result.indicator_id))) return null;
+  const code = String(result.result_official_code ?? '').trim();
+  if (!code) return null;
+  const version =
+    result.report_year_id == null
+      ? ''
+      : `?version=${Number(result.report_year_id)}`;
+  return `${withoutTrailingSlash(clientHost as string)}/reports/result/${ReportingPlatformEnum.STAR}-${encodeURIComponent(code)}${version}`;
+};
+
 export const mapInnovationDetailsSection = (
   innovation: CreateResultInnovationDevDto,
   labels: ResultPdfReportInnovationDetailsLabels,
@@ -577,6 +652,7 @@ const mapCatalogRef = (
 
 export const mapPolicyLinkedResult = (
   result: Result | null | undefined,
+  pdfUrl?: string | null,
 ): ResultPdfReportPolicyLinkedResult | null => {
   if (!result) return null;
   const status = result.result_status;
@@ -594,6 +670,8 @@ export const mapPolicyLinkedResult = (
           config: status.config ?? null,
         }
       : null,
+    // Only the Innovation Development card links to a PDF; Innovation Use sends none.
+    ...(pdfUrl === undefined ? {} : { pdf_url: pdfUrl }),
   };
 };
 
@@ -602,6 +680,8 @@ export type PolicyChangePdfSource = {
   implementingOrganizations: ResultInstitution[];
   innovationDevelopment: Result | null;
   innovationUse: Result | null;
+  /** Absolute link to the linked Innovation Development result's PDF. */
+  innovationDevelopmentPdfUrl?: string | null;
 };
 
 /**
@@ -613,6 +693,7 @@ export const mapPolicyChangeSection = ({
   implementingOrganizations,
   innovationDevelopment,
   innovationUse,
+  innovationDevelopmentPdfUrl,
 }: PolicyChangePdfSource): ResultPdfReportPolicyChangeSection => {
   const policyTypeId =
     policyChange?.policy_type_id == null
@@ -651,7 +732,10 @@ export const mapPolicyChangeSection = ({
         is_active: true,
         ...mapInstitutionItem(item),
       })),
-    innovation_development: mapPolicyLinkedResult(innovationDevelopment),
+    innovation_development: mapPolicyLinkedResult(
+      innovationDevelopment,
+      innovationDevelopmentPdfUrl,
+    ),
     innovation_use: mapPolicyLinkedResult(innovationUse),
   };
 };
