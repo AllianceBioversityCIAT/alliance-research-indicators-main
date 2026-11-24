@@ -452,8 +452,23 @@ export const normalizePortfolio2AlignmentGet = (
     'strategic_objective_id'
   ),
   impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id'),
-  result_sdg_targets: enrichAlignmentSdgTargets(data?.result_sdg_targets, catalogs.sdgTargets)
+  result_sdg_targets: flagSdgTargetsMissingFrom(
+    enrichAlignmentSdgTargets(data?.result_sdg_targets, catalogs.sdgTargets),
+    catalogs.sdgTargets
+  )
 });
+
+/**
+ * SDG target lists come from SDG Management (the OICR portfolio list, or each lever's
+ * targets in Portfolio 1), not the CLARISA `is_active` flag, so a target removed there keeps
+ * an active catalog row. A saved target the list no longer offers is inactive for that
+ * field. An empty list (not loaded) flags nothing.
+ */
+export const flagSdgTargetsMissingFrom = (targets: AlignmentSdgTargetRow[], offered?: LeverSdgTargetOption[]): AlignmentSdgTargetRow[] => {
+  if (!offered?.length) return targets;
+  const offeredIds = new Set(offered.map(item => Number(item.sdg_target_id ?? item.id)));
+  return targets.map(target => (offeredIds.has(Number(target.sdg_target_id)) ? target : { ...target, is_catalog_inactive: true }));
+};
 
 export const buildPortfolio2AlignmentPatch = (
   body: GetAllianceAlignment,

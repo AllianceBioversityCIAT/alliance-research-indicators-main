@@ -40,6 +40,7 @@ import {
   enrichAlignmentSdgTargets,
   enrichPortfolio2Contracts,
   enrichResultSdgs,
+  flagSdgTargetsMissingFrom,
   normalizePortfolio2AlignmentGet
 } from './portfolio/portfolio-2-alignment.mapper';
 
@@ -199,15 +200,22 @@ export default class AllianceAlignmentComponent {
     }
 
     const mapLevers = (levers: Lever[] | undefined): Lever[] =>
-      (levers ?? []).map(lever => ({
-        ...lever,
-        result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
-        result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
-        result_lever_sdg_targets: enrichAlignmentSdgTargets(
-          (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
-          this.getLeverSdgTargetsService.getList(lever.lever_id)()
-        )
-      }));
+      (levers ?? []).map(lever => {
+        // A target SDG Management took off this lever is no longer offered: flag it inactive.
+        const leverTargets = this.getLeverSdgTargetsService.getList(lever.lever_id)();
+        return {
+          ...lever,
+          result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
+          result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
+          result_lever_sdg_targets: flagSdgTargetsMissingFrom(
+            enrichAlignmentSdgTargets(
+              (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
+              leverTargets
+            ),
+            leverTargets
+          )
+        };
+      });
 
     let primary_levers = enrichAlignmentLevers(mapLevers(response.data.primary_levers), leversCatalog);
     let contributor_levers = enrichAlignmentLevers(mapLevers(response.data.contributor_levers), leversCatalog);
