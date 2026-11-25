@@ -898,3 +898,81 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Running totals:** review rounds **13/14** · rev-4 LOC ≈ 4,400 / ≈ 5,000.
 - Waiting for the owner's visual OK before the commit.
 - **Owner visual OK (2026-11-25):** "ok" — committed.
+
+### T-23 follow-up 2 — page top spacing and rich empty panel (owner, 2026-11-25)
+
+- **Owner:**
+  - The page is cramped under the section header.
+  - The empty side panel should explain the structure. The owner's mockup has a circle icon, *"Explore the performance framework"*, and rows for Performance Areas / Dimensions / Indicators, using the app's own icons.
+- **Leader measurement (Chrome, earlier today):** title top ≈ 10 px below the section header bar; Org Structure ≈ 50 px. The gap was lost when the page root cancelled `.app-page-wrapper`'s 25 px margin for the viewport fit (P-46).
+- **Owner decisions:**
+  - Adopt the Leader's adjusted version: PrimeIcons, rows built from `levels` with counts, not clickable, depth 1 tinted with the area accent; IOB gets a short version.
+  - Top spacing: 24 px.
+  - Use the last review round (14/14); a FAIL stops for the owner.
+- **Execute-time spec edits (owner-approved, recorded now):**
+  - `requirements.md` R-STF-016 Empty state;
+  - `design.md` §6.9 Empty state and Top spacing;
+  - `design.md` D-STF-39.
+- **Attempt 1:** fresh Grok `grok-4.7-high`, dispatch `ctx_be2ad7b1a491`, brief `brief-T23c.md`.
+  - **Changes:**
+    - New `ods-page-column.scss` mixin. It is the single source of the 24 px (`$ods-admin-top-gap` / `--ods-admin-top-gap`). Column `height: calc(<column-height> - gap - 16px)` with `content-box`.
+    - New `ods-empty-panel` component, projected into `side-panel-layout`; the `emptyText` fallback is kept.
+    - Framework builds the rows from `levelCounts`. IOB shows `pi-flag` and the short text.
+  - **Falsifier:** three hard-coded rows → `framework.component.spec.ts:266` reports *Expected length 4, Received 3*. Reverted.
+- **Leader re-run (non-author): VERIFIED.** jest administration: 34 suites / 669 tests. Lint clean, build 0, spec tsc 0 under ods-admin.
+- **Leader Chrome check:**
+  - 1280×800: the eyebrow is 25 px below the section header (it was about 9 px). `.content` is 800/800 and the slots are 320–784.
+  - 1280×650 with 1.1.1 selected: `.content` is 650/650, the slots are 318–634 (314 px), and Save ends at 617.
+  - The Framework empty panel shows a circle, title, subtitle and "4 Performance Areas / 13 Dimensions / 31 Indicators", with the first tile accent-tinted.
+  - IOB at 650: `.content` is 650/650, the slots are 295–634, and the short flag empty state shows.
+- **Reviewer** (`akili-reviewer`, opus, round **14/14**): **`STATUS: PASS`**.
+  - The 24 px arithmetic and the box model are correct on both pages.
+  - Rows come from data and are not interactive; tokens only.
+  - The projection fallback is kept.
+- **ADVISORY:**
+  - "1 Indicators" uses the plural at count 1, matching the chips; the summary line uses the singular. This is an owner wording call.
+  - The accent tile is pale in dark theme. The app has no dark theme today.
+  - The empty-panel `<h2>` may skip a heading level; to check at the next a11y pass.
+- **Final:** PASS. Attempts 1, checkpoints none. Spawns: implementer (not reported by host), reviewer PASS. Worker released.
+- **Running totals:** review rounds **14/14** (cap reached, not exceeded) · rev-4 LOC ≈ 4,600 / ≈ 5,000.
+
+### T-23 follow-up 3 — richer IOB empty panel (owner, 2026-11-25)
+
+- **Owner:** the IOB empty panel looks incomplete next to Framework's.
+- **Tripwire:** review rounds were at the 14/14 cap. The Leader stopped and asked; the owner re-based to **16 rounds** (`design.md` §14 row).
+- **Owner chose the Leader's proposal:** flag circle, title, subtitle, and three informational rows: objectives count for the year, distinct linked indicators, and a carry-forward hint.
+- **Execute-time spec edits:** `design.md` §6.9 Empty state (IOB), `requirements.md` R-STF-016 Empty state (IOB), and the §14 re-base row.
+- The spacing and Framework empty-panel change (follow-up 2, PASS) stays uncommitted. It will be committed together with this one after the owner's visual OK.
+- **Dispatch:** Grok `grok-4.7-medium`, `ctx_d76798655125`, brief `brief-T23d.md`. **Owner addition, sent to the same worker mid-task:** on wide screens the empty-panel rows sit flush left under a centred header. Centre the rows block: max-width ≈ 26rem, `margin-inline: auto`, rows left-aligned inside it. This applies to both pages.
+- **Implementer:** the attempt ran as one dispatch (`ctx_d76798655125`) plus a follow-up turn for the centring (`ctx_144e2d816b30`).
+  - `ods-empty-panel` was generalized: inputs for circle, title, subtitle and rows. Framework output is unchanged.
+  - IOB shows 3 neutral rows. `n` comes from the year select's `years[].count`; `m` is the number of distinct indicator ids.
+  - The rows block is centred: `max-width: 26rem; margin: 16px auto 0`.
+  - Falsifier: count links instead of distinct ids → `institutional-objectives.component.spec.ts:364` reports "2" expected, "3" received. Reverted.
+- **Leader re-run (non-author): VERIFIED.** jest administration 34 suites / 670 tests. Lint clean, build 0, spec tsc 0 under ods-admin.
+- **Leader Chrome check at 1728 px:** the rows block is centred in the Framework panel, with a 105 px gap on each side. IOB shows "28 Objectives · 2026", "30 Linked indicators" and "Carry forward to 2027".
+- **Reviewer** (`akili-reviewer`, opus, round **15/16**): **`STATUS: PASS`**.
+  - Texts are exact. Distinct ids are counted through a `Set`.
+  - `n` refreshes together with the list in every traced state.
+  - Framework is unchanged. Tokens only, and every change is under ods-admin.
+- **ADVISORY (recorded, not work):**
+  - A portfolio with no years shows "0 Objectives · " and "Carry forward to " with no year after them.
+  - For one round-trip after a year change, `m` can still be the previous year's count.
+  - `track row.label` could collide.
+- **Final:** PASS. Attempts 1 (+1 owner-addition turn). Worker released.
+- **Running totals:** review rounds **15/16**.
+
+### T-23 follow-up 4 — vertical centring of the empty panel (owner, 2026-11-25)
+- **Owner:** the empty panel sits too close to the top of its card.
+- **Leader decision:** centre the panel content vertically when there is room. Use `margin-block: auto` on a flex column, not `justify-content: center`, so content that overflows starts at the top and scrolls instead of being clipped.
+- **Budget:** this is review round 16/16.
+- **Brief:** `brief-T23e.md`.
+- **Implementer (dispatch `ctx_5afc55664d2f`):** the panel slot becomes a flex column and keeps `min-height: 0; overflow-y: auto`. The `ods-empty-panel` host gets `flex: 1 0 auto` and the block gets `margin-block: auto`. Files: `side-panel-layout.component.scss`, `ods-empty-panel.component.scss`.
+- **Leader re-run (non-author): VERIFIED.** jest administration 34/670 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome:**
+  - Tall IOB panel, empty: the block is centred, 76 px above and 76 px below.
+  - 1280×650 Framework, empty: the block starts at the scroll origin (top 335 = panel top 318 + 16 + 1) and scrolls (382 > 314).
+  - 1280×650 with 1.1.1 selected: the form is unchanged (scrollHeight 801, Save at 617); `.content` 650/650.
+- **Reviewer** (`akili-reviewer`, opus, round **16/16**): **`STATUS: PASS`**. The forms sit inside a plain slot div whose automatic minimum height is its content, so they cannot shrink or clip. Below 1024 px there is no free space, so the block sits at the top. The comments are true. Tokens only.
+- **Final:** PASS. Worker released. Review rounds **16/16** (cap reached).
+- **Owner verdict (2026-11-25):** the Framework page "is coming along great"; follow-ups 2–4 committed as a checkpoint. The owner asked next to align Institutional Objectives with the Framework layout (T-23 follow-up 5, below).

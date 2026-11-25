@@ -413,7 +413,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 
 **Details**
 - **Layout:** the list (tree or table) and a details panel side by side. The panel is part of the page, not a modal overlay. From 1024 px wide it sits on the right; below 1024 px it stacks under the list.
-- **Empty state:** *"Select an entry to see its details."* when nothing is selected.
+- **Empty state:** when nothing is selected. *(Amended 2026-11-25, owner, D-STF-39.)* Framework: an explainer — *"Explore the performance framework"*, *"Select an item from the hierarchy to see its details and actions."* — and one row per level of the portfolio with its count and a one-line description, which is informational only and not clickable. Institutional Objectives: the same pattern — *"Explore the institutional objectives"* with rows for the year's objective count, its distinct linked indicators and a carry-forward hint (enriched 2026-11-25, owner) Rev 4 text was *"Select an entry to see its details."*
 - **Fits the viewport (from 1024 px wide; owner decision 2026-11-24):** at every scroll position of the page, the whole panel (top to bottom edge) is inside the viewport, and its content scrolls inside the panel. The user never has to scroll the page to reach the panel's bottom. *Organizational Structure* has this defect (C-13); these pages must not.
 - **Header:** eyebrow `<LEVEL NAME> · LEVEL <depth>` (Framework) or `INSTITUTIONAL OBJECTIVE`, then the code pill and title. Create mode reads `New <level name>` / `New institutional objective`.
 - **Delete:** in edit mode, a red outlined **Delete** at the **top** of the panel, under the header.
