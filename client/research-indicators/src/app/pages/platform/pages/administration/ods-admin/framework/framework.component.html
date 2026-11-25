@@ -104,8 +104,12 @@
         <app-side-panel-layout
           [hasSelection]="selectedId() !== null"
           [creating]="createRequest() !== null"
-          emptyText="Select an entry to see its details."
           panelLabel="Element details">
+          <app-ods-empty-panel
+            circleIcon="pi pi-sitemap"
+            title="Explore the performance framework"
+            subtitle="Select an item from the hierarchy to see its details and actions."
+            [rows]="emptyRows()" />
           <div list data-testid="framework-list">
             @if (empty()) {
               <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">

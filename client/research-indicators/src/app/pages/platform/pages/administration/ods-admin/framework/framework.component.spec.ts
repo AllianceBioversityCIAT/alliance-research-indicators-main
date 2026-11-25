@@ -87,6 +87,30 @@ const EMPTY: FrameworkEditorView = {
   usageLabels: []
 };
 
+const FOUR_LEVELS: FrameworkLevel[] = [
+  { id: 4, depth: 4, name: 'Sub-indicator', pluralName: 'Sub-indicators', shortLabel: 'SUB', isIndicatorLevel: false },
+  { id: 1, depth: 1, name: 'Performance Area', pluralName: 'Performance Areas', shortLabel: 'AREA', isIndicatorLevel: false },
+  { id: 3, depth: 3, name: 'Indicator', pluralName: 'Indicators', shortLabel: 'INDICATOR', isIndicatorLevel: true },
+  { id: 2, depth: 2, name: 'Dimension', pluralName: 'Dimensions', shortLabel: 'DIMENSION', isIndicatorLevel: false }
+];
+
+const FOUR_LEVEL_VIEW: FrameworkEditorView = {
+  portfolioId: 2,
+  configured: true,
+  levels: FOUR_LEVELS,
+  usageLabels: [],
+  elements: [
+    element({ id: 1, depth: 1, code: '1', name: 'Area A' }),
+    element({ id: 2, depth: 1, code: '2', name: 'Area B' }),
+    element({ id: 3, depth: 1, code: '3', name: 'Area C' }),
+    element({ id: 4, depth: 1, code: '4', name: 'Area D' }),
+    element({ id: 5, depth: 2, code: '1.1', name: 'Dimension one', parentId: 1 }),
+    element({ id: 6, depth: 2, code: '1.2', name: 'Dimension two', parentId: 1 }),
+    element({ id: 7, depth: 3, code: '1.1.1', name: 'Process efficiency', parentId: 5 }),
+    element({ id: 8, depth: 4, code: '1.1.1.1', name: 'Sub', parentId: 7 })
+  ]
+};
+
 const SEEDED: FrameworkEditorView = {
   portfolioId: 2,
   configured: true,
@@ -230,6 +254,54 @@ describe('FrameworkComponent', () => {
     expect(q('framework-page')?.classList.contains('pt-3')).toBe(false);
   });
 
+  const emptyRows = () => Array.from(root().querySelectorAll('[data-testid="empty-level-row"]')) as HTMLElement[];
+
+  it('shows one empty-panel row per level, then hides them when a row is selected', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(FOUR_LEVEL_VIEW));
+    create();
+    await settle();
+
+    expect(q('panel-empty')?.textContent).toContain('Explore the performance framework');
+    expect(q('panel-empty')?.textContent).toContain('Select an item from the hierarchy to see its details and actions.');
+    expect(emptyRows()).toHaveLength(4);
+    expect(emptyRows().map(row => row.getAttribute('data-depth'))).toEqual(['1', '2', '3', '4']);
+    const rowText = emptyRows().map(row => row.textContent ?? '');
+    expect(rowText[0]).toContain('4 Performance Areas');
+    expect(rowText[0]).toContain('Strategic performance areas of the portfolio.');
+    expect(rowText[1]).toContain('2 Dimensions');
+    expect(rowText[1]).toContain('Dimensions within each area.');
+    expect(rowText[2]).toContain('1 Indicators');
+    expect(rowText[2]).toContain('Indicators, their details and responsibles.');
+    expect(rowText[3]).toContain('1 Sub-indicators');
+    expect(rowText[3]).toContain('Elements at this level.');
+    expect(q('panel-empty')?.querySelector('button')).toBeNull();
+    for (const row of emptyRows()) {
+      expect(row.tagName).toBe('LI');
+      expect(row.hasAttribute('tabindex')).toBe(false);
+      expect(row.querySelector('button, [tabindex]')).toBeNull();
+    }
+    q('panel-empty')?.querySelectorAll('i').forEach(icon => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+
+    await clickTree('1');
+    expect(q('panel-empty')).toBeNull();
+    expect(emptyRows()).toHaveLength(0);
+    expect(document.querySelector('[data-testid="panel-code"]')?.textContent?.trim()).toBe('1');
+  });
+
+  it('hides the empty panel when a create starts', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(FOUR_LEVEL_VIEW));
+    create();
+    await settle();
+
+    expect(emptyRows()).toHaveLength(4);
+    (q('new-element')?.querySelector('button') as HTMLButtonElement).click();
+    await settle();
+
+    expect(q('panel-empty')).toBeNull();
+    expect(emptyRows()).toHaveLength(0);
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('New Performance Area');
+  });
+
   it('labels an unconfigured portfolio and opens create beside the empty list', async () => {
     create();
     await settle();
@@ -241,7 +313,7 @@ describe('FrameworkComponent', () => {
 
     expect(q('empty-state')?.textContent).toContain('This portfolio has no framework yet');
     expect(q('add-root-button')?.textContent).toContain('+ Add Performance Area');
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the performance framework');
     expect(q('side-panel')?.getAttribute('aria-label')).toBe('Element details');
 
     (q('add-root-button')?.querySelector('button') as HTMLButtonElement).click();
@@ -369,7 +441,7 @@ describe('FrameworkComponent', () => {
     create();
     await settle();
 
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the performance framework');
     expect(document.querySelector('[data-testid="element-form"]')).toBeNull();
     expect(document.querySelector('p-' + 'drawer')).toBeNull();
 
@@ -711,7 +783,7 @@ describe('FrameworkComponent', () => {
     expect(portfolioLabel()).not.toContain('Portfolio 2');
     expect(component.selectedId()).toBeNull();
     expect(q('empty-state')?.textContent).toContain('This portfolio has no framework yet');
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the performance framework');
   });
 
   it('shows the new portfolio label when Discard proceeds, and clears the selection', async () => {
@@ -730,7 +802,7 @@ describe('FrameworkComponent', () => {
     expect(portfolioLabel()).not.toContain('Portfolio 2');
     expect(component.selectedId()).toBeNull();
     expect(q('empty-state')?.textContent).toContain('This portfolio has no framework yet');
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the performance framework');
   });
 
   it('opens + Dimension with the parent and the proposed code, and adds nothing until save', async () => {

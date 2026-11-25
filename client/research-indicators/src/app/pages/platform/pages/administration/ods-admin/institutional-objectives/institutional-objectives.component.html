@@ -94,8 +94,12 @@
         <app-side-panel-layout
           [hasSelection]="selectedId() !== null"
           [creating]="creating()"
-          emptyText="Select an entry to see its details."
           panelLabel="Objective details">
+          <app-ods-empty-panel
+            circleIcon="pi pi-flag"
+            title="Explore the institutional objectives"
+            subtitle="Select an objective to see its statement, year and linked indicators."
+            [rows]="emptyRows()" />
           <div list data-testid="objectives-list">
             <div data-testid="objectives-table">
               <app-data-table

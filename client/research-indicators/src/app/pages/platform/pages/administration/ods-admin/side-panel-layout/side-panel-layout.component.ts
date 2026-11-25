@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, contentChild, input } from '@angular/core';
+import { OdsEmptyPanelComponent } from '../ods-empty-panel/ods-empty-panel.component';
 
 // @akili-spec institutional-performance/strategy-framework T-19 — design §6.9, D-STF-31, R-STF-016.
-// List and panel slots. The page column owns the viewport height (P-46).
+// List and panel slots. A projected empty panel replaces emptyText (D-STF-39).
+// The page column owns the viewport height (P-46).
 // jsdom cannot judge whether the panel fits the viewport (KZ-017).
 @Component({
   selector: 'app-side-panel-layout',
@@ -15,4 +17,6 @@ export class SidePanelLayoutComponent {
   readonly creating = input(false);
   readonly emptyText = input('Select an entry to see its details.');
   readonly panelLabel = input('Element details');
+  /** Present when the page projects `app-ods-empty-panel`. Otherwise emptyText is shown. */
+  readonly projectedEmpty = contentChild(OdsEmptyPanelComponent);
 }

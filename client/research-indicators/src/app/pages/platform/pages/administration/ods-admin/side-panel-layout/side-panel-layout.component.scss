@@ -18,7 +18,12 @@
   overflow-y: auto;
 }
 
+// Column flex so the empty panel can take leftover height with margin-block:
+// auto. Not justify-content: center — that clips overflow above the scroll
+// origin. min-height: 0 and overflow-y stay on this slot.
 .side-panel-layout__panel {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 40%;
   min-width: 380px;
   min-height: 0;

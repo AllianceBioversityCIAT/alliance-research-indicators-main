@@ -1,0 +1,114 @@
+// strategy-framework T-23 — D-STF-39. Tokens only. The circle and the 40px tiles
+// follow the empty-panel mockup. The row list is a centred block (26rem) with
+// left-aligned rows; below that width it fills the panel. jsdom cannot judge
+// that spacing (KZ-017).
+
+// The host grows to the panel (flex: 1 0 auto) while the block is shorter, and
+// refuses to shrink below the block. Centring is margin-block: auto on the
+// block, not justify-content on the scrollport: auto margins take free space
+// only while the host is taller than the block, and resolve to 0 once the
+// block overflows, so side-panel-layout__panel starts at the top. jsdom cannot
+// measure that (KZ-017).
+
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+  box-sizing: border-box;
+  min-height: min-content;
+}
+
+.ods-empty-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-block: auto;
+  padding: 8px 4px 4px;
+  text-align: center;
+}
+
+.ods-empty-panel__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--ac-grey-100);
+  color: var(--ac-grey-700);
+  font-size: 28px;
+}
+
+.ods-empty-panel__title {
+  margin: 0;
+  color: var(--ac-grey-800);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ods-empty-panel__subtitle {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--ac-grey-700);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ods-empty-panel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 26rem;
+  margin: 16px auto 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.ods-empty-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ods-empty-panel__tile {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--ac-grey-100);
+  color: var(--ac-grey-700);
+  font-size: 16px;
+}
+
+.ods-empty-panel__tile--accent {
+  color: var(--ac-framework-accent-1);
+  background: color-mix(in srgb, var(--ac-framework-accent-1) 14%, var(--ac-white-1));
+}
+
+.ods-empty-panel__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ods-empty-panel__name {
+  color: var(--ac-grey-800);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ods-empty-panel__hint {
+  color: var(--ac-grey-700);
+  font-size: 13px;
+  line-height: 1.5;
+}

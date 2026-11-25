@@ -16,6 +16,7 @@ import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { exportSheetsToXlsx } from '@shared/utils/xlsx-export.util';
+import { OdsEmptyPanelComponent, OdsEmptyRow } from '../ods-empty-panel/ods-empty-panel.component';
 import { SidePanelLayoutComponent } from '../side-panel-layout/side-panel-layout.component';
 import { guardDiscard } from '../unsaved-changes.util';
 import { FrameworkViewSlug, parseFrameworkUrl, serializeFrameworkUrl } from './url/framework-url.codec';
@@ -24,7 +25,7 @@ import { FrameworkTreeComponent } from './components/framework-tree/framework-tr
 import { FrameworkTableCreate, FrameworkTablesComponent } from './components/framework-tables/framework-tables.component';
 import { FrameworkDeleteHandler } from './framework-delete.handler';
 import { frameworkErrorOf } from './utils/framework-error.util';
-import { buildExportSheets, frameworkTreeNodes, summaryLine } from './utils/framework-view.util';
+import { buildExportSheets, frameworkTreeNodes, levelCounts, summaryLine } from './utils/framework-view.util';
 
 interface PortfolioOption extends FrameworkContextPortfolio {
   label: string;
@@ -44,6 +45,7 @@ interface PortfolioOption extends FrameworkContextPortfolio {
     SelectModule,
     CustomProgressBarComponent,
     SidePanelLayoutComponent,
+    OdsEmptyPanelComponent,
     FrameworkTreeComponent,
     FrameworkTablesComponent,
     ElementPanelComponent
@@ -83,7 +85,7 @@ export default class FrameworkComponent implements OnInit {
   /** One-way `[ngModel]` does not write a rejected value back. Only Keep editing calls `writeValue`. */
   private readonly portfolioSelect = viewChild(Select);
 
-  /** Visible height below the fixed chrome (P-46). The stylesheet releases it below 1024px. */
+  /** Visible height below the fixed chrome (P-46). The stylesheet subtracts the 24px top gap and releases the height below 1024px. */
   readonly columnHeight = computed(() => `calc(100vh - ${this.cache.navbarHeight() + this.cache.headerHeight()}px)`);
 
   readonly portfolioOptions = computed<PortfolioOption[]>(() =>
@@ -112,6 +114,19 @@ export default class FrameworkComponent implements OnInit {
   readonly empty = computed(() => {
     const editor = this.editor();
     return editor !== null && editor.elements.length === 0;
+  });
+
+  /** Same counts as the chips and the summary line, one row per level, in depth order. */
+  readonly emptyRows = computed<OdsEmptyRow[]>(() => {
+    const editor = this.editor();
+    if (!editor) return [];
+    return levelCounts(editor).map(level => ({
+      depth: level.depth,
+      label: `${level.count} ${level.pluralName}`,
+      description: emptyLevelDescription(level.depth),
+      icon: emptyLevelIcon(level.depth),
+      accent: level.depth === 1
+    }));
   });
 
   readonly levelOneName = computed(() => {
@@ -484,6 +499,19 @@ export default class FrameworkComponent implements OnInit {
       if (panel instanceof HTMLElement && typeof panel.scrollIntoView === 'function') panel.scrollIntoView({ block: 'nearest' });
     }, 0);
   }
+}
+
+function emptyLevelIcon(depth: number): string {
+  if (depth === 1) return 'pi pi-th-large';
+  if (depth === 2) return 'pi pi-sitemap';
+  return 'pi pi-chart-bar';
+}
+
+function emptyLevelDescription(depth: number): string {
+  if (depth === 1) return 'Strategic performance areas of the portfolio.';
+  if (depth === 2) return 'Dimensions within each area.';
+  if (depth === 3) return 'Indicators, their details and responsibles.';
+  return 'Elements at this level.';
 }
 
 function focusable(current: EventTarget | null): HTMLElement | null {

@@ -9,6 +9,7 @@ import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { frameworkErrorOf } from '../framework/utils/framework-error.util';
+import { OdsEmptyPanelComponent, OdsEmptyRow } from '../ods-empty-panel/ods-empty-panel.component';
 import { SidePanelLayoutComponent } from '../side-panel-layout/side-panel-layout.component';
 import { guardDiscard } from '../unsaved-changes.util';
 import { ObjectivePanelComponent } from './components/objective-panel/objective-panel.component';
@@ -39,6 +40,7 @@ interface ObjectiveTableRow {
     CustomProgressBarComponent,
     DataTableComponent,
     SidePanelLayoutComponent,
+    OdsEmptyPanelComponent,
     ObjectivePanelComponent
   ],
   templateUrl: './institutional-objectives.component.html',
@@ -83,7 +85,7 @@ export default class InstitutionalObjectivesComponent implements OnInit {
 
   readonly searchFields: (keyof ObjectiveTableRow & string)[] = ['code', 'statement'];
 
-  /** Visible height below the fixed chrome (P-46). The stylesheet releases it below 1024px. */
+  /** Visible height below the fixed chrome (P-46). The stylesheet subtracts the 24px top gap and releases the height below 1024px. */
   readonly columnHeight = computed(() => `calc(100vh - ${this.cache.navbarHeight() + this.cache.headerHeight()}px)`);
 
   readonly portfolioOptions = computed<PortfolioOption[]>(() =>
@@ -113,6 +115,40 @@ export default class InstitutionalObjectivesComponent implements OnInit {
   });
 
   readonly exportFileName = computed(() => `institutional-objectives_${this.year() ?? 'year'}.xlsx`);
+
+  /**
+   * Informational rows for the empty panel. `n` is the selected year's count,
+   * the same number the year select shows. `m` is distinct linked indicator ids.
+   */
+  readonly emptyRows = computed<OdsEmptyRow[]>(() => {
+    const year = this.year();
+    const listed = this.years().find(row => row.year === year)?.count ?? 0;
+    const linked = new Set<number>();
+    for (const objective of this.objectives()) {
+      for (const element of objective.elements) linked.add(element.id);
+    }
+    const next = year === null ? '' : String(year + 1);
+    return [
+      {
+        icon: 'pi pi-flag',
+        label: `${listed} Objectives · ${year ?? ''}`,
+        description: 'Institutional objectives for the selected year.',
+        accent: false
+      },
+      {
+        icon: 'pi pi-chart-bar',
+        label: `${linked.size} Linked indicators`,
+        description: "Framework indicators linked to this year's objectives.",
+        accent: false
+      },
+      {
+        icon: 'pi pi-copy',
+        label: `Carry forward to ${next}`,
+        description: "Copy this year's objectives into the next year.",
+        accent: false
+      }
+    ];
+  });
 
   readonly carryLabel = computed(() => {
     const year = this.year();

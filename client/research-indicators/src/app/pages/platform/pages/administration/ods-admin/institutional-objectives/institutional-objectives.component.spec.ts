@@ -314,11 +314,93 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(actions.handleBadRequest).not.toHaveBeenCalled();
   });
 
+  it('shows the objective empty rows from the loaded year, then hides them on select', async () => {
+    const shared: FrameworkObjective[] = [
+      {
+        id: 10,
+        portfolioId: 2,
+        year: 2026,
+        code: 'IOB-1',
+        statement: 'Raise incomes',
+        elements: [
+          { id: 31, code: '1.1.1', name: 'Yield' },
+          { id: 32, code: '1.1.2', name: 'Loss' }
+        ],
+        deletable: true,
+        blockers: []
+      },
+      {
+        id: 11,
+        portfolioId: 2,
+        year: 2026,
+        code: 'IOB-2',
+        statement: 'Cut loss',
+        elements: [{ id: 31, code: '1.1.1', name: 'Yield' }],
+        deletable: true,
+        blockers: []
+      }
+    ];
+    api.GET_StrategyFrameworkObjectiveYears.mockResolvedValue(
+      ok({
+        years: [
+          { year: 2026, count: shared.length },
+          { year: 2027, count: 0 },
+          { year: 2028, count: 1 }
+        ],
+        defaultYear: 2026
+      })
+    );
+    api.GET_StrategyFrameworkObjectives.mockImplementation((_portfolioId: number, year: number) =>
+      Promise.resolve(ok(year === 2026 ? shared : []))
+    );
+    create();
+    await settle();
+
+    const emptyRows = () => Array.from(q('panel-empty')?.querySelectorAll('[data-testid="empty-level-row"]') ?? []) as HTMLElement[];
+    expect(q('panel-empty')?.textContent).toContain('Explore the institutional objectives');
+    expect(q('panel-empty')?.textContent).toContain('Select an objective to see its statement, year and linked indicators.');
+    expect(selectLabel('year-select')).toContain('2026 · 2 objectives');
+    expect(emptyRows()).toHaveLength(3);
+    expect(emptyRows().map(item => item.querySelector('.ods-empty-panel__name')?.textContent?.trim())).toEqual([
+      '2 Objectives · 2026',
+      '2 Linked indicators',
+      'Carry forward to 2027'
+    ]);
+    expect(emptyRows().map(item => item.querySelector('.ods-empty-panel__hint')?.textContent?.trim())).toEqual([
+      'Institutional objectives for the selected year.',
+      "Framework indicators linked to this year's objectives.",
+      "Copy this year's objectives into the next year."
+    ]);
+    expect(emptyRows().map(item => item.querySelector('i')?.className)).toEqual(['pi pi-flag', 'pi pi-chart-bar', 'pi pi-copy']);
+    expect(q('panel-empty')?.querySelector('.ods-empty-panel__tile--accent')).toBeNull();
+    expect(q('panel-empty')?.querySelector('button')).toBeNull();
+    for (const item of emptyRows()) {
+      expect(item.hasAttribute('tabindex')).toBe(false);
+      expect(item.querySelector('button, [tabindex]')).toBeNull();
+    }
+    q('panel-empty')?.querySelectorAll('i').forEach(icon => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+
+    await clickRow(10);
+    expect(q('panel-empty')).toBeNull();
+    expect(emptyRows()).toHaveLength(0);
+
+    await pickOption('year-select', option => option.year === 2028);
+    expect(component.year()).toBe(2028);
+    expect(selectLabel('year-select')).toContain('2028 · 1 objective');
+    expect(q('panel-empty')?.textContent).toContain('1 Objectives · 2028');
+    expect(q('panel-empty')?.textContent).toContain('0 Linked indicators');
+    expect(q('panel-empty')?.textContent).toContain('Carry forward to 2029');
+  });
+
   it('fills the panel from a row click and from Enter, and shows the empty state first', async () => {
     create();
     await settle();
 
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the institutional objectives');
+    expect(q('panel-empty')?.textContent).toContain('Select an objective to see its statement, year and linked indicators.');
+    expect(q('panel-empty')?.querySelector('i')?.classList.contains('pi-flag')).toBe(true);
+    expect(q('panel-empty')?.querySelector('i')?.getAttribute('aria-hidden')).toBe('true');
+    expect(q('panel-empty')?.querySelector('button')).toBeNull();
     expect(document.querySelector('[data-testid="objective-form"]')).toBeNull();
     expect(root().querySelector('[data-testid="edit-objective"]')).toBeNull();
     expect(root().querySelector('[data-testid="delete-objective"]')).toBeNull();
@@ -338,6 +420,7 @@ describe('InstitutionalObjectivesComponent', () => {
     // focus a tabindex row on click the way a browser does (KZ-017).
     expect(document.activeElement).toBe(row(10));
     expect(document.activeElement).not.toBe(document.querySelector('#objectiveCode'));
+    expect(q('panel-empty')).toBeNull();
 
     await pressEnter(11);
     expect(statement()).toBe('Cut loss');
@@ -361,6 +444,7 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(opened.querySelector('label[for="objectiveIndicators"]')?.textContent?.trim()).toBe('Linked indicators');
     expect((document.querySelector('#objectiveCode') as HTMLInputElement).value).toBe('IOB-29');
     expect(document.activeElement).toBe(document.querySelector('#objectiveCode'));
+    expect(q('panel-empty')).toBeNull();
     expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('New institutional objective');
     expect(document.querySelector('[data-testid="objective-panel-delete"]')).toBeNull();
     expect(row(10).getAttribute('aria-selected')).toBe('false');
@@ -622,7 +706,9 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(selectLabel('year-select')).toContain('2027 · 0 objectives');
     expect(selectLabel('year-select')).not.toContain('2026');
     expect(component.selectedId()).toBeNull();
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the institutional objectives');
+    expect(q('panel-empty')?.textContent).toContain('0 Objectives · 2027');
+    expect(q('panel-empty')?.textContent).toContain('Carry forward to 2028');
   });
 
   it('shows the new year label when Discard proceeds, and clears the selection', async () => {
@@ -639,7 +725,9 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(selectLabel('year-select')).toContain('2027 · 0 objectives');
     expect(selectLabel('year-select')).not.toContain('2026');
     expect(component.selectedId()).toBeNull();
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the institutional objectives');
+    expect(q('panel-empty')?.textContent).toContain('0 Objectives · 2027');
+    expect(q('panel-empty')?.textContent).toContain('Carry forward to 2028');
   });
 
   it('shows the new portfolio label when a clean portfolio change proceeds, and clears the selection', async () => {
@@ -654,7 +742,8 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(selectLabel('portfolio-select')).toContain('Portfolio 1');
     expect(selectLabel('portfolio-select')).not.toContain('Portfolio 2');
     expect(component.selectedId()).toBeNull();
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the institutional objectives');
+    expect(q('panel-empty')?.textContent).toContain('28 Objectives · 2026');
   });
 
   it('shows the new portfolio label when Discard proceeds, and clears the selection', async () => {
@@ -671,7 +760,8 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(selectLabel('portfolio-select')).toContain('Portfolio 1');
     expect(selectLabel('portfolio-select')).not.toContain('Portfolio 2');
     expect(component.selectedId()).toBeNull();
-    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('panel-empty')?.textContent).toContain('Explore the institutional objectives');
+    expect(q('panel-empty')?.textContent).toContain('28 Objectives · 2026');
   });
 
   it('asks before carry forward while the form is dirty, and Keep editing does not copy', async () => {

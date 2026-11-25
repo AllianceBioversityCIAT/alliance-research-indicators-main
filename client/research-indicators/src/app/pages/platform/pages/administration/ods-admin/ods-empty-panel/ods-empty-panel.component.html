@@ -1,0 +1,20 @@
+<div class="ods-empty-panel" data-testid="panel-empty">
+  <div class="ods-empty-panel__mark">
+    <i [class]="circleIcon()" aria-hidden="true"></i>
+  </div>
+  <h2 class="ods-empty-panel__title">{{ title() }}</h2>
+  <p class="ods-empty-panel__subtitle">{{ subtitle() }}</p>
+  <ul class="ods-empty-panel__rows">
+    @for (row of rows(); track row.label) {
+      <li class="ods-empty-panel__row" [attr.data-depth]="row.depth ?? null" data-testid="empty-level-row">
+        <span class="ods-empty-panel__tile" [class.ods-empty-panel__tile--accent]="row.accent">
+          <i [class]="row.icon" aria-hidden="true"></i>
+        </span>
+        <span class="ods-empty-panel__copy">
+          <span class="ods-empty-panel__name">{{ row.label }}</span>
+          <span class="ods-empty-panel__hint">{{ row.description }}</span>
+        </span>
+      </li>
+    }
+  </ul>
+</div>

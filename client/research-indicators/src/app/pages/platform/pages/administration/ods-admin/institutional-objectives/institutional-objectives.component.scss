@@ -1,8 +1,10 @@
 @use '../ods-code-pill' as pill;
+@use '../ods-page-column' as column;
 
 // strategy-framework T-20 — design §6.6, §6.9, P-46, D-STF-31. Tokens only.
 // The root cancels `.app-page-wrapper`'s vertical margin so the column height
-// is the visible area below the fixed chrome. jsdom cannot judge that fit (KZ-017).
+// is the visible area below the fixed chrome. The 24px top gap is subtracted
+// in ods-page-column (D-STF-39). jsdom cannot judge that fit (KZ-017).
 // Global `.app-page-wrapper` is `flex: 1 1 0%` (`custom-fields.scss`). Inside this
 // column host, which has no definite height, that basis wins over `height` and the
 // page grows with its content. `flex: none` lets the height bind.
@@ -14,15 +16,7 @@
 }
 
 .objectives-page.app-page-wrapper {
-  flex: none;
-  margin-top: 0;
-  margin-bottom: 0;
-  padding-top: 0;
-  padding-bottom: 16px;
-  min-height: 0;
-  height: var(--objectives-column-height);
-  overflow: hidden;
-  box-sizing: border-box;
+  @include column.ods-admin-fixed-column('--objectives-column-height');
 }
 
 .objectives-page__body {
