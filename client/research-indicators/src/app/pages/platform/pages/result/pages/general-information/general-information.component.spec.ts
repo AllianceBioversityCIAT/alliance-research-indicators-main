@@ -38,7 +38,7 @@ import { GetResultsService } from '@shared/services/control-list/get-results.ser
 import { GetUserStaffService } from '@shared/services/control-list/get-user-staff.service';
 import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, effect } from '@angular/core';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 
 jest.mock('../../../../../../shared/services/control-list/get-results.service');
@@ -112,6 +112,39 @@ describe('GeneralInformationComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('H4: keeps what the user typed while the section was still loading', async () => {
+    let resolveLoad!: (value: unknown) => void;
+    (apiService as any).GET_GeneralInformation = jest.fn().mockImplementation(() => new Promise(r => (resolveLoad = r)));
+
+    const pending = component.getData();
+    component.body.update(b => ({ ...b, description: 'Typed during load', user_id: 'user-9' }) as any);
+    resolveLoad({ data: { title: 'Saved title', description: '', user_id: null } });
+    await pending;
+
+    expect(component.body().title).toBe('Saved title');
+    expect(component.body().description).toBe('Typed during load');
+    expect((component.body() as any).user_id).toBe('user-9');
+  });
+
+  it('loading inside the version watcher effect requests the section once, not in a loop', async () => {
+    (apiService as any).GET_GeneralInformation = jest.fn().mockResolvedValue({ data: { title: 'Loaded', description: 'From server' } });
+    TestBed.runInInjectionContext(() => effect(() => void component.getData()));
+
+    for (let i = 0; i < 3; i++) {
+      TestBed.flushEffects();
+      await fixture.whenStable();
+    }
+
+    expect(component.body().title).toBe('Loaded');
+    expect((apiService as any).GET_GeneralInformation).toHaveBeenCalledTimes(1);
+  });
+
+  it('H4: takes the loaded data as-is when nothing was edited during the load', async () => {
+    (apiService as any).GET_GeneralInformation = jest.fn().mockResolvedValue({ data: { title: 'Loaded', description: 'From server' } });
+    await component.getData();
+    expect(component.body().description).toBe('From server');
   });
 
   it('should call getData and set body', async () => {

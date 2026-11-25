@@ -11,7 +11,7 @@
       </div>
 
       <div class="flex-1 max-w-[260px]">
-        <app-radio-button label="Is this a training or a engagement?" [isRequired]="true" [signal]="body"
+        <app-radio-button label="Is this a training or an engagement?" [isRequired]="true" [signal]="body"
           [disabled]="!submission.isEditableStatus()" [serviceName]="'capSharingTypes'" [optionLabel]="'name'"
           [optionValue]="{ body: 'session_type_id', option: 'session_type_id' }"
           [helperText]="'Training is a structured learning activity with clear objectives. Engagement is broader collaboration with partners or stakeholders.'"></app-radio-button>

@@ -24,6 +24,8 @@ import { CommonModule } from '@angular/common';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { ApiService } from '@services/api.service';
+import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { formatUtcWithConfig } from '@shared/utils/date-format.util';
 import { PiDelegatesClientService } from '../services/pi-delegates.client.service';
 import type { PiDelegateHistoryEntry } from '@interfaces/pi-delegates.interface';
 
@@ -41,6 +43,7 @@ export class PiDelegateHistoryComponent {
   readonly allModalsService = inject(AllModalsService);
   private readonly api = inject(ApiService);
   private readonly piService = inject(PiDelegatesClientService);
+  private readonly dateFormatConfig = inject(DateFormatConfigService);
 
   // ─── State signals ────────────────────────────────────────────────────────────
 
@@ -139,29 +142,9 @@ export class PiDelegateHistoryComponent {
    * Uses Intl.DateTimeFormat so the timezone abbreviation reflects the browser locale.
    */
   formatDate(isoString: string): string {
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return isoString;
-
-    const datePart = new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(date);
-
-    // 12-hour time with short timezone name (e.g. "10:12 AM (CET)")
-    const timeParts = new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZoneName: 'short'
-    }).formatToParts(date);
-
-    const hour = timeParts.find(p => p.type === 'hour')?.value ?? '';
-    const minute = timeParts.find(p => p.type === 'minute')?.value ?? '';
-    const dayPeriod = timeParts.find(p => p.type === 'dayPeriod')?.value ?? '';
-    const tz = timeParts.find(p => p.type === 'timeZoneName')?.value ?? '';
-
-    return `${datePart} at ${hour}:${minute} ${dayPeriod} (${tz})`;
+    // H23 — same configured timezone (app_config DATE_FORMAT) as Home and Submission History,
+    // instead of the browser's local zone.
+    return formatUtcWithConfig(isoString, this.dateFormatConfig.config()) ?? isoString;
   }
 
   /**

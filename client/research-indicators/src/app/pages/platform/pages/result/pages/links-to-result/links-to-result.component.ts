@@ -149,6 +149,8 @@ export default class LinksToResultComponent implements OnInit, OnDestroy {
     const queryParams = version ? { version } : undefined;
 
     if (page === 'back') {
+      // H3 — Back saves like Next, so leaving the section never drops the selection.
+      await this.saveData();
       this.router.navigate(['result', this.cache.currentResultId(), 'geographic-scope'], {
         queryParams,
         replaceUrl: true

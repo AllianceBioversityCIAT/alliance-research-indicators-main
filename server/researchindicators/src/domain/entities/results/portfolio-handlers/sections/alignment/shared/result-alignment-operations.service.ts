@@ -261,19 +261,26 @@ export class ResultAlignmentOperationsService {
   }
 
   async find(resultId: number): Promise<ResultAlignmentDto> {
+    // Every selected item comes back with its catalog row (relation), and the
+    // relation is NOT filtered by the catalog's is_active. The client lists only
+    // active options, so this is what lets a selection that was later
+    // deactivated in its control list still be shown — with its status.
     const contracts = await this.resultContractsService.find(
       resultId,
       ContractRolesEnum.ALIGNMENT,
+      { agresso_contract: true },
     );
 
     const levers = await this.resultLeversService.find(
       resultId,
       LeverRolesEnum.ALIGNMENT,
+      { lever: true },
     );
 
     const sdgTargets =
       await this.resultLeverSdgTargetsService.findByMultiplesResultLeverIds(
         levers.map((el) => el.result_lever_id),
+        { sdg_target: { clarisa_sdg: true } },
       );
 
     levers.forEach((lever) => {
@@ -287,6 +294,7 @@ export class ResultAlignmentOperationsService {
     const strategicOutcomes =
       await this.resultLeverStrategicOutcomeService.findByMultiplesResultLeverIds(
         primaryLevers.map((el) => el.result_lever_id),
+        { lever_strategic_outcome: true },
       );
 
     primaryLevers.forEach((lever) => {
@@ -295,7 +303,9 @@ export class ResultAlignmentOperationsService {
       );
     });
 
-    const result_sdgs = await this.resultSdgsService.find(resultId);
+    const result_sdgs = await this.resultSdgsService.find(resultId, undefined, {
+      clarisa_sdg: true,
+    });
 
     return {
       contracts,
@@ -398,6 +408,6 @@ export class ResultAlignmentOperationsService {
 
   private actingUserId(): number | null {
     const userId = this.currentUser?.user_id;
-    return userId == null ? null : userId;
+    return userId ?? null;
   }
 }

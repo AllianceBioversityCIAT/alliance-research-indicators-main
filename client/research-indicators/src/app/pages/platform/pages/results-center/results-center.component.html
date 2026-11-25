@@ -43,7 +43,7 @@
 </app-section-sidebar>
 
 <app-section-sidebar [title]="'Table Configuration'"
-  [description]="'Customize your table by enabling, disabling, or reordering columns.'"
+  [description]="'Customize your table by reordering its columns.'"
   [showSignal]="this.resultsCenterService.showConfigurationsSidebar" confirmText="Save table settings"
   (confirm)="sidebarConfigurations.applyConfigurations()">
   <app-table-configuration #sidebarConfigurations></app-table-configuration>

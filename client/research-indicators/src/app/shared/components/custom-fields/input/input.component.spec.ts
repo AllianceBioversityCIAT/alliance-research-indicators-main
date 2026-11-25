@@ -1341,6 +1341,32 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
       expect(inputNumber.value).toBe(5); // clamped on the real PrimeNG instance
     });
   });
+
+  describe('H8 — negative numbers in a min >= 0 number field', () => {
+    beforeEach(() => {
+      component.type = 'number';
+    });
+
+    it('explains a rejected minus key', () => {
+      expect(component.showNegativeNotAllowed()).toBe(false);
+      component.onNumberKeyDown(new KeyboardEvent('keydown', { key: '-' }));
+      expect(component.showNegativeNotAllowed()).toBe(true);
+    });
+
+    it('ignores digits and fields that accept negatives', () => {
+      component.onNumberKeyDown(new KeyboardEvent('keydown', { key: '5' }));
+      expect(component.showNegativeNotAllowed()).toBe(false);
+      component.min = -10;
+      component.onNumberKeyDown(new KeyboardEvent('keydown', { key: '-' }));
+      expect(component.showNegativeNotAllowed()).toBe(false);
+    });
+
+    it('explains a rejected paste of a negative number', () => {
+      const event = { clipboardData: { getData: () => '-5' } } as unknown as ClipboardEvent;
+      component.onPaste(event);
+      expect(component.showNegativeNotAllowed()).toBe(true);
+    });
+  });
 });
 
 // @akili-spec docs/specs/changes/innovation-use-required-fields (T-02 — app-input: tokenize the

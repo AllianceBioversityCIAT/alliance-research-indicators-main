@@ -25,6 +25,16 @@ describe('CacheService', () => {
     expect(service.isSidebarCollapsed()).toBe(false);
   });
 
+  it('H18: reloads the whole page when a profile simulation starts or ends', () => {
+    const service = TestBed.inject(CacheService);
+    const reloadPage = jest.fn();
+    service.reloadPage = reloadPage;
+
+    service.bumpContentReload();
+
+    expect(reloadPage).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to empty object when JSON invalid', () => {
     withLocalStorage({ data: '}{', isSidebarCollapsed: 'true' });
     const service = TestBed.inject(CacheService);
@@ -510,13 +520,5 @@ describe('CacheService', () => {
 
     service.searchAResultValue.set('test search');
     expect(service.searchAResultValue()).toBe('test search');
-  });
-
-  it('bumpContentReload increments the key by one each call', () => {
-    const service = TestBed.inject(CacheService);
-    const start = service.contentReloadKey();
-    service.bumpContentReload();
-    service.bumpContentReload();
-    expect(service.contentReloadKey()).toBe(start + 2);
   });
 });

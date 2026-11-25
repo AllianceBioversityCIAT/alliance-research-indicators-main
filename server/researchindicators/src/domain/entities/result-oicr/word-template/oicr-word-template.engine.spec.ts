@@ -772,6 +772,46 @@ describe('oicr word template engine', () => {
     });
   });
 
+  describe('archive guard', () => {
+    it('rejects an archive with more than 1000 entries', async () => {
+      const zip = new JSZip();
+      for (let i = 0; i < 1001; i++) zip.file(`part-${i}.txt`, 'x');
+      const packed = await zip.generateAsync({
+        type: 'nodebuffer',
+        compression: 'DEFLATE',
+      });
+      const error = await rejection(packed, {});
+      expect(error).toBeInstanceOf(OicrWordTemplateUnexpectedStructureError);
+      expect((error as OicrWordTemplateUnexpectedStructureError).reason).toBe(
+        'template exceeds entry limit',
+      );
+    });
+
+    it('rejects an input buffer larger than 20 MB before opening it', async () => {
+      const packed = Buffer.alloc(20 * 1024 * 1024 + 1);
+      const error = await rejection(packed, {});
+      expect(error).toBeInstanceOf(OicrWordTemplateUnexpectedStructureError);
+      expect((error as OicrWordTemplateUnexpectedStructureError).reason).toBe(
+        'template exceeds size limit',
+      );
+    });
+
+    it('rejects word/document.xml whose inflated text exceeds 20 MB', async () => {
+      const zip = new JSZip();
+      zip.file('word/document.xml', 'x'.repeat(20 * 1024 * 1024 + 1));
+      const packed = await zip.generateAsync({
+        type: 'nodebuffer',
+        compression: 'DEFLATE',
+      });
+      expect(packed.length).toBeLessThan(20 * 1024 * 1024);
+      const error = await rejection(packed, {});
+      expect(error).toBeInstanceOf(OicrWordTemplateUnexpectedStructureError);
+      expect((error as OicrWordTemplateUnexpectedStructureError).reason).toBe(
+        'template exceeds size limit',
+      );
+    });
+  });
+
   describe('mapped label that is not an option', () => {
     it('throws the named option error and returns no document', async () => {
       let error: Error | undefined;

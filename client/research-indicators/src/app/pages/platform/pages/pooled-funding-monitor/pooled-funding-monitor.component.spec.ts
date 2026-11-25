@@ -8,6 +8,18 @@ import { RolesService } from '@shared/services/cache/roles.service';
 import PooledFundingMonitorComponent from './pooled-funding-monitor.component';
 import { PfmQueue, PfmScope, PfmSummary } from './pfm.interfaces';
 
+// These suites cover the three tabs, so they run with no tab hidden. The hidden-tab setup that
+// ships today (Stats only) is covered in pfm-hidden-tabs.spec.ts.
+jest.mock('./pfm.interfaces', () => {
+  const actual = jest.requireActual('./pfm.interfaces');
+  return {
+    ...actual,
+    PFM_HIDDEN_TABS: [],
+    PFM_VISIBLE_TABS: actual.PFM_TABS,
+    isPfmTabVisible: (tab: string | null | undefined) => (actual.PFM_TABS as readonly string[]).includes(tab ?? '')
+  };
+});
+
 const ok = <T>(data: T) => ({ successfulRequest: true, data });
 
 const summary = (scope: PfmScope, isPi = true): PfmSummary => ({

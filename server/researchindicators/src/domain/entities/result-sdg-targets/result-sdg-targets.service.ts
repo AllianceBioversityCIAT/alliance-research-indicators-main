@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  FindOptionsRelations,
+  In,
+  IsNull,
+  Repository,
+} from 'typeorm';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import {
   CurrentUserUtil,
@@ -28,13 +35,17 @@ export class ResultSdgTargetsService extends BaseServiceSimple<
   }
 
   /** Portfolio 2026 rows: same table, no lever foreign key. */
-  async findByResult(resultId: number): Promise<ResultLeverSdgTarget[]> {
+  async findByResult(
+    resultId: number,
+    relations?: FindOptionsRelations<ResultLeverSdgTarget>,
+  ): Promise<ResultLeverSdgTarget[]> {
     return this.mainRepo.find({
       where: {
         result_id: resultId,
         result_lever_id: IsNull(),
         is_active: true,
       },
+      relations,
     });
   }
 

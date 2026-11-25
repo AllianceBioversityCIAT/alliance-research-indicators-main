@@ -58,12 +58,17 @@ export interface Lever {
   icon?: string;
   short_name?: string;
   other_names?: string;
+  full_name?: string;
+  /** Set when the selected item's control-list entry is inactive (see catalog-relation.util). */
+  is_catalog_inactive?: boolean;
 }
 /** Saved on result; list rows from GET lever-strategic-outcome/by-lever/:lever_id also include id + strategic_outcome. */
 export interface LeverStrategicOutcome {
   lever_strategic_outcome_id: number;
   id?: number;
   strategic_outcome?: string;
+  /** Set when the selected item's control-list entry is inactive (see catalog-relation.util). */
+  is_catalog_inactive?: boolean;
 }
 export interface StepTwo {
   primary_lever: Lever[];

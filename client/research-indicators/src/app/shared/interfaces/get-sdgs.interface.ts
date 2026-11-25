@@ -12,4 +12,7 @@ export interface GetSdgs {
   color: string;
   clarisa_sdg_id: number;
   description: string;
+  select_label?: string;
+  /** Set when the selected item's control-list entry is inactive (see catalog-relation.util). */
+  is_catalog_inactive?: boolean;
 }
