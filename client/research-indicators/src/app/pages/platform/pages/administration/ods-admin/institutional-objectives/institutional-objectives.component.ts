@@ -429,7 +429,7 @@ export default class InstitutionalObjectivesComponent implements OnInit {
   }
 
   /**
-   * Next row on the current page, else the previous, else + Add objective.
+   * Next row on the current page, else the previous, else the Add objective button.
    * Captured before the row leaves the DOM; resolved by `data-row-key` after the refresh.
    * A key that is no longer rendered (another page) falls through.
    */

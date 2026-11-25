@@ -62,10 +62,10 @@
 
           <p-button
             label="Export .xlsx"
-            icon="pi pi-download !text-[12px]"
-            severity="secondary"
+            icon="pi pi-file-excel !text-[12px]"
+            [outlined]="true"
             size="small"
-            styleClass="!rounded-[9px] !text-[13px]"
+            styleClass="!rounded-[8px] !text-[13px] !bg-white !text-[var(--ac-light-blue-400)] !border-[var(--ac-light-blue-400)]"
             [disabled]="editor() === null || loading() || exporting()"
             (onClick)="exportWorkbook()"
             data-testid="export-button">

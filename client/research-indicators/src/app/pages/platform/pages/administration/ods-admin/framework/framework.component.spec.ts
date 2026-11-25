@@ -331,6 +331,25 @@ describe('FrameworkComponent', () => {
     expect(q('framework-tree-slot')).not.toBeNull();
   });
 
+  it('draws Export .xlsx as the outlined excel button and keeps it off until a portfolio loads', async () => {
+    create();
+
+    const pending = q('export-button')?.querySelector('button') as HTMLButtonElement;
+    expect(pending.classList.contains('p-button-outlined')).toBe(true);
+    expect(pending.querySelector('.pi-file-excel')).not.toBeNull();
+    expect(pending.disabled).toBe(true);
+
+    await settle();
+
+    const ready = q('export-button')?.querySelector('button') as HTMLButtonElement;
+    const add = q('new-element')?.querySelector('button') as HTMLButtonElement;
+    expect(ready.classList.contains('p-button-outlined')).toBe(true);
+    expect(ready.classList.contains('p-button-sm')).toBe(true);
+    expect(add.classList.contains('p-button-sm')).toBe(true);
+    expect(ready.querySelector('.pi-file-excel')).not.toBeNull();
+    expect(ready.disabled).toBe(false);
+  });
+
   it('exports one sheet per level for the selected portfolio', async () => {
     const exportSpy = jest.spyOn(xlsxExportUtil, 'exportSheetsToXlsx').mockResolvedValue(undefined);
     create();

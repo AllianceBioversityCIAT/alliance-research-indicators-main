@@ -214,6 +214,7 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(root().querySelector('[data-testid="cell-code"] span')?.textContent?.trim()).toBe('IOB-1');
     expect(root().textContent).toContain('Raise incomes');
     expect(root().textContent).toContain('1.1.1 Yield');
+    expect(button('add-objective').textContent?.replace(/\s+/g, ' ').trim()).toBe('Add objective');
     expect(button('carry-forward').textContent).toContain('Carry forward to 2027');
     expect(button('carry-forward').disabled).toBe(false);
   });
