@@ -875,3 +875,26 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **T-23 final status: PASS** (Reviewer PASS on attempt 1, owner OK).
 - **Not exercised live** (shared DB, writes forbidden): focus after Save when the row is hidden, IOB Year change on save, focus moves after Delete. Jest covers them.
 - **Approval:** owner, explicit.
+
+### T-23 follow-up — header Export button and "Add objective" (owner, 2026-11-25)
+
+- **Owner, after the T-23 commit:**
+  - the Framework header **Export .xlsx** does not look like the app's export button (Results Center "Export metadata results": outlined, `pi-file-excel`, primary blue);
+  - IOB still shows "+ + Add objective", which the owner reversed from the earlier "accept".
+- **Attempt 1:** fresh Grok `grok-4.7-medium`, dispatch `ctx_5491043e7894`, brief `brief-T23b.md`.
+  - Kept a local `p-button`: the shared `app-filters-action-buttons` disables only while loading, so it would drop the page's `editor() === null || loading()` rule.
+  - New styling: outlined, `pi-file-excel`, white background, border and text `--ac-light-blue-400` (`colors.scss:10` = `#035ba9`), 8 px radius.
+  - IOB label is now `Add objective`, icon kept; focus-after-delete still finds the button by `data-testid`.
+- **Leader Chrome check:** Export rendered 27 px tall against ~34 px for its siblings, so it sat lower than the rest of the row. Sent back to the worker (Leader live finding, before review); follow-up dispatch `ctx_46742accf128`: `size="small"`, 13 px, and no `py-1` / `max-h-27` overrides.
+- **Leader re-run (non-author): VERIFIED.** jest administration 33 suites / 664 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome check:** Tree, New Performance Area and Export all render at 146–179 px (34 px tall). Export border and text `rgb(3,91,169)` on white. IOB reads "+ icon Add objective".
+- **Reviewer** (`akili-reviewer`, opus): **`STATUS: PASS`**.
+  - Token checked at source; no hex.
+  - The reason for not reusing the shared component is correct.
+  - The tests assert the outlined class, the icon, the disabled rule and size parity.
+  - 0 `+ Add objective` left in `src`.
+  - Not checked: dark theme (none in the app).
+- **Final:** PASS. attempts 1 (+1 Leader-feedback turn) · checkpoints none · spawns: implementer ×2 turns (not reported by host), reviewer ×1 (PASS). Worker released.
+- **Running totals:** review rounds **13/14** · rev-4 LOC ≈ 4,400 / ≈ 5,000.
+- Waiting for the owner's visual OK before the commit.
+- **Owner visual OK (2026-11-25):** "ok" — committed.
