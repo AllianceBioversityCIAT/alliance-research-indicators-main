@@ -55,6 +55,7 @@ graph TD
   T21 --> T20
   T19 --> T22[T-22 Docs, family F-4, rev-4 HITL]
   T20 --> T22
+  T22 --> T23[T-23 One table + list cards]
 ```
 
 Rev 4: T-18 and T-21 touch different files and may run in parallel **for editing** only if the Leader re-runs the client suite after both; by default run them one after the other (same package).
@@ -473,7 +474,7 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ### T-22 — Docs, family F-4 and the rev-4 HITL pass
-- **Status:** todo · **Size:** S · **Depends:** T-19, T-20
+- **Status:** done (PASS, F-1…F-6 rework attempt 2, owner visual OK 2026-11-25) · **Size:** S · **Depends:** T-19, T-20
 - **Requirements:** requirements §0b B-3 (F-4 exception withdrawn), §10 rendered rows (tree geometry, indentation, inherited bars, panel fit), R-STF-016 AC.4, NFR-STF-004 manual keyboard pass, visual fidelity to Organizational Structure
 - **Design:** §6.3 (28 px step tuned live), §6.9, D-STF-30, D-STF-31; P-42, P-46
 - **Scope:**
@@ -496,6 +497,32 @@ Shared for T-18…T-22: client only, under `client/research-indicators/`; verifi
 - **Done criteria:** the measurements, keyboard pass and owner verdict are quoted in `execution.md`; `family.md` and `docs/ux-ui/design.md` are updated; no commit of UI before the owner's visual approval.
 - **Skills:** `ui-ux-pro-max`, `cognitive-doc-design`
 
+
+### T-23 — One Table view and list cards (B-6, owner at the T-22 HITL, 2026-11-25)
+- **Status:** done (PASS attempt 1, owner visual OK 2026-11-25) · **Size:** M · **Depends:** T-22 fixes (F-1…F-6, Reviewer PASS 2026-11-25)
+- **Requirements:** R-STF-008 (rewritten 2026-11-25: one table, count chips, no add button; AC.1–AC.3), R-STF-016 (guard without the level-chip trigger; AC.3), NFR-STF-004 (rows by Tab/Enter/Space unchanged)
+- **Design:** §6.4 amended paragraph, §6.9 (chip trigger removed), D-STF-37, D-STF-38; requirements §0b B-6
+- **Scope:**
+  - `framework-tables`: one `app-data-table` with every element. Columns Code (pill), Level, Name, Parent `<code> · <name>` (empty on level 1), Responsibles. Natural code sort. `[selectable]`, `[keyboardSelectable]="true"`, string `[selectedKey]`, `(rowSelected)` and `data-row-key` focus-after-delete as today. Chips become count summaries with no click, no `aria-pressed` and no guard. Remove the in-table **+ <Level>** button. The table's own search and Export stay, inside the list card. The two-Export-buttons question stays an open owner call and is not decided here.
+  - `framework.component.*`: drop the level-chip state, its guard trigger and Tree → Table chip-follow; Tree ↔ Table keeps the selection. Codec: stop writing `level`; an old `level=` decodes and is ignored.
+  - `side-panel-layout`: the **list slot is a card** with the same tokens as the panel card (D-STF-38). Keep `min-height: 0; overflow-y: auto` and the viewport fit. Both pages and both views (tree search and tree inside the card; table search, Export and table inside the card; IOB the same).
+- **Tests:**
+  - The single table renders 48 rows for the seed-shaped fixture and 4-level fixture rows from every level, sorted naturally.
+  - Level and Parent column values.
+  - Row click, Enter and Space select.
+  - Chips have no click effect and no prompt.
+  - No add button inside `framework-tables`.
+  - Tree → Table keeps the selected row selected and does not set a `level` param.
+  - Old `?view=table&level=depth-3` still opens Table.
+  - The list slot carries the card class.
+  - Specs that pinned the chips' filter behaviour, `+ <Level>` or the chip guard are rewritten; list each changed assertion.
+- **Falsifier:** (a) restore one table per level (filter rows by the active chip) → the 48-rows test goes red; (b) wire the chip click back to the guard → the "chips do nothing" test goes red.
+- **Red run:** predicted — observed in T-23.
+- **Disqualifier:** visuals (card, alignment, white toolbar) are judged in Chrome by the Leader, never by class presence alone (KZ-017); a test that only counts rows without checking levels cannot show "every level".
+- **Consumers:** `framework-tables.component.spec.ts`, `framework.component.spec.ts`, `framework-url.codec.spec.ts`, `side-panel-layout.component.spec.ts`, `institutional-objectives.component.spec.ts` (list card).
+- **Review:** full — rewrites an approved requirement's surface.
+- **Done criteria:** ods-admin jest green; falsifiers executed, quoted, reverted; lint, build (style sizes) and spec tsc clean; the Leader's Chrome pass at 1280×800 and 1280×650 (panel and list fit, card visible, toolbar inside the card) quoted in `execution.md`; owner visual OK before the UI commit.
+- **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ---
 
@@ -558,6 +585,6 @@ No task is `skip-eligible`. `full`: T-01, T-02, T-05, T-06, T-08, T-09, T-10, T-
 
 - [ ] All tasks `done` with evidence in `execution.md`.
 - [ ] T-17 performed in the running product **before** `/akili-validate` (KZ-007).
-- [ ] Rev 4: T-18…T-22 done; T-22's measurements and the owner's visual approval recorded before any UI commit.
+- [x] Rev 4: T-18…T-22 done; T-22's measurements and the owner's visual approval recorded before any UI commit. (T-23 added 2026-11-25, also done.)
 - [ ] Every requirement-level AC checked; Swagger documents every endpoint; coverage thresholds green.
 - [ ] Rollout note: Dev pre-merge checks, role assignment owner, backout (design §11).

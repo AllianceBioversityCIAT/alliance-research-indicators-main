@@ -12,7 +12,7 @@
 - **Proposal:** [`proposal.md`](proposal.md) — revision 6 (2026-11-17)
 - **Visual reference:** (1) **Framework page:** the dev lead's mockup *Strategy 2026–2030 – Monitoring framework*, shared 2026-11-17 (inline outline editor; screenshot only). (2) **Sidebar:** the *Institutional Indicators* canvas https://claude.ai/artifact/8tak5qfvNbBhfaH8DvWDpg (group *ODS Admin*). (3) **Institutional Objectives page:** artboard 4, [`../mockup/InstitutionalObjectives.dc.html`](../mockup/InstitutionalObjectives.dc.html). Known drift: the Framework mockup shows 14 dimensions · 32 indicators (pre-merge innovation rows, A-6), KPI counts (only once child 4 exists, R-STF-012) and no detail panel, portfolio selector or table view (A-8, A-9); artboard 4 shows an owner unit (removed, A-3). **(4) Rev 4:** the live *Organizational Structure* page (C-12) is the layout reference for the tree table and the side panel; the mockups remain the reference for the panel content only
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-11-24 (rev 4)
+- **Last updated:** 2026-11-25 (rev 4, B-6 from the T-22 HITL)
 
 ## 0. Revisions — what changed (dev lead, 2026-11-17)
 
@@ -39,6 +39,7 @@ The owner asked both pages to work like *Organizational Structure*. Proposal: [`
 | B-2 | Editing moves from the modal drawer to a **details panel beside the list**, filled by clicking a row, on **both** pages (supersedes A-9's "panel opened from the row" as a drawer) | New R-STF-016; R-STF-008, R-STF-009, NFR-STF-004 amended |
 | B-3 | The element **name is read-only text** outside the panel; the inline name editor and inline draft rows are removed | R-STF-007; `family.md` F-4 child-3 exception withdrawn |
 | B-4 | Q-1 ask before discarding unsaved edits · Q-2 keep the search · Q-3 keep the area colours, **inherited by every descendant row**, with clearly larger indentation than Organizational Structure · Q-4 **Delete at the top** of the panel · Q-5 the panel **always fits the viewport** and scrolls internally | R-STF-007, R-STF-016 |
+| B-6 | **T-22 HITL (owner, 2026-11-25):** the Table view is **one table listing every element of every level**, like Organizational Structure's table, with a Level column; the level chips stay as **count summaries that do not filter**; the in-table **+ <Level>** button is removed (the header **New <level-1>** creates Performance Areas; Dimensions and Indicators are added from the tree's **+**). On both pages the **list column is a card** like Organizational Structure's, so the search, Export and table or tree sit on the card, not on the page background | R-STF-008 rewritten; R-STF-016 "level chip" trigger removed; design §6.4, D-STF-37, D-STF-38 |
 | B-5 | Organizational Structure is **not** changed, including its panel-height defect (Q-5); a separate fix is the owner's call | §12 |
 
 ---
@@ -278,14 +279,17 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 
 ### R-STF-008 — Framework page: table view (F-7)
 
-- **As an** authorized user **I want** a table per level **so that** I can search, sort and export.
+- **As an** authorized user **I want** one table with every element of the framework **so that** I can search, sort and export.
 
 **Details**
-- Level chips from the levels (*Performance Areas · 4*, *Dimensions · 13*, *Indicators · 31*). Each table meets F-7. **Clicking a row selects it and opens it in the side details panel (R-STF-016, rev 4)**; delete is in the panel; a **+ <Level>** button opens the panel in create mode. Columns: code, name, parent code and the codes of every higher level; Indicators also show the responsibles.
+- *Rewritten 2026-11-25 (B-6). Rev 4 had one table per level selected by level chips.*
+- **One table** lists every element of every level of the selected portfolio, like Organizational Structure's table. It meets F-7. Columns: code, level, name, parent (`<code> · <name>`), responsibles (empty on rows with none). Default sort: code, natural order (`1.2` before `1.10`).
+- Level chips (*Performance Areas · 4*, *Dimensions · 13*, *Indicators · 31*) are **count summaries only**; they do not filter.
+- **Clicking a row selects it and opens it in the side details panel (R-STF-016)**; delete is in the panel. The Table view has **no add button**: the page header's **New <level-1>** creates a level-1 element, and children are added from the tree's **+** (R-STF-007).
 - **Export .xlsx** (toolbar) writes one workbook with one sheet per level, all elements of the selected portfolio, sorted by code.
 
 **Acceptance criteria**
-- [ ] AC.1 — Each level's table passes the F-7 checks with the shared `DataTable`.
+- [ ] AC.1 — The single table lists all 48 seeded elements (4 + 13 + 31) and passes the F-7 checks with the shared `DataTable`.
 - [ ] AC.2 — Selecting a row and deleting from the panel behave as in the tree.
 - [ ] AC.3 — The workbook has one sheet per level with the seeded counts.
 
@@ -427,7 +431,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
   - selecting another row;
   - starting a create;
   - changing the portfolio, year or view;
-  - changing the level chip (Table view) or running *Carry forward*.
+  - running *Carry forward*.
   - **Discard** proceeds. **Keep editing** leaves everything as it was.
 - **Errors:** a failed save keeps the typed values and shows the message in the panel (D-STF-26).
 
@@ -454,7 +458,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 **Acceptance criteria**
 - [ ] AC.1 — Both pages: row click fills the panel; empty state when nothing is selected; no `p-drawer` remains.
 - [ ] AC.2 — Delete at the top, edit mode only, follows `deletable` and the existing flow.
-- [ ] AC.3 — The unsaved-changes prompt guards row change, create, portfolio/year/view change, level chip and Carry forward; both answers behave as stated.
+- [ ] AC.3 — The unsaved-changes prompt guards row change, create, portfolio/year/view change and Carry forward; both answers behave as stated.
 - [ ] AC.4 — At ≥ 1024 px wide, the panel bottom is within the viewport at rest and scrolled, at two window heights (measured in a real browser). Below 1024 px the panel stacks under the list and the page scrolls.
 
 ## 6. Non-functional requirements

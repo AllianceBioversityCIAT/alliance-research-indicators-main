@@ -682,3 +682,196 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Running totals:** rev-4 tasks 4/5 · rev-4 client **3,981 LOC added** (cap re-based to ≈ 4,500) · review rounds **9/11**.
 - **Forward pointers → T-22:** the IOB Year-change-on-save selection clear (product note); the NgModel `viewModel` hardening (advisory); the earlier T-19 pointers.
 - **Approval:** auto-approved (owner standing direction). The run stops here per the owner ("finish the worker, then stop for today").
+
+## Session resume (2026-11-25)
+
+- `/akili-execute` → T-22 (the only eligible task). No worker spawned: T-22 is docs + a Leader-run live pass + the owner's verdict (Review: checklist).
+
+### T-22 — Docs, family F-4 and the rev-4 HITL pass
+
+- **Status:** in progress — measurements recorded, **waiting for the owner's verdict**. UI still uncommitted.
+- **Docs (Leader, uncommitted):**
+  - `family.md` F-4: the 2026-11-17 Strategy Framework child-3 exception (inline name editing) withdrawn, rev-4 note added; Document Control "Last updated" 2026-11-25.
+  - `docs/ux-ui/design.md` §12.2: new 2026-11-25 entry — ODS Admin tree/level table beside a viewport-fit side panel (D-STF-29…31, D-STF-36), ask-first unsaved changes, inherited area bar, opt-in `keyboardSelectable`.
+  - Client README styles row: not touched — `git diff HEAD -- client/research-indicators/src/styles src/app/theme` is empty (no token changed).
+- **Live pass (Leader, Chrome via the extension, 2026-11-25, local client :4200 + local server :3001 on the shared DB — read-only: no Save, Delete or Carry forward was clicked).**
+  - **Falsifier — 1280×650, tall Indicator selected (`1.1.1 Process efficiency`, 6-line Responsibles):** `.content` scrollHeight/clientHeight 650/650; list slot 294–634 (3,040 scrolls inside 340); panel slot 294–634 (748 scrolls inside 340). Panel scrolled to the end: Save button bottom 634 ≤ `innerHeight` 650. **Not red.**
+  - **1280×800, same selection:** `.content` 800/800; both slots 296–784 (panel 748 inside 489). Table view at 650: 650/650, slots 294–634. IOB at 800 with IOB-1 selected: 800/800, slots 281–784 (panel 526 inside 503).
+  - **800 px wide (800×800):** slots stack (list 378–1781, panel 1797–2491); the page scrolls (`.content` 2,507/800), as designed below 1024 px; no horizontal overflow (`scrollWidth` 800 = `clientWidth` 800).
+  - **Indent step:** at 800×800 the name text starts at 134 / 162 / 190 px for levels 1 / 2 / 3 (28 px step, padding 0 / 28 / 56). **At 1280×800 it is 146 / 174 / 166** — the level-3 (leaf) name sits 8 px *left* of its parent Dimension's name. There the Name column is 251 px, so parent rows wrap their counts onto a second line while the leaf row has no chevron. Same width at 1280×650 renders 138 / 166 / 194 (correct). **Finding F-1.**
+  - **Inherited bar:** every sampled row of area 1 carries `box-shadow: rgb(92,122,20) 4px 0 0 0 inset` on the first cell, levels 1–3; continuous under the selected row (screenshot).
+  - **Selected row:** light-blue background + area bar. The `<tr>` outline is not visible at normal zoom.
+  - **Dark mode:** not reachable — the app has no dark theme (same finding as the T-17 round 1 record; `localStorage.theme=dark` does not set `data-theme` on this build).
+  - **Keyboard — tree:**
+    - From the search box, Tab lands on one row (roving `tabindex`).
+    - ArrowDown moves between rows; Enter and Space select (`aria-selected="true"`, panel header `INDICATOR · LEVEL 3`).
+    - Chevrons are `tabindex=-1` with `aria-label`/`aria-expanded`.
+    - Enter on **+ Indicator** opens create `1.2.5 New Indicator` with focus in Code; the tree stays at 48 rows; no row selected.
+    - From a row, Tab goes through **every visible `+` button (17 tab stops)** before it reaches the panel. **Finding F-2.**
+    - The `p-treeTable` host carries `aria-label="Framework tree"`, but the host has no role and the inner `<table>` has none of its own (forward pointer from T-18 — still open).
+  - **Keyboard — Table view (Indicators):** click a row, then Tab moves to the next row (1 px focus outline); Enter selects 1.2.2; Tab + Space selects 1.2.3; `.content` scrollTop stays 0 (Space does not scroll the page). Tree → Table kept the selection and set the `depth-3` chip.
+  - **Keyboard — IOB:** from search, Tab → Export → 3 sortable headers → first row; Enter selects IOB-1 (`IOB-2 · 2026` header after Tab + Space); Delete at the top.
+  - **Unsaved-changes guard:**
+    - Dirty create form + a row click → *Discard changes?*.
+    - **Keep editing** keeps "HITL draft" and no row gets selected; **Discard** selects the clicked row.
+    - **After either answer, focus is on `<body>`.** **Finding F-3.**
+    - Cancel on a dirty edit reverts the text and returns focus to the selected row.
+  - **Not exercised (shared DB, writes forbidden):** focus after Save when the row is hidden by search or collapse; IOB Year change on save; Delete focus move. These stay covered by jest only.
+  - **Side by side with Organizational Structure (1280×800):**
+    - **Same:** split layout, Tree/Table toggle, summary chips, Delete at the panel top, light-blue selected row.
+    - **Different:**
+      - Org Structure's panel and empty state sit in a white card; the Framework and IOB panels sit on the page background with no card.
+      - Org Structure uses an icon-only **+** in a Status column; Framework uses text buttons ("+ Dimension" / "+ Indicator").
+      - Org Structure's indent step is 16 px; Framework's is 28 px (owner decision: bigger indent).
+      - Org Structure keeps name and count on one line; Framework wraps the count under the name at 1280×800.
+      - Org Structure starts collapsed; Framework starts expanded.
+  - **Other observations:**
+    - "+ + Indicator" (table header) and "+ + Add objective" (IOB) show a plus icon **and** a "+" in the label (F-4).
+    - Responsibles still wraps at about 1 word per line (open owner call from 2026-11-23).
+    - Two Export buttons on the Table view (open owner call).
+    - Search-time toggles are ephemeral (T-18 pointer — R-STF-007 allows it).
+- **Evidence screenshots (local, temporary):** tree at 1280×800 (F-1) `/var/folders/hb/4_fzxxh90715phch17y0txgc0000gn/T/claude-chrome-screenshots-9ufuP6/screenshot-1795617599490-2.png`; Org Structure `…/screenshot-1795617669516-3.jpg`.
+- **Owner verdict on the findings (2026-11-25):** fix **F-1** (leaf indent) and **F-2/F-3** (keyboard). F-4 (double plus) is accepted as is. The owner then reviewed the page and added two more:
+  - **F-5:** the Framework tree search box shows a thick dark outline offset 2 px from the input, cut off by the list slot. Every other input in the app only recolours its own border on focus. Cause: `framework-tree.component.scss:43-49` (`outline: 2px solid …; outline-offset: 2px`). The IOB search is the shared `app-data-table` search, which shows the browser's default outline flush with the input (measured: `outline: rgb(0,95,204) auto 1px`, offset 0). It is the same input as Org Structure's table view and Control Lists, so it is **not changed here** (blast radius).
+  - **F-6:** Org Structure wraps its whole detail panel, empty state and form, in a white card (`organizational-structure.component.html:151`: `rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4`). The Framework and IOB panels sit bare on the page background. Fix it in `side-panel-layout`, so it covers both pages.
+- **Rework:** one Grok worker for F-1, F-2, F-3, F-5 and F-6, then a Reviewer, then the Leader re-measures in Chrome, then the owner's visual OK, then the UI commit.
+- **Rework attempt 1 (2026-11-25).** Grok `grok-4.7-high` via Cursor, dispatch `ctx_de0ac7e85164`, task `task_5dddc051882d`. Brief: scratchpad `brief-T22-fixes.md` (F-1, F-2, F-3, F-5, F-6; skills `angular-developer`, `ui-ux-pro-max`; effort high).
+  - **Files changed:**
+    - `framework-tree.component.{html,scss,ts,spec.ts}`
+    - `side-panel-layout.component.{html,scss,spec.ts}`
+    - `unsaved-changes.util.{ts,spec.ts}`
+  - **Falsifiers (Implementer):**
+    - F-2 binding removed → `framework-tree.component.spec.ts:142` `Expected "0" Received null`.
+    - F-3 restore removed → `unsaved-changes.util.spec.ts:90`.
+    - Both reverted.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest administration + data-table: 33 suites / 674 tests.
+    - lint clean; build exit 0 (framework-tree 3.76 kB, side-panel-layout 0.84 kB); spec tsc 0 under ods-admin.
+  - **Leader live check (Chrome):**
+    - **F-1:** at 1280×800, name x = 146 / 174 / 202 for levels 1 / 2 / 3; counts aligned with the name.
+    - **F-2:** with a Dimension selected, Tab goes row → "Add Indicator under 1.1" → panel Delete. Only that row's + has tabindex 0. From a focused but unselected row, PrimeNG's Tab jumps to the selected row, which is pre-existing `ttRow` behaviour.
+    - **F-3:** after Keep editing and after Discard, focus is on the clicked row, not `<body>`.
+    - **F-5:** the search box recolours its own border.
+    - **F-6:** the card is 8 px radius, 1 px `rgb(232,235,237)` border, 16 px padding.
+    - **Falsifier at 1280×650 with 1.1.1 selected:** card 294–634, Save 617 ≤ 650, `.content` 650/650.
+    - **IOB at 650:** card 271–634, `.content` 650/650.
+  - **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: FAIL`**.
+    - F-1, F-2, F-3 and F-6 are sound.
+    - F-5: `field__control` added to the search input is an encapsulated class with no effect there. Its test asserts only the class's presence, and the scss comment claims it matches the panel Name field. False: the panel fields use a 2 px outline with a 2 px offset.
+    - ADVISORY:
+      - F-3 × create-mode focus depends on timer order; Leader to confirm focus on Code.
+      - `rovingId` moves before the guard (harmless).
+      - Tab after ArrowDown away from the selected row.
+      - The util spec cleanup should use `finally`.
+  - **Leader live confirmation:** the IOB panel Code field focuses with `outline: rgb(17,47,92) solid 2px; outline-offset: 2px`, the same defect the owner reported on the search box.
+  - **Owner decision (2026-11-25):** extend F-5 to every text-like field in both ODS panels; they must use the app-standard focus, where only the field's own border recolours. Scoped to `ods-admin/`.
+- **Rework attempt 2:** sent to the same worker (follow-up dispatch `ctx_eb4953b81d26`, task `task_b1331a91b9f9`). It carries the Reviewer issue verbatim, an attempt-history line, the owner's scope decision, and the util-spec cleanup advisory.
+- **Rework attempt 2 (2026-11-25):** same worker, follow-up dispatch `ctx_eb4953b81d26`.
+  - **Change:**
+    - New shared mixins in `ods-admin/ods-field-focus.scss`: `outline: none; outline-offset: 0; border-color: var(--p-form-field-focus-border-color)`. That token is `roartheme.ts` `formField.focusBorderColor` = `{primary.color}`; `focusRing` is 0.
+    - Included by the tree search and by both panels (inputs, textareas, `p-select`, `p-multiselect`, `p-autoComplete`). The old offset outline was removed from both panels.
+    - `field__control` was removed from the search input, with its presence test.
+    - `afterEach` cleanup added to the util spec.
+  - **Files changed:**
+    - `ods-field-focus.{scss,spec.ts}`
+    - `framework-tree.component.{html,scss,spec.ts}`
+    - `element-panel.component.scss`
+    - `objective-panel.component.scss`
+    - `unsaved-changes.util.spec.ts`
+  - **Falsifier:** offset outline put back in the mixin → `ods-field-focus.spec.ts:22` red; reverted.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest administration + data-table: 34 suites / 675 tests.
+    - lint clean; spec tsc 0 under ods-admin.
+    - build exit 0: framework-tree 3.79 kB, element-panel 1.72 kB, objective-panel 1.33 kB, side-panel-layout 0.84 kB.
+  - **Leader live check (Chrome):**
+    - IOB Code, Statement, Year and Linked indicators, and the Framework Name field, all focus with `outline: none`, offset 0 and border `rgb(3,91,169)`.
+    - Year was reached by a real Tab and screenshotted: the field's own border recolours, with no detached ring.
+  - **Reviewer** (`akili-reviewer`, opus, rework override e): **`STATUS: PASS`**.
+    - The token claim was checked at the source (`roartheme.ts:343-349, 450, 575`).
+    - No offset outline is left on any panel field; buttons keep their rings.
+    - `:host ::ng-deep` stays inside the component.
+    - F-1, F-2, F-3 and F-6 show no regressions.
+  - **ADVISORY** (recorded, not work):
+    - Pin each consumer file to its own mixin in the consumer test.
+    - The autocomplete and multiselect selectors are dead in `objective-panel`.
+    - From attempt 1: create-mode focus after Discard depends on timer order (Leader: Code focus not re-checked live); Tab after ArrowDown away from the selected row is PrimeNG `ttRow` behaviour.
+- **Rework totals:** attempts 2 · checkpoints none · continuations none.
+  - Spawns: implementer (Cursor/Grok) ×2 turns in one worker, not reported by host (complete, complete); reviewer ×2 (FAIL, PASS). The worker was released after the PASS (`already_released`).
+- **Running totals:**
+  - Rev-4 client **4,221 LOC added** (cap ≈ 4,500).
+  - Review rounds **11/11**: at the cap, not exceeded. Any further review round trips the tripwire.
+- **Next:** the owner's visual approval. Then T-22 → `[x]` and one UI commit for T-18…T-22 plus these fixes.
+
+## Spec amendment B-6 — owner at the T-22 HITL (2026-11-25)
+
+- **Owner, after the F-1…F-6 PASS:** the Table view shows only one level at a time. It should list every Performance Area, Dimension and Indicator in one table, like Organizational Structure. The in-table "+ + Performance Area" button is misaligned and duplicates the header **New Performance Area**. The search box and buttons sit on the dark page background, but on Organizational Structure and Results Center they sit inside the table's container. The tree view has the same problem.
+- **Leader finding:** Organizational Structure's whole list column is a card (`organizational-structure.component.html:85`). The ODS list slot is not a card.
+- **This changes an approved requirement (R-STF-008), so it was a Pivot-class amendment, approved by the owner in chat before any code:**
+  - Chips are count summaries only and do not filter.
+  - In the Table view, children are added only from the tree's **+**.
+  - Budget re-based to ≈ 5,000 LOC / 14 rounds.
+- **Edits:**
+  - `requirements.md`: §0b B-6; R-STF-008 rewritten (one table, count chips, no add button, AC.1 = 48 rows); R-STF-016 level-chip trigger removed (details and AC.3).
+  - `design.md`: §2 table and diagram; §6.4 amended paragraph; §6.9 chip trigger and chip-follow struck; D-STF-37 and D-STF-38; §14 re-base row.
+  - `tasks.md`: new T-23 and a dependency-graph edge.
+- **Two-direction sweep:** a forward grep for `level chip`, `per level`, `+ <Level>` and `table per level` across the spec folder. Remaining hits are in historical task text (T-12, T-14, T-19, done), the §13a challenge table (history), counts "per level" (unrelated), and the per-level export workbook (unchanged on purpose). The backward check is §6.9 ↔ R-STF-016, both amended.
+- **Not decided here:** the two Export buttons stay an open owner call.
+- **T-22:** F-1…F-6 PASS stands. T-22 closes with T-23's owner visual OK, because the owner's verdict on the rev-4 pass is pending T-23.
+
+### T-23 — One Table view and list cards (B-6)
+
+- **Attempt 1 (2026-11-25):** fresh Grok `grok-4.7-high` via Cursor, dispatch `ctx_2e02d9415df4`, task `task_423fa742beba`, effort high. Brief: scratchpad `brief-T23.md` (task text pointer + owner decisions + T-19/T-20 lessons).
+  - **Files changed:**
+    - `framework-tables.component.{ts,html,scss,spec.ts}` and a new `ods-table-wrap.scss`.
+    - `framework.component.{ts,html,spec.ts}`.
+    - `framework-url.codec.{ts,spec.ts}`.
+    - `side-panel-layout.component.{html,scss,spec.ts}`.
+    - `institutional-objectives.component.spec.ts`.
+  - **Rewritten assertions:** the Implementer listed each one; the full list is in the worker's `worker_done`. Chips are now a `UL`/`LI` with no `aria-pressed`. The per-level columns test was replaced by Code/Level/Name/Parent/Responsibles. The 48-row test checks the 4/13/31 split. The export file name changed to `strategy-framework.xlsx`. The `+ Level` create test was removed. The old `level=` parameter opens Table and is ignored. The chip guard test was replaced by "does nothing when a level chip is clicked". The codec never serialises `level`.
+  - **Falsifiers (both reverted):**
+    - (a) Filter the table by the active chip → `framework-tables.component.spec.ts:152` *Expected length 48, Received 4*.
+    - (b) Wire the chip back to the guard → `framework.component.spec.ts` (quoted as `:610`; the Reviewer places it at `:607`) *Expected 0 calls, Received 1*.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest `administration` + `data-table`: 34 suites / 679 tests.
+    - Lint clean; build exit 0; spec tsc 0 errors under ods-admin.
+    - `git status -- client/` shows nothing outside ods-admin or data-table.
+  - **Leader live check (Chrome):**
+    - Table view: one table in a white card (8 px radius, `rgb(232,235,237)` border); chips, search and the table Export are inside the card. Paginator shows 5 pages × 10 = 48 rows. Order is 1, 1.1, 1.1.1, 1.1.2, 1.2, …
+    - 1280×800: `.content` 800/800, slots 296–784.
+    - 1280×650 with indicator `1.1.2` selected (4-line responsibles): `.content` 650/650, list and panel 294–634, Save bottom 617.
+    - Table → Tree keeps the selection and writes no `level` param; the tree list is also a card.
+    - IOB list is a card.
+    - **Still seen:** IOB **"+ + Add objective"** (plus icon plus "+" in the label). Out of B-6 scope; asked at the owner gate.
+  - **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: PASS`**.
+    - Single selectable keyboard table; natural sort on two paths.
+    - Chips are inert; no chip state is left in the page, URL or guard.
+    - Focus after delete is still by `data-row-key`; the list card keeps viewport fit; tokens only; both Exports kept.
+  - **ADVISORY** (recorded, not work):
+    - The codec `levelDepth` call is a no-op.
+    - Dead `actions` rules remain in `ods-table-wrap.scss`.
+    - `FrameworkTableCreate` should move next to the panel.
+    - Spec title at `:348` still says "a level-table row".
+    - Design §6.5 focus sentence: **amended now** as an execute-time edit (`design.md` §6.5, "the next row of the single table in its rendered order on the current page"; carried to the next Reviewer brief if any).
+- **Final status: PASS (attempt 1), 2026-11-25, not committed.**
+  - attempts: 1 · checkpoints: none · continuations: none.
+  - spawns: implementer (Cursor/Grok) — not reported by host (complete); reviewer — not reported by host (PASS).
+  - Worker released (`already_released`).
+- **Running totals:** rev-4 client **4,376 LOC added** (cap ≈ 5,000) · review rounds **12/14**.
+- **Next:** owner visual OK, then T-22 and T-23 `[x]` and one UI commit.
+
+## Owner visual verdict — T-22 and T-23 (2026-11-25)
+
+- **Owner, in chat:** "OK, commit". The owner checked on local `localhost:4200`: Framework in Tree and Table views, and Institutional Objectives.
+- The owner had seen IOB's "+ + Add objective" and **accepted it as is** (same call as F-4).
+- **T-22 final status: PASS.**
+  - Docs: `family.md` F-4 and the ux decision row.
+  - Live pass and fixes F-1…F-6: Reviewer PASS on attempt 2.
+  - The owner's verdict is recorded above.
+  - Open owner calls carried forward, not decided:
+    - the two Export buttons;
+    - Responsibles column wrap;
+    - "+ + Add objective";
+    - the IOB search, which uses the shared DataTable focus.
+- **T-23 final status: PASS** (Reviewer PASS on attempt 1, owner OK).
+- **Not exercised live** (shared DB, writes forbidden): focus after Save when the row is hidden, IOB Year change on save, focus moves after Delete. Jest covers them.
+- **Approval:** owner, explicit.
