@@ -1,27 +1,48 @@
-// strategy-framework T-16 — design §6.6, §6.7. Tokens only.
-// The drawer node is moved to the body, so its width is the `[style]` binding
-// (420px, 100% below 1024px). jsdom does not measure that width (KZ-017).
+@use '../../../ods-field-focus' as fieldFocus;
+
+// strategy-framework T-20 — design §6.6, §6.7. Tokens only.
+// The form lives in the page's side panel. The panel slot scrolls, not this host.
 :host {
   display: block;
+}
+
+.objective-panel__delete {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.objective-panel__delete-button[aria-disabled='true'] {
+  color: var(--ac-grey-700);
+  border-color: var(--ac-grey-200);
+  cursor: default;
+}
+
+.objective-panel__reason {
+  margin: 0;
+  color: var(--ac-grey-700);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.objective-panel__form {
+  min-width: 0;
 }
 
 .objective-panel__actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
-}
-
-.objective-panel__actions-end {
-  display: flex;
-  gap: 0.5rem;
-  margin-left: auto;
 }
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .field__control {
@@ -36,7 +57,4 @@
   line-height: 1.5;
 }
 
-.field__control:focus-visible {
-  outline: 2px solid var(--ac-primary-blue-600);
-  outline-offset: 2px;
-}
+@include fieldFocus.ods-panel-field-focus;

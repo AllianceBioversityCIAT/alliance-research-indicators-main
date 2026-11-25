@@ -1,6 +1,6 @@
 import { writeExportSheets } from '@shared/utils/xlsx-export.util';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, FrameworkResponsible } from '@shared/interfaces/strategy-framework.interface';
-import { buildExportSheets, descendantCountText, nestFramework, summaryLine, tableRowsForLevel } from './framework-view.util';
+import { buildExportSheets, descendantCountText, frameworkTreeNodes, nestFramework, summaryLine, tableRowsForLevel } from './framework-view.util';
 
 // @akili-spec institutional-performance/strategy-framework T-12 — design §6.2, §6.4, R-STF-007 AC.1,
 // R-STF-008 AC.3. The seeded shape is 4 / 13 / 31. `1.10` is inserted before `1.2` so a lexical
@@ -189,5 +189,26 @@ describe('framework-view.util', () => {
     expect(workbook.worksheets).toHaveLength(4);
     expect(workbook.worksheets.map(worksheet => worksheet.name)).toEqual(['Performance Areas', 'Dimensions', 'Indicators', 'Sub-indicators']);
     expect(codesOf('Sub-indicators', workbook)).toEqual(['1.1.1.1']);
+  });
+
+  it('stamps every tree node with its depth-1 ancestor index', () => {
+    const nodes = frameworkTreeNodes(seededView());
+    expect(nodes.map(node => node.data?.code)).toEqual(['1', '2', '3', '4']);
+    expect(nodes.map(node => node.data?.areaIndex)).toEqual([0, 1, 2, 3]);
+    const area1 = nodes[0];
+    const childCodes = area1.children?.map(node => node.data?.code) ?? [];
+    expect(childCodes.indexOf('1.2')).toBeLessThan(childCodes.indexOf('1.10'));
+    expect(area1.children?.every(node => node.data?.areaIndex === 0)).toBe(true);
+    expect(area1.children?.[0].children?.every(node => node.data?.areaIndex === 0)).toBe(true);
+    expect(nodes[1].children?.every(node => node.data?.areaIndex === 1)).toBe(true);
+    expect(area1.data?.countsText).toBe('10 dimensions · 31 indicators');
+    expect(area1.data?.levelName).toBe('Performance Area');
+    expect(area1.data?.nextLevelName).toBe('Dimension');
+    expect(area1.expanded).toBe(true);
+    const indicator = area1.children?.[0].children?.find(node => node.data?.code === '1.1.2');
+    expect(indicator?.data?.responsiblesText).toBe('Idris Jones; Philippe Attey (inactive)');
+    expect(indicator?.data?.countsText).toBe('46 KPIs');
+    expect(indicator?.data?.nextLevelName).toBeNull();
+    expect(indicator?.data?.areaIndex).toBe(0);
   });
 });

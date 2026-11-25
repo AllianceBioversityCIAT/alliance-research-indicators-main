@@ -1,6 +1,6 @@
 /**
- * The §6.3 delete flow (A8, then the blocked / confirm / notice alert, then A7),
- * shared by the outline editor and the table view (design §6.4, D-STF-26).
+ * The delete flow (A8, then the blocked / confirm / notice alert, then A7).
+ * The page supplies `resolveElement` and `prepareFocus` (design §6.5).
  * Alerts keep `hideCloseButton`. Focus returns to the opener when the alert
  * closes, and to the caller's target after the row is gone.
  *
@@ -140,7 +140,10 @@ function blockedDetail(summary: FrameworkElementBlockers): string {
 }
 
 function blockersDetail(blockers: readonly FrameworkBlocker[]): string {
-  return blockers.map(blocker => `${blocker.count} ${blocker.reason}. ${blocker.wayOut}`).map(escapeHtml).join('<br>');
+  return blockers
+    .map(blocker => `${blocker.count} ${blocker.reason}. ${blocker.wayOut}`)
+    .map(escapeHtml)
+    .join('<br>');
 }
 
 function readBlockers(errorDetail: unknown): FrameworkBlocker[] | null {

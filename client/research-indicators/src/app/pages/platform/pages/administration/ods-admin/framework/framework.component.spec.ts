@@ -1,19 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { NgZone } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { Select } from 'primeng/select';
-import { FrameworkContext, FrameworkEditorView, FrameworkLevel } from '@shared/interfaces/strategy-framework.interface';
+import { FrameworkContext, FrameworkEditorElement, FrameworkEditorView, FrameworkLevel } from '@shared/interfaces/strategy-framework.interface';
+import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
+import { ElementPanelComponent } from './components/element-panel/element-panel.component';
 import FrameworkComponent from './framework.component';
 
-// @akili-spec institutional-performance/strategy-framework T-12 — R-STF-001, R-STF-007, R-STF-008,
-// R-STF-015 AC.2, D-STF-23, D-STF-26, P-36. The page is the real component. KZ-015: loading is
-// asserted before the response resolves. Framework errors stay inline; handleBadRequest is not called.
+// @akili-spec institutional-performance/strategy-framework T-19 — R-STF-007, R-STF-008, R-STF-016, NFR-STF-004.
+// KZ-015: row clicks, chips, buttons and the alert callbacks drive the transition.
+// KZ-001: the panel header, the request body and the toast are asserted from the DOM and the mock.
+// KZ-017: jsdom cannot judge viewport fit, scroll, or real Tab order. The column height binding is not that measurement.
 
 const ok = <T>(data: T): MainResponse<T> =>
   ({ data, status: 200, description: 'ok', timestamp: '', path: '', successfulRequest: true }) as MainResponse<T>;
@@ -35,6 +40,28 @@ const LEVELS: FrameworkLevel[] = [
   { depth: 3, name: 'Indicator', pluralName: 'Indicators', shortLabel: 'INDICATOR', isIndicatorLevel: true, virtual: true }
 ];
 
+const storedLevels = LEVELS.map(level => ({
+  id: level.depth,
+  depth: level.depth,
+  name: level.name,
+  pluralName: level.pluralName,
+  shortLabel: level.shortLabel,
+  isIndicatorLevel: level.isIndicatorLevel
+}));
+
+const element = (
+  partial: Partial<FrameworkEditorElement> & Pick<FrameworkEditorElement, 'id' | 'depth' | 'code' | 'name'>
+): FrameworkEditorElement => ({
+  levelId: partial.depth,
+  description: null,
+  parentId: null,
+  descendantCounts: {},
+  usage: {},
+  deletable: true,
+  blockers: [],
+  ...partial
+});
+
 const CONTEXT: FrameworkContext = {
   currentYear: 2026,
   defaultPortfolioId: 2,
@@ -47,30 +74,9 @@ const CONTEXT: FrameworkContext = {
 const WITH_ELEMENTS: FrameworkEditorView = {
   portfolioId: 2,
   configured: true,
-  levels: LEVELS.map(level => ({
-    id: level.depth,
-    depth: level.depth,
-    name: level.name,
-    pluralName: level.pluralName,
-    shortLabel: level.shortLabel,
-    isIndicatorLevel: level.isIndicatorLevel
-  })),
+  levels: storedLevels,
   usageLabels: [],
-  elements: [
-    {
-      id: 1,
-      levelId: 1,
-      depth: 1,
-      code: '1',
-      name: 'Area',
-      description: null,
-      parentId: null,
-      descendantCounts: {},
-      usage: {},
-      deletable: true,
-      blockers: []
-    }
-  ]
+  elements: [element({ id: 1, depth: 1, code: '1', name: 'Area' })]
 };
 
 const EMPTY: FrameworkEditorView = {
@@ -79,6 +85,20 @@ const EMPTY: FrameworkEditorView = {
   levels: LEVELS,
   elements: [],
   usageLabels: []
+};
+
+const SEEDED: FrameworkEditorView = {
+  portfolioId: 2,
+  configured: true,
+  levels: storedLevels,
+  usageLabels: [],
+  elements: [
+    element({ id: 1, depth: 1, code: '1', name: 'Area' }),
+    element({ id: 20, depth: 2, code: '1.1', name: 'Dimension one', parentId: 1 }),
+    element({ id: 21, depth: 2, code: '1.2', name: 'Dimension two', parentId: 1 }),
+    element({ id: 31, depth: 3, code: '1.1.1', name: 'Process efficiency', parentId: 20, description: 'Stored text' }),
+    element({ id: 32, depth: 3, code: '1.1.2', name: 'Quality', parentId: 20 })
+  ]
 };
 
 describe('FrameworkComponent', () => {
@@ -105,11 +125,42 @@ describe('FrameworkComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    fixture.detectChanges();
   };
   const create = () => {
     fixture = TestBed.createComponent(FrameworkComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  };
+  const treeRow = (code: string) =>
+    Array.from(root().querySelectorAll('[data-testid="framework-tree-row"]')).find(
+      row => row.querySelector('[data-testid="framework-tree-code"]')?.textContent?.trim() === code
+    ) as HTMLElement;
+  const clickTree = async (code: string) => {
+    (treeRow(code).querySelector('[data-testid="framework-tree-name"]') as HTMLElement).click();
+    await settle();
+  };
+  const typeInto = async (selector: string, value: string) => {
+    const field = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement;
+    field.value = value;
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+  };
+  const lastAlert = () => actions.showGlobalAlert.mock.calls.at(-1)?.[0] as GlobalAlert;
+  const answer = async (label: 'Discard' | 'Keep editing') => {
+    const alert = lastAlert();
+    const callback = label === 'Discard' ? alert.confirmCallback : alert.cancelCallback;
+    callback?.event?.();
+    await settle();
+  };
+  const portfolioLabel = () => root().querySelector('[data-testid="portfolio-select"] .p-select-label')?.textContent ?? '';
+  const pickPortfolio = async (id: number) => {
+    const select = fixture.debugElement.query(By.css('[data-testid="portfolio-select"]')).componentInstance as Select;
+    const option = (select.options as { id: number }[]).find(item => item.id === id);
+    select.onOptionSelect(new Event('click'), option);
+    await settle();
   };
 
   beforeEach(async () => {
@@ -122,8 +173,8 @@ describe('FrameworkComponent', () => {
       GET_StrategyFrameworkStaff: jest.fn().mockResolvedValue(ok([])),
       POST_StrategyFrameworkElement: jest.fn(),
       PATCH_StrategyFrameworkElement: jest.fn(),
-      DELETE_StrategyFrameworkElement: jest.fn(),
-      GET_StrategyFrameworkElementBlockers: jest.fn()
+      DELETE_StrategyFrameworkElement: jest.fn().mockResolvedValue(ok({ id: 31 })),
+      GET_StrategyFrameworkElementBlockers: jest.fn().mockResolvedValue(ok({ children: 0, objectives: 0, consumers: [], wayOut: [] }))
     };
     actions = { handleBadRequest: jest.fn(), showGlobalAlert: jest.fn(), showToast: jest.fn() };
     router = { navigate: jest.fn().mockResolvedValue(true) };
@@ -142,7 +193,6 @@ describe('FrameworkComponent', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     fixture?.destroy();
-    document.querySelectorAll('.p-drawer, .p-drawer-mask, .p-overlay-mask').forEach(node => node.remove());
   });
 
   it('shows a skeleton, then the title from the years of Portfolio 2', async () => {
@@ -160,34 +210,46 @@ describe('FrameworkComponent', () => {
     expect(q('page-title')?.textContent?.trim()).toBe('Strategy 2026–2030 – Monitoring framework');
     expect(q('page-title')?.textContent).not.toContain('Portfolio 2 –');
     expect(q('eyebrow')?.textContent?.trim()).toBe('ADMIN · ODS');
-    expect(root().textContent).toContain('Define the performance areas, dimensions and indicators of the framework.');
-    expect(component.portfolioId()).toBe(2);
     expect(q('summary-line')?.textContent?.trim()).toBe('1 performance area · 0 dimensions · 0 indicators');
-    const outlineName = q('outline-editor-slot')?.querySelector('[data-testid="name-input"]') as HTMLInputElement | null;
-    expect(outlineName?.value).toBe('Area');
-    expect(q('outline-editor-slot')?.querySelector('[data-testid="code-badge"]')?.textContent?.trim()).toBe('1');
+    expect(q('view-tree')?.textContent?.trim()).toBe('Tree');
+    expect(root().querySelector('p-treetable input, p-treetable textarea')).toBeNull();
+    expect(treeRow('1').querySelector('[data-testid="framework-tree-name"]')?.textContent?.trim()).toBe('Area');
     expect(q('framework-banner')?.textContent).toContain('Changes apply to every module that uses the framework. Items in use cannot be deleted.');
     expect(root().querySelector('app-custom-progress-bar')).toBeNull();
+    expect(root().querySelector('p-' + 'drawer')).toBeNull();
   });
 
-  it('labels an unconfigured portfolio and shows + Add Performance Area when it has no levels', async () => {
+  it('binds the column height from the navbar and header signals', async () => {
+    const cache = TestBed.inject(CacheService);
+    cache.navbarHeight.set(51);
+    cache.headerHeight.set(60.5);
+    create();
+    await settle();
+
+    expect(q('framework-page')?.style.getPropertyValue('--framework-column-height').trim()).toBe('calc(100vh - 111.5px)');
+    expect(q('framework-page')?.classList.contains('pt-3')).toBe(false);
+  });
+
+  it('labels an unconfigured portfolio and opens create beside the empty list', async () => {
     create();
     await settle();
 
     const unconfigured = component.portfolioOptions().find(portfolio => portfolio.id === 1);
     expect(unconfigured?.label).toBe('Portfolio 1 · 2020–2021 (not configured)');
-    expect(component.portfolioOptions().find(portfolio => portfolio.id === 2)?.label).toBe('Portfolio 2 · 2026–2030');
-
     fixture.debugElement.query(By.directive(Select)).triggerEventHandler('onChange', { value: 1 });
     await settle();
 
     expect(q('empty-state')?.textContent).toContain('This portfolio has no framework yet');
     expect(q('add-root-button')?.textContent).toContain('+ Add Performance Area');
-    expect(q('summary-line')).toBeNull();
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(q('side-panel')?.getAttribute('aria-label')).toBe('Element details');
 
     (q('add-root-button')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
-    expect(component.rootDraftRequested()).toBe(true);
+    expect(q('empty-state')).not.toBeNull();
+    expect(q('panel-empty')).toBeNull();
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('New Performance Area');
+    expect(root().querySelector('p-' + 'drawer')).toBeNull();
   });
 
   it.each([403, 404])('shows the error state with Retry when the editor load returns %s', async status => {
@@ -203,7 +265,8 @@ describe('FrameworkComponent', () => {
     expect(q('retry-button')?.textContent).toContain('Retry');
     expect(root().textContent).toContain(status === 403 ? 'Forbidden' : 'Portfolio not found');
     expect(q('empty-state')).toBeNull();
-    expect(q('outline-editor-slot')).toBeNull();
+    expect(q('framework-tree-slot')).toBeNull();
+    expect(q('side-panel')).toBeNull();
   });
 
   it('shows the framework error inline and raises no result-title alert', async () => {
@@ -218,13 +281,11 @@ describe('FrameworkComponent', () => {
     await settle();
 
     expect(q('error-state')?.textContent).toContain('code is taken: STAR-1');
-    expect(root().textContent).not.toContain('Title Already Exists');
-    expect(root().textContent).not.toContain('Enter other title');
     expect(actions.handleBadRequest).not.toHaveBeenCalled();
     expect(actions.showGlobalAlert).not.toHaveBeenCalled();
   });
 
-  it('retries a failed load into the framework', async () => {
+  it('retries a failed load into the tree', async () => {
     api.GET_StrategyFrameworkEditor.mockResolvedValueOnce(failed(500, 'The framework read failed')).mockResolvedValue(ok(WITH_ELEMENTS));
     create();
     await settle();
@@ -234,70 +295,59 @@ describe('FrameworkComponent', () => {
     await settle();
 
     expect(q('error-state')).toBeNull();
-    expect(q('page-title')?.textContent?.trim()).toBe('Strategy 2026–2030 – Monitoring framework');
-    expect(q('outline-editor-slot')).not.toBeNull();
+    expect(q('framework-tree-slot')).not.toBeNull();
   });
 
-  it('reads the frozen view and level slugs, and falls back when they are unknown', async () => {
-    query = { view: 'table', level: 'depth-2' };
+  it('opens Table from an old level param and does not write level', async () => {
+    query = { view: 'table', level: 'depth-3' };
     create();
     await settle();
     expect(component.view()).toBe('table');
-    expect(component.level()).toBe(2);
     expect(q('view-table')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('framework-tables-slot')).not.toBeNull();
-    expect(q('outline-editor-slot')).toBeNull();
+    expect(q('framework-tree-slot')).toBeNull();
+    expect(root().querySelector('[data-testid="cell-code"]')?.textContent?.trim()).toBe('1');
+    expect(root().querySelector('[data-testid="cell-levelName"]')?.textContent?.trim()).toBe('Performance Area');
 
-    (q('view-editor') as HTMLButtonElement).click();
+    (q('view-tree') as HTMLButtonElement).click();
     await settle();
     expect(component.view()).toBe('editor');
-    expect(q('outline-editor-slot')).not.toBeNull();
+    expect(q('framework-tree-slot')).not.toBeNull();
     expect(router.navigate).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { view: null, level: 'depth-2' },
+        queryParams: { view: null, level: null },
         queryParamsHandling: 'merge',
         replaceUrl: true
       })
     );
   });
 
-  it('falls back to the editor when the view slug is not in the vocabulary', async () => {
+  it('falls back to the tree when the view slug is not in the vocabulary', async () => {
     query = { view: 'cards', level: 'performance-area' };
     create();
     await settle();
     expect(component.view()).toBe('editor');
-    expect(component.level()).toBeNull();
-    expect(q('outline-editor-slot')).not.toBeNull();
+    expect(q('framework-tree-slot')).not.toBeNull();
   });
 
-  it('records the details selection for the panel slot', async () => {
+  it('draws Export .xlsx as the outlined excel button and keeps it off until a portfolio loads', async () => {
     create();
+
+    const pending = q('export-button')?.querySelector('button') as HTMLButtonElement;
+    expect(pending.classList.contains('p-button-outlined')).toBe(true);
+    expect(pending.querySelector('.pi-file-excel')).not.toBeNull();
+    expect(pending.disabled).toBe(true);
+
     await settle();
 
-    (q('outline-editor-slot')?.querySelector('[data-testid="details"]') as HTMLButtonElement).click();
-    await settle();
-
-    expect(component.detailsElementId()).toBe(1);
-    expect(q('element-panel-slot')?.getAttribute('data-element-id')).toBe('1');
-    expect((document.querySelector('#elementCode') as HTMLInputElement).value).toBe('1');
-  });
-
-  it('returns focus to the outline control that opened the panel', async () => {
-    create();
-    await settle();
-
-    const opener = q('outline-editor-slot')?.querySelector('[data-testid="details"]') as HTMLButtonElement;
-    opener.focus();
-    opener.click();
-    await settle();
-    expect(document.querySelector('[data-testid="element-form"]')).not.toBeNull();
-
-    (document.querySelector('[data-testid="element-cancel"] button') as HTMLButtonElement).click();
-    await settle();
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(document.activeElement).toBe(opener);
-    expect(document.querySelector('[data-testid="element-form"]')).toBeNull();
+    const ready = q('export-button')?.querySelector('button') as HTMLButtonElement;
+    const add = q('new-element')?.querySelector('button') as HTMLButtonElement;
+    expect(ready.classList.contains('p-button-outlined')).toBe(true);
+    expect(ready.classList.contains('p-button-sm')).toBe(true);
+    expect(add.classList.contains('p-button-sm')).toBe(true);
+    expect(ready.querySelector('.pi-file-excel')).not.toBeNull();
+    expect(ready.disabled).toBe(false);
   });
 
   it('exports one sheet per level for the selected portfolio', async () => {
@@ -311,195 +361,478 @@ describe('FrameworkComponent', () => {
     expect(exportSpy).toHaveBeenCalledTimes(1);
     const input = exportSpy.mock.calls[0][0];
     expect(input.fileName).toBe('strategy-framework_2026-2030.xlsx');
-    expect(input.sheets).toHaveLength(WITH_ELEMENTS.levels.length);
     expect(input.sheets.map(sheet => sheet.name)).toEqual(['Performance Areas', 'Dimensions', 'Indicators']);
   });
 
-  it('writes the level slug from a chip and opens the panel selection from the row edit', async () => {
-    query = { view: 'table' };
+  it('fills the panel from a tree row and from a level-table row, and shows the empty state first', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
     create();
     await settle();
 
-    const edit = q('framework-tables-slot')?.querySelector('[data-testid="edit-row"]') as HTMLButtonElement;
-    edit.click();
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+    expect(document.querySelector('[data-testid="element-form"]')).toBeNull();
+    expect(document.querySelector('p-' + 'drawer')).toBeNull();
+
+    await clickTree('1.1.1');
+    expect(document.querySelector('[data-testid="panel-level"]')?.textContent?.trim()).toBe('INDICATOR · LEVEL 3');
+    expect(document.querySelector('[data-testid="panel-code"]')?.textContent?.trim()).toBe('1.1.1');
+    const remove = document.querySelector('[data-testid="element-delete"] button') as HTMLButtonElement;
+    const code = document.querySelector('#elementCode') as HTMLInputElement;
+    expect(remove.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
+
+    (q('view-table') as HTMLButtonElement).click();
+    await settle();
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(root().querySelector('[data-row-key="31"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(root().querySelector('[data-testid="level-chip"]')?.getAttribute('aria-pressed')).toBeNull();
+    expect(router.navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'table', level: null } }));
+    expect(document.querySelector('#elementCode')?.getAttribute('value') ?? (document.querySelector('#elementCode') as HTMLInputElement).value).toBe(
+      '1.1.1'
+    );
+
+    const other = root().querySelector('[data-testid="data-table-row"][data-row-key="32"]') as HTMLElement;
+    other.click();
+    await settle();
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Quality');
+    expect(other.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('saves the typed name, toasts, and keeps the row selected', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'Process efficiency updated');
+    api.PATCH_StrategyFrameworkElement.mockResolvedValue(ok({ ...SEEDED.elements[3], name: 'Process efficiency updated' }));
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(
+      ok({
+        ...SEEDED,
+        elements: SEEDED.elements.map(item => (item.id === 31 ? { ...item, name: 'Process efficiency updated' } : item))
+      })
+    );
+
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
     await settle();
 
-    expect(component.detailsElementId()).toBe(1);
-    expect(q('element-panel-slot')?.getAttribute('data-element-id')).toBe('1');
-    expect(document.querySelector('[data-testid="element-form"]')).not.toBeNull();
+    expect(api.PATCH_StrategyFrameworkElement).toHaveBeenCalledWith(31, {
+      code: '1.1.1',
+      name: 'Process efficiency updated',
+      description: 'Stored text',
+      responsibleCarnets: []
+    });
+    expect(actions.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Saved', detail: '1.1.1 saved' });
+    expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
+    expect(treeRow('1.1.1').querySelector('[data-testid="framework-tree-name"]')?.textContent?.trim()).toBe('Process efficiency updated');
+  });
+
+  it('does not ask to discard a name that was just saved', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'Process efficiency updated');
+    api.PATCH_StrategyFrameworkElement.mockResolvedValue(ok({ ...SEEDED.elements[3], name: 'Process efficiency updated' }));
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(
+      ok({
+        ...SEEDED,
+        elements: SEEDED.elements.map(item => (item.id === 31 ? { ...item, name: 'Process efficiency updated' } : item))
+      })
+    );
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    await settle();
+    actions.showGlobalAlert.mockClear();
+
+    await clickTree('1.1.2');
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Quality');
+  });
+
+  it('keeps the saved name when Cancel follows Save', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'Process efficiency updated');
+    api.PATCH_StrategyFrameworkElement.mockResolvedValue(ok({ ...SEEDED.elements[3], name: 'Process efficiency updated' }));
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(
+      ok({
+        ...SEEDED,
+        elements: SEEDED.elements.map(item => (item.id === 31 ? { ...item, name: 'Process efficiency updated' } : item))
+      })
+    );
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    await settle();
+
     (document.querySelector('[data-testid="element-cancel"] button') as HTMLButtonElement).click();
-    await settle();
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(document.activeElement).toBe(edit);
+    fixture.detectChanges();
 
-    (q('framework-tables-slot')?.querySelector('[data-testid="level-chip"][data-depth="2"]') as HTMLButtonElement).click();
-    await settle();
-
-    expect(component.level()).toBe(2);
-    expect(router.navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({
-        queryParams: { view: 'table', level: 'depth-2' },
-        queryParamsHandling: 'merge',
-        replaceUrl: true
-      })
-    );
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Process efficiency updated');
+    expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
   });
 
-  it('records an empty create from + Level, and requires a parent below the first level', async () => {
-    query = { view: 'table' };
+  it('keeps a created element when Cancel follows Save', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    api.GET_StrategyFrameworkCodeProposal.mockImplementation((query: { parentId?: number }) =>
+      Promise.resolve(ok({ code: query.parentId ? '1.7' : '4' }))
+    );
+    const created = element({ id: 40, depth: 2, code: '1.7', name: 'Added dimension', parentId: 1 });
+    api.POST_StrategyFrameworkElement.mockResolvedValue(ok(created));
     create();
     await settle();
-
-    (q('framework-tables-slot')?.querySelector('[data-testid="level-table"][data-depth="1"] [data-testid="add-level"] button') as HTMLButtonElement).click();
+    (treeRow('1').querySelector('[data-testid="framework-tree-add"]') as HTMLButtonElement).click();
     await settle();
-    expect(component.createRequest()).toEqual({ depth: 1, parentRequired: false });
-    expect(component.detailsElementId()).toBeNull();
+    await typeInto('#elementName', 'Added dimension');
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok({ ...SEEDED, elements: [...SEEDED.elements, created] }));
 
-    (q('framework-tables-slot')?.querySelector('[data-testid="level-chip"][data-depth="2"]') as HTMLButtonElement).click();
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
     await settle();
-    (q('framework-tables-slot')?.querySelector('[data-testid="level-table"][data-depth="2"] [data-testid="add-level"] button') as HTMLButtonElement).click();
-    await settle();
+    (document.querySelector('[data-testid="element-cancel"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
 
-    expect(component.createRequest()).toEqual({ depth: 2, parentRequired: true });
-    expect(q('element-panel-slot')?.getAttribute('data-element-id')).toBeNull();
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Added dimension');
+    expect((document.querySelector('#elementCode') as HTMLInputElement).value).toBe('1.7');
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
   });
 
-  it('closes only the Parent select on Escape, then the drawer, and returns focus to the opener', async () => {
-    const media = installMatchMedia();
+  it('keeps text typed while a save is in flight and still asks before leaving', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'X');
+    let resolvePatch: (value: MainResponse<FrameworkEditorElement>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkElement.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
     api.GET_StrategyFrameworkEditor.mockResolvedValue(
       ok({
-        ...WITH_ELEMENTS,
-        elements: [
-          ...WITH_ELEMENTS.elements,
-          {
-            id: 20,
-            levelId: 2,
-            depth: 2,
-            code: '1.1',
-            name: 'Dimension one',
-            description: null,
-            parentId: 1,
-            descendantCounts: {},
-            usage: {},
-            deletable: true,
-            blockers: []
-          }
-        ]
+        ...SEEDED,
+        elements: SEEDED.elements.map(item => (item.id === 31 ? { ...item, name: 'X' } : item))
       })
     );
-    try {
-      create();
-      await settle();
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    await typeInto('#elementName', 'XY');
+    resolvePatch(ok({ ...SEEDED.elements[3], name: 'X' }));
+    await settle();
 
-      const opener = root().querySelector('[aria-label="Edit details of Dimension 1.1"]') as HTMLButtonElement;
-      opener.focus();
-      opener.click();
-      await settle();
-      expect(document.querySelector('[data-testid="element-form"]')).not.toBeNull();
-
-      const name = document.querySelector('#elementName') as HTMLInputElement;
-      name.value = 'Dimension one edited';
-      name.dispatchEvent(new Event('input', { bubbles: true }));
-      fixture.detectChanges();
-
-      const parent = document.querySelector('[data-testid="element-parent"]') as HTMLElement;
-      parent.click();
-      await settle();
-      const overlay = document.querySelector('.p-select-overlay');
-      expect(overlay).not.toBeNull();
-      const filter = overlay?.querySelector('input') ?? overlay;
-      pressEscape(filter as HTMLElement);
-      await settle();
-
-      expect(document.querySelector('[data-testid="element-form"]')).not.toBeNull();
-      expect(document.querySelector('.p-select-overlay')).toBeNull();
-      expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Dimension one edited');
-
-      pressEscape(document.querySelector('#elementCode') as HTMLElement);
-      await settle();
-      await new Promise(resolve => setTimeout(resolve, 0));
-      expect(document.querySelector('[data-testid="element-form"]')).toBeNull();
-      expect(document.activeElement).toBe(opener);
-    } finally {
-      media.restore();
-    }
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('XY');
+    actions.showGlobalAlert.mockClear();
+    await clickTree('1.1.2');
+    expect(lastAlert().summary).toBe('Discard changes?');
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('XY');
   });
 
-  it('closes the drawer on Escape when an unrelated control outside the panel is expanded', async () => {
-    const media = installMatchMedia();
-    api.GET_StrategyFrameworkEditor.mockResolvedValue(
-      ok({
-        ...WITH_ELEMENTS,
-        elements: [
-          ...WITH_ELEMENTS.elements,
-          {
-            id: 20,
-            levelId: 2,
-            depth: 2,
-            code: '1.1',
-            name: 'Dimension one',
-            description: null,
-            parentId: 1,
-            descendantCounts: {},
-            usage: {},
-            deletable: true,
-            blockers: []
-          }
-        ]
-      })
+  it('keeps text typed while a create is saving, and edits the new id after refresh', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    api.GET_StrategyFrameworkCodeProposal.mockImplementation((query: { parentId?: number }) =>
+      Promise.resolve(ok({ code: query.parentId ? '1.7' : '4' }))
     );
-    const outside = document.createElement('button');
-    outside.setAttribute('aria-expanded', 'true');
-    outside.setAttribute('data-testid', 'unrelated-expanded');
-    document.body.appendChild(outside);
-    try {
-      create();
-      await settle();
+    const created = element({ id: 40, depth: 2, code: '1.7', name: 'X', parentId: 1 });
+    create();
+    await settle();
+    (treeRow('1').querySelector('[data-testid="framework-tree-add"]') as HTMLButtonElement).click();
+    await settle();
+    await typeInto('#elementName', 'X');
+    let resolvePost: (value: MainResponse<FrameworkEditorElement>) => void = () => undefined;
+    api.POST_StrategyFrameworkElement.mockReturnValue(new Promise(resolve => (resolvePost = resolve)));
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    await typeInto('#elementName', 'XY');
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok({ ...SEEDED, elements: [...SEEDED.elements, created] }));
+    resolvePost(ok(created));
+    await settle();
 
-      const opener = root().querySelector('[aria-label="Edit details of Dimension 1.1"]') as HTMLButtonElement;
-      opener.click();
-      await settle();
-      expect(document.querySelector('[data-testid="element-form"]')).not.toBeNull();
-      expect(document.querySelector('[data-testid="element-form"]')?.contains(outside)).toBe(false);
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('XY');
+    expect(document.querySelector('[data-testid="element-delete"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).not.toContain('New');
+    expect(treeRow('1.7').getAttribute('aria-selected')).toBe('true');
+  });
 
-      pressEscape(document.querySelector('#elementCode') as HTMLElement);
-      await settle();
-      expect(document.querySelector('[data-testid="element-form"]')).toBeNull();
-    } finally {
-      outside.remove();
-      media.restore();
-    }
+  it('does not ask to discard a saved edit before the refresh returns', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'Process efficiency updated');
+    let resolvePatch: (value: MainResponse<FrameworkEditorElement>) => void = () => undefined;
+    let resolveGet: (value: MainResponse<FrameworkEditorView>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkElement.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    api.GET_StrategyFrameworkEditor.mockReturnValue(new Promise(resolve => (resolveGet = resolve)));
+    resolvePatch(ok({ ...SEEDED.elements[3], name: 'Process efficiency updated' }));
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+    actions.showGlobalAlert.mockClear();
+
+    (treeRow('1.1.2').querySelector('[data-testid="framework-tree-name"]') as HTMLElement).click();
+    fixture.detectChanges();
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Quality');
+    resolveGet(ok(SEEDED));
+    await settle();
+  });
+
+  it('asks before replacing a dirty form, and Keep editing leaves the text and the selection', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementDescription', 'edited text');
+    await clickTree('1.1.1');
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+
+    await clickTree('1.1.2');
+    expect(lastAlert().summary).toBe('Discard changes?');
+    expect(lastAlert().detail).toBe('Your edits to 1.1.1 will be lost.');
+    expect(lastAlert().cancelCallback?.label).toBe('Keep editing');
+    await answer('Keep editing');
+
+    expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('edited text');
+    expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
+    expect(treeRow('1.1.2').getAttribute('aria-selected')).toBe('false');
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Process efficiency');
+  });
+
+  it('discards into the clicked row, and ignores a second click while the prompt is open', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementDescription', 'edited text');
+    await clickTree('1.1.2');
+    await clickTree('1.2');
+    expect(actions.showGlobalAlert).toHaveBeenCalledTimes(1);
+
+    await answer('Discard');
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Quality');
+    expect(treeRow('1.1.2').getAttribute('aria-selected')).toBe('true');
+    expect(treeRow('1.2').getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('does nothing when a level chip is clicked', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    (q('view-table') as HTMLButtonElement).click();
+    await settle();
+    await typeInto('#elementDescription', 'edited text');
+    const writes = router.navigate.mock.calls.length;
+
+    (root().querySelector('[data-testid="level-chip"][data-depth="1"]') as HTMLElement).click();
+    await settle();
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledTimes(writes);
+    expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('edited text');
+    expect(root().querySelector('[data-row-key="31"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim())).toEqual([
+      '1',
+      '1.1',
+      '1.1.1',
+      '1.1.2',
+      '1.2'
+    ]);
+  });
+
+  it('guards create, the portfolio and the view the same way', async () => {
+    api.GET_StrategyFrameworkEditor.mockImplementation((id: number) => Promise.resolve(ok(id === 1 ? EMPTY : SEEDED)));
+    api.GET_StrategyFrameworkCodeProposal.mockResolvedValue(ok({ code: '4' }));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementDescription', 'edited text');
+
+    (q('new-element')?.querySelector('button') as HTMLButtonElement).click();
+    await settle();
+    expect(lastAlert().detail).toBe('Your edits to 1.1.1 will be lost.');
+    await answer('Keep editing');
+    expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('edited text');
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('Process efficiency');
+
+    (q('view-table') as HTMLButtonElement).click();
+    await settle();
+    await answer('Keep editing');
+    expect(q('view-tree')?.getAttribute('aria-pressed')).toBe('true');
+
+    await answer('Discard');
+    expect(q('view-table')?.getAttribute('aria-pressed')).toBe('true');
+    expect(root().querySelector('[data-row-key="31"]')?.getAttribute('aria-selected')).toBe('true');
+    expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('Stored text');
+    expect(actions.showGlobalAlert).toHaveBeenCalledTimes(2);
+    expect(router.navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'table', level: null } }));
+
+    (q('view-tree') as HTMLButtonElement).click();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementDescription', 'portfolio edit');
+    fixture.debugElement.query(By.directive(Select)).triggerEventHandler('onChange', { value: 1 });
+    await settle();
+    await answer('Keep editing');
+    expect(component.portfolioId()).toBe(2);
+    expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('portfolio edit');
+
+    await answer('Discard');
+    expect(component.portfolioId()).toBe(1);
+    expect(q('empty-state')).not.toBeNull();
+    expect(document.querySelector('[data-testid="element-form"]')).toBeNull();
+  });
+
+  it('shows the current portfolio label again when Keep editing rejects the change', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementDescription', 'portfolio edit');
+    const select = fixture.debugElement.query(By.css('[data-testid="portfolio-select"]')).componentInstance as Select;
+    const rejected = (select.options as { id: number }[]).find(option => option.id === 1);
+    select.onOptionSelect(new Event('click'), rejected);
+    await settle();
+    await answer('Keep editing');
+
+    expect(component.portfolioId()).toBe(2);
+    expect(root().querySelector('[data-testid="portfolio-select"] .p-select-label')?.textContent).toContain('Portfolio 2');
+    expect(root().querySelector('[data-testid="portfolio-select"] .p-select-label')?.textContent).not.toContain('Portfolio 1');
+    expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('portfolio edit');
+  });
+
+  it('shows the new portfolio label when a clean change proceeds, and clears the selection', async () => {
+    api.GET_StrategyFrameworkEditor.mockImplementation((id: number) => Promise.resolve(ok(id === 1 ? EMPTY : SEEDED)));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+
+    await pickPortfolio(1);
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(component.portfolioId()).toBe(1);
+    expect(portfolioLabel()).toContain('Portfolio 1');
+    expect(portfolioLabel()).not.toContain('Portfolio 2');
+    expect(component.selectedId()).toBeNull();
+    expect(q('empty-state')?.textContent).toContain('This portfolio has no framework yet');
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+  });
+
+  it('shows the new portfolio label when Discard proceeds, and clears the selection', async () => {
+    api.GET_StrategyFrameworkEditor.mockImplementation((id: number) => Promise.resolve(ok(id === 1 ? EMPTY : SEEDED)));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementDescription', 'portfolio edit');
+
+    await pickPortfolio(1);
+    expect(lastAlert().summary).toBe('Discard changes?');
+    await answer('Discard');
+
+    expect(component.portfolioId()).toBe(1);
+    expect(portfolioLabel()).toContain('Portfolio 1');
+    expect(portfolioLabel()).not.toContain('Portfolio 2');
+    expect(component.selectedId()).toBeNull();
+    expect(q('empty-state')?.textContent).toContain('This portfolio has no framework yet');
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+  });
+
+  it('opens + Dimension with the parent and the proposed code, and adds nothing until save', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    api.GET_StrategyFrameworkCodeProposal.mockImplementation((query: { parentId?: number }) =>
+      Promise.resolve(ok({ code: query.parentId ? '1.7' : '4' }))
+    );
+    create();
+    await settle();
+    const before = Array.from(root().querySelectorAll('[data-testid="framework-tree-code"]')).map(node => node.textContent?.trim());
+
+    (treeRow('1').querySelector('[data-testid="framework-tree-add"]') as HTMLButtonElement).click();
+    await settle();
+
+    expect(api.GET_StrategyFrameworkCodeProposal).toHaveBeenCalledWith({ portfolioId: 2, parentId: 1 });
+    expect((document.querySelector('#elementCode') as HTMLInputElement).value).toBe('1.7');
+    const panel = fixture.debugElement.query(By.directive(ElementPanelComponent)).componentInstance as ElementPanelComponent;
+    expect(panel.form.controls.parentId.value).toBe(1);
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('New Dimension');
+    expect(document.querySelector('[data-testid="element-delete"]')).toBeNull();
+    expect(Array.from(root().querySelectorAll('[data-testid="framework-tree-code"]')).map(node => node.textContent?.trim())).toEqual(before);
+    expect(before).not.toContain('1.7');
+    expect(root().querySelector('[data-testid="framework-tree-row"][aria-selected="true"]')).toBeNull();
+  });
+
+  it('keeps a failed save in the panel', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    api.PATCH_StrategyFrameworkElement.mockResolvedValue(failed(409, { description: 'code is taken', field: 'code' }));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'Process efficiency edited');
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    await settle();
+
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Process efficiency edited');
+    expect(document.querySelector('[data-testid="element-error"]')?.textContent?.trim()).toBe('code is taken');
+    expect(actions.showToast).not.toHaveBeenCalled();
+    expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('ignores a save response for a selection that is no longer current', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    await typeInto('#elementName', 'Stale name');
+    let resolvePatch: (value: MainResponse<FrameworkEditorElement>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkElement.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
+    (document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).click();
+    await clickTree('1.1.2');
+    await answer('Discard');
+
+    resolvePatch(ok({ ...SEEDED.elements[3], name: 'Stale name' }));
+    await settle();
+
+    expect(actions.showToast).not.toHaveBeenCalled();
+    expect((document.querySelector('#elementName') as HTMLInputElement).value).toBe('Quality');
+    expect(treeRow('1.1.2').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('deletes from the panel and moves focus to the next visible row', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    create();
+    await settle();
+    await clickTree('1.1.1');
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok({ ...SEEDED, elements: SEEDED.elements.filter(item => item.id !== 31) }));
+    fixture.autoDetectChanges(true);
+    (document.querySelector('[data-testid="element-delete"] button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(lastAlert().detail).toBe('Delete Indicator 1.1.1 · Process efficiency?');
+    expect(lastAlert().confirmCallback?.label).toBe('Delete');
+    expect(lastAlert().hideCloseButton).toBe(true);
+    await TestBed.inject(NgZone).run(() => lastAlert().confirmCallback?.event?.());
+    await fixture.whenStable();
+
+    expect(api.DELETE_StrategyFrameworkElement).toHaveBeenCalledWith(31);
+    expect(treeRow('1.1.1')).toBeUndefined();
+    expect(document.activeElement?.getAttribute('data-row-key')).toBe('32');
+  });
+
+  it('blocks delete with a Close-only dialog and returns focus to Delete', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    api.GET_StrategyFrameworkElementBlockers.mockResolvedValue(
+      ok({ children: 2, objectives: 0, consumers: [], wayOut: ['Delete or move its 2 indicators first.'] })
+    );
+    create();
+    await settle();
+    await clickTree('1');
+    const button = document.querySelector('[data-testid="element-delete"] button') as HTMLButtonElement;
+    button.click();
+    await settle();
+
+    expect(api.DELETE_StrategyFrameworkElement).not.toHaveBeenCalled();
+    expect(lastAlert().summary).toBe('Cannot delete');
+    expect(lastAlert().confirmCallback?.label).toBe('Close');
+    expect(lastAlert().hasNoCancelButton).toBe(true);
+    expect(lastAlert().hideCloseButton).toBe(true);
+    expect(lastAlert().detail).toContain('2 children');
+    (document.body as HTMLElement).focus();
+    lastAlert().confirmCallback?.event?.();
+    expect(document.activeElement).toBe(button);
   });
 });
-
-function pressEscape(target: EventTarget): void {
-  const event = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true });
-  Object.defineProperty(event, 'which', { configurable: true, get: () => 27 });
-  target.dispatchEvent(event);
-}
-
-function installMatchMedia(): { restore: () => void } {
-  if (typeof Element.prototype.scrollIntoView !== 'function') Element.prototype.scrollIntoView = () => undefined;
-  const original = Object.getOwnPropertyDescriptor(window, 'matchMedia');
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: jest.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn()
-    }))
-  });
-  return {
-    restore: () => {
-      if (original) Object.defineProperty(window, 'matchMedia', original);
-      else delete (window as Partial<Window>).matchMedia;
-    }
-  };
-}

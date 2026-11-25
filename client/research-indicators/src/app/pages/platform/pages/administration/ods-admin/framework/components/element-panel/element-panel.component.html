@@ -1,20 +1,28 @@
-<p-drawer
-  [visible]="open()"
-  (visibleChange)="onVisibleChange($event)"
-  position="right"
-  [modal]="true"
-  [dismissible]="true"
-  [closeOnEscape]="true"
-  appendTo="body"
-  styleClass="element-panel"
-  [style]="drawerStyle()"
-  ariaCloseLabel="Close"
-  data-testid="element-drawer">
-  <ng-template pTemplate="header">
-    <app-panel-heading [eyebrow]="eyebrow()" [title]="headerTitle()" [code]="pillCode()" />
-  </ng-template>
+<div class="element-panel" data-testid="element-panel">
+  <app-panel-heading [eyebrow]="eyebrow()" [title]="headerTitle()" [code]="pillCode()" />
 
-  <form class="element-panel__form flex flex-col gap-4" pFocusTrap appOverlayEscapeGuard [formGroup]="form" data-testid="element-form" (ngSubmit)="save()" [attr.aria-busy]="saving()">
+  @if (element(); as current) {
+    <div class="element-panel__delete" data-testid="element-delete">
+      <button
+        type="button"
+        pButton
+        severity="danger"
+        [outlined]="true"
+        size="small"
+        class="element-panel__delete-button !rounded-[9px] !text-[13px]"
+        [attr.aria-disabled]="current.deletable ? null : 'true'"
+        [attr.aria-describedby]="current.deletable ? null : 'element-delete-reason'"
+        [disabled]="saving()"
+        (click)="remove()">
+        Delete
+      </button>
+      @if (!current.deletable) {
+        <p id="element-delete-reason" class="element-panel__reason" data-testid="element-delete-reason">{{ blockerText(current) }}</p>
+      }
+    </div>
+  }
+
+  <form class="element-panel__form flex flex-col gap-4" [formGroup]="form" data-testid="element-form" (ngSubmit)="save()" [attr.aria-busy]="saving()">
     <div class="element-panel__pair" [class.element-panel__pair--split]="showParent()">
       <div class="field">
         <label for="elementCode" class="text-sm font-medium atc-grey-800">Code <span aria-hidden="true">*</span></label>
@@ -63,7 +71,9 @@
 
     @for (ancestor of derivedAncestors(); track ancestor.depth) {
       <div class="field">
-        <label class="text-sm font-medium atc-grey-800" [attr.for]="'derived-' + ancestor.depth" data-testid="derived-label">{{ ancestor.label }}</label>
+        <label class="text-sm font-medium atc-grey-800" [attr.for]="'derived-' + ancestor.depth" data-testid="derived-label">{{
+          ancestor.label
+        }}</label>
         <input
           [id]="'derived-' + ancestor.depth"
           type="text"
@@ -93,12 +103,7 @@
 
     <div class="field">
       <label for="elementDescription" class="text-sm font-medium atc-grey-800">Description</label>
-      <textarea
-        id="elementDescription"
-        class="field__control"
-        formControlName="description"
-        rows="4"
-        data-testid="element-description"></textarea>
+      <textarea id="elementDescription" class="field__control" formControlName="description" rows="4" data-testid="element-description"></textarea>
     </div>
 
     @if (indicatorLevel()) {
@@ -110,40 +115,25 @@
     }
 
     <div class="element-panel__actions" data-testid="element-actions">
-      <span data-testid="element-delete">
-        <button
-          type="button"
-          pButton
-          label="Delete"
-          severity="danger"
-          [outlined]="true"
-          size="small"
-          class="!rounded-[9px] !text-[13px]"
-          [disabled]="saving() || element() === null"
-          (click)="remove($event)">
-        </button>
-      </span>
-      <div class="element-panel__actions-end">
-        <p-button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          (onClick)="cancel()"
-          data-testid="element-cancel">
-        </p-button>
-        <p-button
-          type="submit"
-          label="Save"
-          severity="info"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          [disabled]="saving()"
-          [loading]="saving()"
-          data-testid="element-save">
-        </p-button>
-      </div>
+      <p-button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        size="small"
+        styleClass="!rounded-[9px] !text-[13px]"
+        (onClick)="cancel()"
+        data-testid="element-cancel">
+      </p-button>
+      <p-button
+        type="submit"
+        label="Save"
+        severity="info"
+        size="small"
+        styleClass="!rounded-[9px] !text-[13px]"
+        [disabled]="saving()"
+        [loading]="saving()"
+        data-testid="element-save">
+      </p-button>
     </div>
   </form>
-</p-drawer>
+</div>

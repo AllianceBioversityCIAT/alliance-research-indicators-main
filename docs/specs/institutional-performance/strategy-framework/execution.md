@@ -462,3 +462,439 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Leader re-run:** ods-admin 11 suites / 88 tests; full client `npm test` → 403/403 suites, 9,325 tests passed.
 - **Kept deliberately:** derived ancestor placed under the parent select (mockup puts it last); code pills grey like the outline badges (mockup blue).
 - **Commit:** client still uncommitted, waiting for the owner's visual approval.
+
+## Rev 4 execution (2026-11-24)
+
+- Rev-4 spec docs committed as the execution baseline: `c60e4ac87` (the owner's `/akili-execute` call taken as the Phase 3 gate approval). Same standing split and direction as above: Grok implements, Claude reviews; continue until FATAL_FAIL / HALT / Pivot / tripwire. UI code stays uncommitted until the owner's visual approval (T-22).
+
+### T-21 — Shared DataTable: opt-in keyboard row selection
+
+- **Status:** PASS (attempt 1) — 2026-11-24 · **not committed** (UI, waits for T-22 visual approval)
+- **Dispatch:** fresh Grok `grok-4.7-high` via Cursor, run `run_674b6b131b1f`, task `task_228562571342`, dispatch `ctx_4c8bab3823af`. Effort medium (S, shared component). Skills `angular-developer`, `ui-ux-pro-max` (task defaults). Exemplar: the component itself. Kaizen carried KZ-015, KZ-001, K-004/KZ-014, KZ-017. Forward pointers: none.
+- **Files changed:** `shared/components/data-table/data-table.component.{ts,html,spec.ts}` (+112 / −1).
+- **Implementer evidence:** red before implementation — tabindex expected `["0","0","0"]` received `[null,null,null]` (spec:454); Enter expected the UOM-2 row received `[]` (:465); Space `defaultPrevented` expected true received false (:476). Falsifier (a) `keydown.enter` dropped → :465 red, received `[]`; falsifier (b) tabindex unconditional → `hasAttribute('tabindex')` expected false received true (:407); both reverted. KZ-017 declared: real Tab order and focus ring unreachable in jsdom.
+- **Leader re-run (non-author): VERIFIED** — `npx jest src/app/shared/components/data-table src/app/pages/platform/pages/administration --coverage=false` 31 suites / 645 tests passed (data-table, control-lists, organizational-structure, ods-admin; consumer specs unchanged); lint clean; `tsc -p tsconfig.spec.json` 943 errors total, 0 in touched files; diff stat = the three files.
+- **Reviewer (`akili-reviewer`, opus, full, lens checklist): `STATUS: PASS`** — opted-out DOM unchanged (null attribute bindings; handler early-returns), `target !== currentTarget` before `preventDefault`, Space prevented only on the row, `rowKey` = the `String(row.id)` that `isSelected` compares, events dispatched on the `<tr>`, default test mounts with `selectable=true`, existing assertions untouched.
+  - ADVISORY: (1) Enter/Space on a native `<button>` in `#rowActions` fires a synthetic click that bubbles to the row's `(click)` → `rowSelected` (pre-existing click path; jsdom cannot see it). Moot for the ods-admin tables once T-19/T-20 drop `#rowActions`; **forward pointer → T-22 keyboard pass**. (2) duplicated flag check in `onRowKeydown` — keep (P-47 safety). (3) Tab order / focus ring / Space-no-scroll → T-22 Chrome pass.
+- **checkpoints:** none. **continuations:** none.
+- **spawns:** implementer (Cursor/Grok) — not reported by host, ended complete; reviewer — not reported by host, complete.
+- **Requirements covered:** NFR-STF-004 (table rows, jsdom scope), R-STF-008 AC.2 / R-STF-016 AC.1 (selection mechanism; wiring in T-19/T-20).
+- **Running totals:** rev-4 tasks 1/5 · rev-4 client LOC +112 · rev-4 review rounds 1/9 (design §14 rev-4 row; corrected below).
+- **Approval:** auto-approved (owner standing direction).
+
+#### T-21 — PASS withdrawn, attempt 2 opened (2026-11-24)
+
+- **Cause, observed by the T-18 worker and re-run by the Leader:** `npm run build` → `NG5: Argument of type 'Event' is not assignable to parameter of type 'KeyboardEvent'` at `data-table.component.html:61:38` and `:61:82` (`(keydown.enter)` / `(keydown.space)` → `onRowKeydown($event, row)`). AOT strict templates type a key-alias `$event` as `Event`; jest and `tsc -p tsconfig.spec.json` do not run the template type check (KZ-017: a gate narrower than its claim).
+- **Leader defect:** the T-21 brief omitted `npm run build`, which Phase E's shared verification requires for every rev-4 task, and the non-author re-run copied the brief's command list. The Reviewer could not run it (read-only). Counted as an implicit FAIL on attempt 1, so it consumes an attempt. Effort bumped medium → high. Fresh worker, because attempt 1's worker was released at the withdrawn PASS.
+- **Attempt 2 (2026-11-24):** fresh Grok `grok-4.7-high`, dispatch `ctx_a184d43d4e24`, task `task_41965a294999`, effort high. The brief carried the NG5 output verbatim and a one-line attempt history. **Files changed:** `data-table.component.ts` only, where `onRowKeydown(event: Event, row)` now narrows with `instanceof KeyboardEvent` before reading `key`. Implementer: build exit 0 ("Application bundle generation complete"); jest 9 suites / 285 tests; lint clean; spec tsc 0 errors in the data-table files.
+  - **Leader re-run (non-author, combined with T-18): VERIFIED.** `npm run build` exit 0 with no data-table error. The red is the attempt-1 NG5, seen, so the build gate has been observed failing. jest data-table + `administration/` 33 suites / 656 tests; lint clean; spec tsc 943 total, 0 in touched files.
+  - **Reviewer (`akili-reviewer`, opus, full, override e): `STATUS: PASS`.** Guards and their order unchanged; Space `preventDefault` still only on the row (spec 468–486 asserts both sides); emit unchanged; the narrowing is always true for events Angular's key filters deliver. A cross-window event is the only false case, and it is unreachable for a table rendered in the same document. P-47 holds (html untouched).
+- **Final status: PASS (attempt 2), 2026-11-24, not committed.** attempts: 2. checkpoints: none. continuations: none. spawns: implementer ×2 (Cursor/Grok, not reported by host; ended complete, complete), reviewer ×2 (not reported by host; complete, complete). Effort: medium → high. Running totals: rev-4 tasks 1/5 · rev-4 review rounds 2/9.
+- **Kaizen candidate (for archive):** a brief's verification list must be copied from the phase's *shared* verification as well as the task's Done criteria. The Leader's re-run inherits the brief's list, so a gate left out of the brief is left out twice.
+- **Approval:** auto-approved (owner standing direction).
+
+### T-18 — Framework tree table (replaces the outline editor)
+
+- **Attempt 1 (2026-11-24):** fresh Grok `grok-4.7-high`, dispatch `ctx_3ce81751746b`, task `task_43088576b303`, effort high, skills `angular-developer` + `ui-ux-pro-max`, exemplar `center-admin/organizational-structure/components/org-tree/`. Leader narrowing in the brief: `outline-filter.util` had no spec file → `git mv` to `framework-tree/tree-filter.util.ts` plus a new `tree-filter.util.spec.ts`; only the two outline import lines change.
+  - **Files:** new `framework-tree/framework-tree.component.{ts,html,scss,spec.ts}`, `tree-filter.util.{ts,spec.ts}` (renamed from `utils/outline-filter.util.ts`); edited `utils/framework-view.util.{ts,spec.ts}`, `outline-editor.component.ts` and `outline-row.component.ts` (imports only). Diff 974 lines.
+  - **Implementer:** ods-admin jest 13 suites / 99 tests. Falsifier (a), accent taken from the row's own index → `expect(accentOf('1.2')).toBe(accentOf('1'))` red, received `var(--ac-framework-accent-2)`. Falsifier (b), `target === currentTarget` removed → `expect(selected).toEqual([])` red, received `[1]`. Both reverted. CSS 3,380 B. It reported `failed` only because the build was red on T-21's NG5 (see T-21 above).
+  - **Leader re-run (non-author): VERIFIED.** Build exit 0, jest 33 / 656, lint clean, spec tsc 0 in touched files. **Scope limit (KZ-017):** `framework-tree` has no importer yet, so the production build does not AOT-type-check its template; that becomes reachable in T-19.
+  - **Reviewer (`akili-reviewer`, opus, full): `STATUS: FAIL`.** One issue: `[ttRow]` ArrowLeft/ArrowRight mutate `node.expanded` and emit `onNodeCollapse`/`onNodeExpand` (`primeng-treetable.mjs:5208-5263`). Both are unbound, so keyboard toggles never reach the collapsed-ids Set or `expansionChanged`. Effects: the state is lost on refresh, and the chevron's first click after a keyboard toggle is a no-op. Violates design §6.3 *Expand state* and *Rows*, T-18 Scope, R-STF-007 "survives a refresh" + AC.3, and NFR-STF-004. The report was relayed verbatim to the same worker.
+    - Everything else on the checklist conformed: own chevron with aria, ttRow with no own tabindex, highlight and selected attributes, target guard, + propagation, accent read from the rendered style, 28 px indent, outline not shadow, natural order, no inputs, outputs, search restore, tokens present in both themes, every `$event` typed `Event`.
+  - ADVISORY (recorded, not work): dead host binding `--framework-tree-indent-step.px` (the step is the TS constant `indentStep`; note it for T-22 tuning); the capture-phase comment overstates; the chevron is a dead control during an active search; `aria-label` on the role-less `p-treeTable` host is likely ignored (→ T-22 screen-reader pass); Prettier reflowed `tableColumnsForLevel`.
+- **Attempt 2:** same worker (retained through the FAIL), effort bumped high → xhigh (steered in the brief; the model slug stays the same).
+  - **Files:** `framework-tree.component.{ts,html,spec.ts}`. `(onNodeExpand)`/`(onNodeCollapse)` → `onNodeToggle`; both it and `toggle()` go through `writeCollapsed`, which is the only writer of the Set and the only emitter of `expansionChanged`. New test "keeps ArrowLeft and ArrowRight in the collapsed set across a refresh" covers ArrowLeft → refresh → chevron → search/clear → ArrowRight. Red against the attempt-1 code at spec:234 (`expect(emitted.at(-1)?.has(1)).toBe(true)`, Received undefined), then green.
+  - **Leader re-run (non-author): VERIFIED.** jest ods-admin + data-table 14 suites / 116 tests; lint clean; build exit 0; spec tsc 943 total, 0 in framework-tree.
+  - **Reviewer (`akili-reviewer`, opus, full, override e): `STATUS: PASS`.** Trace a/b/c resolved; one source of truth. The test discriminates: removing both bindings → spec:234 red, removing only `onNodeExpand` → spec:255 red. Typings checked: `onNodeExpand: EventEmitter<TreeTableNodeExpandEvent>`, which extends `TreeTableNodeCollapseEvent` and adds nothing (`treetable.d.ts:409/415`, `treetable.interface.d.ts:82-98`), so no NG2345 is expected when T-19 wires the tree. This was read from the typings, not compiled. The build in T-19 settles it.
+  - ADVISORY (recorded, not work): a toggle made during an active search is ephemeral and is dropped when the search clears; this is allowed by R-STF-007 "force-expanded" → **forward pointer: T-22 HITL notes**. Rename the parameter `collapsed` → `toCollapsed`.
+- **Final status: PASS (attempt 2), 2026-11-24, not committed.** attempts: 2. checkpoints: none. continuations: none. spawns: implementer (Cursor/Grok) ×2 turns in one worker, not reported by host, ended fail (red build, not its own) and then complete; reviewer ×2 (not reported by host; FAIL, PASS). Effort: high → xhigh.
+- **Forward pointers → T-19:** the AOT strict-template check of `framework-tree` first runs when the page imports it; the tree's own indent step is the TS constant `indentStep`, and the host binding `--framework-tree-indent-step.px` is dead (advisory). **→ T-22:** search-time toggles are ephemeral; `aria-label` sits on the role-less `p-treeTable` host (screen-reader pass); the chevron is inert during search.
+- **Running totals:** rev-4 tasks 2/5 · rev-4 client **999 LOC added** / 19 deleted (`git diff HEAD --numstat -- client/`) · rev-4 review rounds **4/9** — *corrected 2026-11-24:* design §14 has its own rev-4 row (≈ 2,300 LOC, ≈ 7 rounds; tripwire 3,000 LOC added or 9 rounds). The earlier T-21 line "28/≈36" counted against the pre-rev-4 re-base by mistake.
+- **Approval:** auto-approved (owner standing direction).
+
+### T-19 — first step: P-46 settled live (Leader, 2026-11-24)
+
+- **Where:** Chrome (Claude extension), `localhost:4200/administration/ods-admin/framework`, width 1280, measured at innerHeight **650** and **800** (window 827 / 977). The page as committed (outline editor + drawer), `div.content.scrollTop = 0`. The local server points at the shared DB, and this was read-only.
+- **Geometry observed:** `.grid-container` rows `0px <innerHeight>`. `div.content` has `top 0` and `clientHeight == innerHeight` (650 / 800). Navbar (`alliance-navbar`, 51 / 71 px) and section header (`#section-sidebar`, 60.5 / 42 px) are `position: fixed`. The page is offset by the content wrapper's `padding-top`, **111.5 px / 113 px = navbarHeight + headerHeight exactly**, which are the `CacheService` signals (navbar host `ResizeObserver`, `#section-sidebar` rect).
+- **Above the list (both heights):** `page-header` 68.5, `summary-line` 21, `framework-banner` 39, section `row-gap` 18 × 3 → **182.5 px**. `.app-page-wrapper` adds margin 25 px top / 70 px bottom (global, `custom-fields.scss:35`) plus `pt-3` 12 px.
+- **Verdict P-46: confirmed, with one condition.** `calc(100vh − navbarHeight − headerHeight)` equals the visible height below the fixed chrome. It fits without scrolling only if the page root cancels the wrapper's 25/70 margins and 12 px top padding. That is what design §6.x already requires ("zero vertical padding and margin"); left alone, the page overflows by 107 px.
+- **280 px target: confirmed.** At 650: 650 − 111.5 − 182.5 − 16 (bottom gap) = **340 px** for the split row (60 px margin). At 800: ≈ 488 px. Kept as the `min-height` target.
+- **Not measured here:** "with a tall element selected" needs the new panel, which does not exist yet. That is T-19 falsifier (c) and the T-22 HITL.
+- **Execute-time spec edit (no change of meaning):** `design.md` §6 viewport-fit paragraph and §13 P-46 row, `UNVERIFIED` → verified, with the numbers above. → named conformance check for the T-19 Reviewer: "conformance to `design.md` viewport-fit + P-46 as amended 2026-11-24".
+
+### Execute-time spec edit — overlay guard deletion moved T-19 → T-20 (2026-11-24)
+
+- **Found while composing the T-19 brief:** `ods-admin/overlay-escape-guard.directive.ts` is still used by `institutional-objectives/components/objective-panel` (html + ts + both IOB specs), and the IOB drawer stays until T-20. As written, T-19 would delete the directive and break the IOB build, and its done-criteria grep over all of `ods-admin/` could never reach 0 while the IOB drawer exists.
+- **Edit (task ordering only; no requirement or design meaning changes; design §2.1 already lists the directive as retired in rev 4):** T-19 removes the guard from `element-panel` and greps only `ods-admin/framework/`. T-20 deletes the directive file with its last consumer, and its grep now includes `OverlayEscapeGuard`. Recorded in `tasks.md` § T-19 and § T-20.
+- Named conformance check for the T-19 and T-20 Reviewers: "conformance to `tasks.md` T-19/T-20 as amended 2026-11-24".
+
+### T-19 — Side panel layout, unsaved-changes guard and the Framework page
+
+- **Attempt 1 (2026-11-24):** fresh Grok `grok-4.7-high`, dispatch `ctx_8e48234acea9`, task `task_5a888fc88985`, effort xhigh (data-loss guard, L). Skills `angular-developer`, `ui-ux-pro-max`. Exemplars: Org Structure page (its sticky panel pattern explicitly not copied, P-42) and `framework-tables` (`refreshToken`, `focusAfterDelete`). The brief carried the measured P-46 geometry, the 2026-11-24 ordering edit and the build-gate lesson.
+  - **Files:** new `ods-admin/side-panel-layout/*`, `ods-admin/unsaved-changes.util.{ts,spec.ts}`. Deleted `outline-editor/*` and `outline-row/*`. Edited `framework.component.*`, `element-panel.*`, `framework-tables.*`, `framework-tree.component.html` (`data-row-key` on the `<tr>`), `framework-url.codec.ts` (comment), `framework-delete.handler.ts` (header comment + Prettier reflow; contract unchanged). Kept `overlay-escape-guard.directive.ts` (T-20) and `outline-node.model.ts`.
+  - **Implementer:** ods-admin + data-table 14 suites / 98 tests. Falsifier (a), row click without `guardDiscard` → `framework.component.spec.ts:413` `expect(lastAlert().summary).toBe('Discard changes?')` TypeError (undefined). Falsifier (b), stale check removed (`accept()` → true) → `:548` `expect(actions.showToast).not.toHaveBeenCalled()` received 1 (same in `element-panel.component.spec.ts:290`). Both reverted. Styles: side-panel-layout 721 B, framework 1,112, element-panel 1,400, framework-tables 1,025, framework-tree 3,380. It listed every changed or removed assertion (drawer/Escape tests deleted under D-STF-29; edit-row → row click; the delete dialog asserted on the page; Cancel restores values and returns focus to the row).
+  - **Leader re-run (non-author), gates: VERIFIED.** jest `administration/` + data-table 33 suites / 639 tests; lint clean; build exit 0; spec tsc 943, 0 under ods-admin; framework grep 0. The specs spell `'p-' + 'drawer'` so the grep does not match the absence assertions (harmless, noted for the Reviewer). Rev-4 LOC: **2,401 added** / 2,780 deleted (new files included via `git add -N`).
+  - **Leader live measurement (falsifier c / Done criteria): MISMATCH → implicit FAIL.** Chrome, 1280×650:
+    - (1) `div.content` scrollHeight **12,377** vs 650. The page root's `height: var(--framework-column-height)` (`calc(100vh - 111.5px)`) matched but was overridden by `flex: 1 1 0%` from the global `.app-page-wrapper` (`custom-fields.scss:35`) inside a column-flex `:host` with indefinite height. A temporary `flex: none` override gave a 539 px page, `.content` 650/650, list and panel 340 px at top 294, panel bottom 634 ≤ 650. With indicator 1.1.1 selected, the panel's 748 px of content scroll inside its 340 px and the page stays put. **Cause confirmed live.**
+    - (2) The tree's Name column collapses: `table-layout: fixed`, five unsized `th` at 137 px each; inside the name cell, toggle 28 + counts 141 (no shrink) leave `.framework-tree__name` at **0 px**, so names render one letter per line and rows are 595 px tall. Override (Name `th` 50% + counts shrink) → 49 px rows, names readable. Responsibles still wraps to 6 lines and the "+ Dimension" button to 2 (advisory-grade).
+    - Not caught by T-18's review either: jsdom has no layout (KZ-017). This is the first time the tree rendered in a real browser.
+  - **No Reviewer spawned** (MISMATCH → FAIL per Step 2; it adds no review round). The feedback, with measured values and the live-verified causes, was relayed to the same worker.
+- **Attempt 2:** same worker (dispatch `ctx_b5d383c01b27`, follow-up), effort held at xhigh (T2 ceiling).
+- **Attempt 2 (2026-11-24):** same worker. `framework.component.scss` `flex: none` on the page root. Tree: `[autoLayout]`, Name `th` 50%, name `flex: 1 1 8rem; min-width: 8rem`, counts shrink, nowrap on Code/Level/Actions. Styles: framework 1,126 B, framework-tree 3,526 B.
+  - **Leader re-run (non-author): VERIFIED.** jest 33 / 639; lint; build 0; spec tsc 0 under ods-admin; grep 0.
+  - **Leader live measurement:** Chrome, indicator 1.1.1 selected.
+    - 1280×650: `.content` 650/650, panel 294–634, panel content 748 scrolls inside 340, list 3,040 scrolls inside 340, tree columns 299/61/118/108/97.
+    - 1280×800: 800/800, panel 296–784.
+    - **Falsifier (c)** (column removed live, `flex: 1 1 0%` + `height: auto`): `.content` 5,463 vs 800 → red, then restored to 800/800. At 650 the red was already seen as attempt 1's 12,377 vs 650.
+  - **Reviewers (parallel lens; counted as ONE review round):**
+    - **a11y/UI/readability lens:** `STATUS: PASS`. Panel `aside` + label + empty text, header, Delete at the top (edit only, `aria-disabled` + reason), Cancel/Save, failed save `role="alert"`, focus on create/Save/Cancel/delete per §6.9 and §6.5, toggle group `aria-pressed` + chip-follow, empty state in the list slot, stacking below 1024 px, 0 hex, no drawer leftovers.
+    - **correctness/data-loss lens:** `STATUS: FAIL`. Issue 1: the dirty baseline (`opened`) is never re-captured after a successful save, edit or create. As a result the panel stays dirty, an already-saved edit prompts, and Cancel restores the pre-save values, which a later Save would send back. Violates §6.5, §6.9 and R-STF-016 Cancel. Issue 2: Keep editing on a portfolio change leaves the `p-select` showing the rejected portfolio (one-way `[ngModel]` with `(onChange)`). Violates R-STF-016 "Keep editing leaves everything as it was" and JC-3. The report was relayed verbatim. The Leader added a narrowing: check the same display defect on the level chips and the Tree/Table toggle.
+  - ADVISORY (both lenses, recorded, not work): stale `element-panel.scss:32-34` drawer comment; comment the `'p-' + 'drawer'` split; `host()` returns `document`; inline Name width belongs in SCSS; focus after Save is lost if the saved row is hidden by search or collapse (→ **T-22 keyboard pass**); `promptOpen` WeakMap could stick if the alert is removed without its callbacks (T-20 shares it; not constructed here); browser back/forward bypasses the guard via `queryParamMap` (`replaceUrl` makes it hard to reach).
+  - **Spec tension (both lenses):** design §6.9 says the Tree↔Table toggle "keeps the selection and its unsaved edits … nothing is discarded", and also that it is "itself a guarded trigger". R-STF-016 lists the view change as a trigger where Discard proceeds. The code follows R-STF-016. **Raised to the owner as an amendment proposal** (below). The code stays as it is.
+- **Attempt 3:** same worker (follow-up), **effort ceiling: held xhigh** (the owner's rule keeps the same worker through FAIL/rework; no in-host T3 Implementer escalation). Rev-4 review rounds 5/9.
+- **Attempt 3 (2026-11-24):** same worker, follow-up dispatch `ctx_8ee0b601b616`.
+  - **Files:** `element-panel.component.ts`: the prepare key now carries the stored element's code, name, description, parent and carnets, so the refresh after Save re-prepares. `framework.component.ts`: `portfolioSelect()?.writeValue(portfolioId())` on Keep editing. `framework.component.spec.ts`: 4 new tests, each seen red against attempt 2: `:422` (0 expected, received 1), `:445` (old name received), `:468` ("" received), `:577` (rejected portfolio label shown). Chip and toggle were already correct (`:528`, `:540`).
+  - **Leader re-run (non-author): VERIFIED.** jest 33 suites / 643 tests, lint clean, build 0, spec tsc 0 under ods-admin, grep 0. No layout file changed since the attempt-2 live measurement.
+  - **Reviewer** (`akili-reviewer`, opus, correctness/data-loss, override e/f): **`STATUS: FAIL`**.
+    - **Resolved:** both attempt-2 issues, for edit and create. `writeValue` reverts on Keep editing and applies on Discard. The tests discriminate.
+    - **New issue (introduced by attempt 3):** edits typed while a Save is in flight are silently discarded. The fields are not disabled during save. When the PATCH resolves, `reloadEditor()` changes the stored stamp, the key differs, and `prepare()` runs `form.reset(existing)` (`element-panel.component.ts:173-179, :326-334`). Same in create, during the POST + GET window. Violates R-STF-016 *Unsaved changes* "BUT it must NOT replace the form without asking" and §6.5.
+    - **Remediation proposed:** snapshot `readForm()` at Save and, on success, set `opened` to that snapshot; drop the stored stamp from the key. Alternative: re-prepare only when not dirty. Alternative: disable the form while saving, which is a behaviour change and the owner's call.
+    - **ADVISORY:** between save success and refresh, `isDirty()` still compares against the pre-save values, so a row click there asks about already-saved edits (goes away with the snapshot fix). Cascade code changes would change the stamp; no path found today. No regression elsewhere.
+  - Rev-4 review rounds: **6/9**.
+
+## HALT: T-19 (2026-11-24)
+
+- **Cause:** 3 attempts consumed:
+  1. Leader live-measurement MISMATCH: global wrapper flex overrode the column height; tree Name column 0 px.
+  2. Reviewer FAIL: the dirty baseline was not re-captured after save; Keep editing left the portfolio select stale.
+  3. Reviewer FAIL: the attempt-3 fix wipes edits typed during an in-flight save.
+- **Implementer summaries:** see attempts 1–3 above, all in the same Grok worker (dispatches `ctx_8e48234acea9` → `ctx_b5d383c01b27` → `ctx_8ee0b601b616`). The worker is retained, per the owner's rule (alive until PASS).
+- **FAIL reports:** attempt 1 = the Leader's measured MISMATCH (above). Attempts 2 and 3 = the Reviewer reports, recorded above and relayed verbatim to the worker.
+- **Final verification output (attempt 3):** jest 33 / 643 green, lint clean, build exit 0, spec tsc 0 in ods-admin, grep 0. Live fit at 1280×650 / 1280×800 green (attempt 2 measurement, layout untouched since).
+- **Leader's root-cause hypothesis:** not a spec problem and not one recurring defect. Each attempt fixed what it was told, and the third fix opened a new edge, because the dirty baseline has no single owner: it is re-derived from refresh timing instead of being set by the save that produced it. The Reviewer's snapshot remediation is a small, targeted change. Design §6.5 already implies it ("the values it was opened with"). One open product question: whether fields should be read-only while a save is in flight.
+- **Tree state:** holds other PASSed uncommitted work (T-21 data-table, T-18 framework-tree). Per Step 4, a rollback would be a pathspec restore of T-19's files only: `framework.component.*`, `element-panel.*`, `framework-tables.*`, `framework-tree.component.{html,scss}` changes, `framework-url.codec.ts`, `framework-delete.handler.ts`, the deleted `outline-editor/*` and `outline-row/*`, the new `side-panel-layout/*` and `unsaved-changes.util.*`. That is also T-18's tree component, partly. **Rollback NOT executed yet:** it is destructive, it overlaps T-18's PASSed files, and it would discard a mostly-correct L-size diff. The owner decides (options presented in chat).
+
+### Owner decisions at the T-19 HALT (2026-11-24)
+
+- **HALT resolution:** *"Attempt 4 with the snapshot"*. The tree is kept (no rollback). The same worker re-baselines the dirty state to the values actually saved, and adds a test that types during an in-flight save. This is an owner-approved fourth attempt beyond the 3-attempt ceiling. Rev-4 review round 7 of 9 if it reaches a Reviewer.
+- **Spec tension §6.9 vs R-STF-016:** *"Ask first"*. **Execute-time spec edit:** `design.md` §6.9, Tree ↔ Table sentence. The view toggle is a guarded trigger; Discard reverts and keeps the selection; the chip follows without a second prompt. The superseded wording is quoted inline. The code already behaves this way. Sweep: `grep -n "nothing is discarded\|its unsaved edits" design.md requirements.md tasks.md` → 0 after the edit. Named conformance check for the next T-19 Reviewer and the T-20 Reviewer: "conformance to `design.md` §6.9 Tree ↔ Table as amended 2026-11-24".
+- **Attempt 4 (2026-11-24, owner-approved after the HALT):** same worker, dispatch `ctx_aa481feed588`.
+  - **Files:** `element-panel.component.ts` and `framework.component.spec.ts`. `save()` snapshots `readForm()` before PATCH/POST; on success `adoptSaved` makes the snapshot the `opened` baseline (the server's code only if the user left the code field untouched). `storedStamp` was removed from the prepare key.
+  - **New tests, each seen red against attempt 3:** `:492` (expected "XY", received "X"), `:518` (create, "XY" vs "X"), `:544` (0 calls expected, received 1).
+  - **Leader re-run (non-author): VERIFIED.** jest 33 suites / 646 tests; lint clean; build 0; spec tsc 0 under ods-admin; grep 0. No layout change since the live measurement.
+  - **Reviewer** (`akili-reviewer`, opus, correctness/data-loss, override e/f): **`STATUS: PASS`.**
+    - Edit and create resolved. The only remaining `form.reset` paths are guarded selection triggers or Cancel/Discard.
+    - Cancel and the Tree ↔ Table Discard after a save restore the saved snapshot. Conformance to §6.9 as amended 2026-11-24.
+    - Stale data while the form is clean is acceptable (no live sync in the spec).
+    - The tests use held promises and real clicks.
+  - **ADVISORY** (recorded, not work):
+    - Create-mode survival relies on `selectedId` being seen before the refresh GET; this is not constructible under zone timing. An explicit "adopted after save" marker is suggested.
+    - A second Save during the post-create GET sends a duplicate POST, rejected by the unique code index (P-30). This is pre-existing.
+    - The baseline keeps untrimmed name and description (cosmetic).
+    - Discarding during an in-flight PATCH skips the list refresh (pre-existing).
+- **Final status: PASS (attempt 4, owner-approved beyond the 3-attempt ceiling), 2026-11-24, not committed.**
+  - attempts: 4. checkpoints: none. continuations: none. effort: xhigh (ceiling held).
+  - spawns: implementer (Cursor/Grok) — one worker, 4 turns, not reported by host (ended complete ×4); reviewer ×5 (not reported by host: attempt 2 ×2 parallel lenses PASS/FAIL, attempt 3 FAIL, attempt 4 PASS).
+  - Live measurement (falsifier c): 1280×650 → `.content` 650/650, panel 294–634; 1280×800 → 800/800, panel 296–784; column removed → 5,463 vs 800 (red), restored.
+  - **Forward pointers → T-20:** `promptOpen` WeakMap shared through `unsaved-changes.util` (it must not stick); same baseline-from-save rule for `objective-panel`; same Keep-editing display revert for the year and portfolio selects; same global `.app-page-wrapper` flex override. **→ T-22:** focus after Save when the row is hidden by search or collapse; stale `element-panel.scss:32-34` drawer comment; `aria-label` on the role-less `p-treeTable` host; search-time toggles are ephemeral; Enter on a row-action button.
+- **Running totals:** rev-4 tasks 3/5 · rev-4 client **2,600 LOC added** (tripwire 3,000) · rev-4 review rounds **7/9** (attempt 2's parallel lenses counted as one). Not exceeded.
+- **Approval:** auto-approved (owner standing direction). The HALT itself was decided by the owner above.
+
+## Session pause (2026-11-24, owner: "vamos parando por hoy")
+
+- **T-20:** dispatched (Grok `grok-4.7-high`, `ctx_610c9eea5424`, task `task_edc4778770b4`, brief = task text + T-19 lessons; Leader-added tests tagged `[advisory-grade]` in a follow-up note) and **stopped by the owner before it reported** (`worker-stop`, terminal closed). Tree probe: `git status` under `institutional-objectives/` and the directive file → **no partial edits**. Not a runtime event and not an attempt: T-20 restarts from scratch with a fresh worker, and the brief is reusable (`brief-T20.md` content = tasks.md § T-20 + the "Lessons from T-19" list recorded under T-19's forward pointers).
+- Also released the leftover settled dispatch `ctx_e284f0874b5b` (`terminalState=release_unknown`). No Orca worker is left open for this spec.
+- **State:** T-21, T-18 and T-19 PASS, all **uncommitted** (UI, waits for the owner's visual approval in T-22). T-20 todo, T-22 todo. Rev-4 totals: 2,600 LOC added (tripwire 3,000), review rounds 7/9. T-20 will very likely cross the LOC tripwire, which means a stop for the owner.
+- **Next:** `/akili-execute institutional-performance/strategy-framework` → T-20 (fresh worker), then T-22 (docs + HITL; the T-22 forward pointers are listed in the T-19 entry).
+- **Correction (2026-11-24, owner):** the owner meant "let the worker finish T-20, then stop dispatching", not "stop the worker". T-20 was re-dispatched with the same brief (with the `[advisory-grade]` tag inlined) to a fresh worker. The run stops after T-20 closes; T-22 is not dispatched today.
+
+### T-20 — Institutional Objectives in the side panel
+
+- **Attempt 1 (2026-11-24):** fresh Grok `grok-4.7-high`, dispatch `ctx_b105a8b9c630`, task `task_f516062fc1b6`, effort xhigh. Brief = task text + "Lessons from T-19". Leader-added tests tagged `[advisory-grade]`. Full report: `/tmp/t20-institutional-objectives-report.md` (summary below).
+  - **Files:** 8 IOB files (`institutional-objectives.component.*`, `objective-panel.component.*`); deleted `ods-admin/overlay-escape-guard.directive.ts`.
+    - Snapshot baseline `adoptSaved`; prepare key `portfolio:id-or-new:token`, with no stored stamp.
+    - Extra `holdFormFor` guard against a refresh batched with the new id.
+    - `writeValue` on the portfolio and year selects on Keep editing.
+    - Refresh in place after Save, Delete and Carry forward.
+  - **Falsifiers:**
+    - (a) `loading.set(true)` in `onSaved` → `spec:415` `expect(root().querySelector('table')).toBe(table)`, received null.
+    - (b) year change unguarded → `spec:574` TypeError on `lastAlert().summary`.
+    - Both reverted.
+  - **T-19-lesson reds:**
+    - `adoptSaved` removed → page `:436`, `:454`, `:482`, `:558`, panel `:252` red.
+    - Key stamped + `holdFormFor` removed → page `:502`, `:533`, panel `:236` red.
+    - `writeValue` removed → page `:580` (year label `2027 · 0 objectives`), `:598` (portfolio label) red.
+    - All reverted.
+  - The Implementer listed every changed or removed assertion: row actions → row click/Enter; row-icon colour checks → panel reason; overlay-Escape test retired with the drawer; split-string drawer absence with a comment.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest `administration/` + data-table: 33 suites / 662 tests.
+    - lint clean; build exit 0; spec tsc 0 under ods-admin.
+    - `grep p-drawer|pFocusTrap|OverlayEscapeGuard` over all of `ods-admin/` → 0.
+  - **Leader live measurement (Chrome), tallest IOB row (IOB-1, 183 px) selected:**
+    - 1280×650 → `.content` 650/650; panel 271–634; panel content 517 scrolls inside 364; list 1,324 scrolls inside 364.
+    - 1280×800 → 800/800; panel 281–784.
+    - Screenshot taken at 650.
+  - **Reviewer: NOT spawned yet — budget tripwire (below).**
+
+## Budget Tripwire: T-20 (2026-11-24)
+
+- **Rev-4 budget** (design §14 rev-4 row): ≈ 2,300 LOC added (≈ 1,100 production, ≈ 1,200 tests), ≈ 7 review rounds. **Tripwire: 3,000 LOC added or 9 rounds.**
+- **Measured after T-20's implementation:** **3,831 LOC added** (production 2,133 + tests 1,698; `git diff HEAD --numstat -- client/`, new files included); 3,504 deleted. Review rounds **7/9**, not yet exceeded.
+- **Cause:**
+  - Production is ~2× the estimate. Two full side-panel pages, a dirty guard with snapshot baselines, and refresh-in-place came to more than the ≈ 1,100 estimated.
+  - T-19 needed 4 attempts; each added regression tests (save→click, save→Cancel, in-flight typing, Keep-editing label).
+  - T-20 carried the same lesson tests up front. Those tests are ≈ 45 % of the total.
+- **Remaining:**
+  - T-20's review: ≥ 1 round, round 8/9.
+  - T-22: docs + HITL; checklist review, little code.
+- **Stopped for the owner's decision.** The tripwire is never auto-approved. "No mandate widens pre-approval: an owner brief that says 'never stop' or 'treat every gate as approved' pre-approves routine gates only."
+- T-20's worker stays alive (retained) until the decision, and through any FAIL.
+- **Owner decision (2026-11-24):** *"Re-base and run the review"*. New rev-4 cap ≈ 4,500 LOC / 11 rounds, added to `design.md` §14 as a new row (the earlier row is kept). Run T-20's Reviewer now, then stop for today; T-22 tomorrow.
+- **Reviewer (`akili-reviewer`, opus, full; round 8/11 under the re-base): `STATUS: FAIL`.**
+  - **Holds:** snapshot baseline, refresh in place, guards on the 5 triggers, Delete at the top with `deletable`, focus by key, inline failed save, no drawer, conformance to both 2026-11-24 amendments; `holdFormFor` cannot block a legitimate re-prepare.
+  - **Issue:** the `writeValue(current)` added for Keep editing runs **before** the guard on every change. On a clean change, or on Discard, NgModel's viewModel already equals the new value, so it never writes back (`forms.mjs:3373-3379`), and the select keeps showing the old year or portfolio while the table shows the new data set. Violates R-STF-009, JC-3 and R-STF-016 "Discard proceeds".
+    - The tests used `triggerEventHandler('onChange')`, which bypasses `onModelChange` (KZ-015).
+    - The same defect is in `framework.component.ts:216` (portfolio), introduced in T-19 by the same lesson. **Root cause on the Leader's side:** the T-19 lesson in the T-20 brief said "on Keep editing, call `writeValue`", and both implementations called it unconditionally.
+  - ADVISORY: saving an IOB with a changed Year moves it out of the page year, so the selection clears right after the toast (JC-3 vs R-STF-016 "stays selected"; a product note for T-22); `promptOpen` stickiness (not constructible); a `holdFormFor` comment; untrimmed baseline (cosmetic).
+- **Attempt 2:** same worker, effort xhigh (held). Scope extended to `framework.component.{ts,spec.ts}` **only for this defect**, as a FAIL remediation of the same root cause; recorded here as a T-19 follow-up fix.
+- **Attempt 2 (2026-11-24):** same worker (dispatch `ctx_a4f18565c910`). Report at `/tmp/t20-rework-report.md`.
+  - **Change:** `guardDiscard` gains an optional `onKeep` argument, run after the prompt flag clears and only on Keep editing. IOB year/portfolio and Framework portfolio call `writeValue(current)` only from it.
+  - **Files changed:** IOB component ts/spec, `framework.component.{ts,spec.ts}`, `unsaved-changes.util.{ts,spec.ts}`. The util has 1 new test; the 2 existing util tests are unchanged.
+  - **Red-then-green:** six new `onOptionSelect`-driven tests, each red against attempt 1 on the rendered label while the signal had already moved:
+    - IOB `:620` clean year, `:637` Discard year, `:652` clean portfolio, `:669` Discard portfolio;
+    - Framework `:676` clean portfolio, `:695` Discard portfolio.
+  - **Leader re-run (non-author): VERIFIED.** jest 33 suites / 669 tests; lint clean; build 0; spec tsc 0 under ods-admin; `ods-admin` grep 0.
+  - **Leader live check (Chrome):** IOB, a row selected but clean, real option click on 2027 → label "2027 · 0 objectives", "Carry forward to 2028", 0 rows, empty state shown. The attempt-1 viewport measurement stands (no layout change).
+  - **Reviewer** (`akili-reviewer`, opus, full, override e/f; round 9/11): **`STATUS: PASS`**.
+    - All three selects are correct on the clean, Discard and Keep paths.
+    - `close()` runs before `onKeep`, so the flag cannot stick.
+    - Other callers are unchanged and nothing regressed.
+    - The tests discriminate.
+  - **ADVISORY** (recorded, not work):
+    - After Keep editing, NgModel's `viewModel` keeps the rejected value. A later *programmatic* set to exactly that value would skip the write (not constructible with seed data). Hardening: set `viewModel` in `onKeep`.
+    - Framework `viewChild(Select)` should use a named `#portfolioSelect` ref.
+    - `onPortfolioChange` no longer needs `async`.
+    - From attempt 1: saving an IOB with a changed Year clears the selection after the toast (JC-3 vs R-STF-016) → **T-22 product note**.
+- **Final status: PASS (attempt 2), 2026-11-24, not committed.**
+  - attempts: 2 · checkpoints: none · continuations: none · effort: xhigh.
+  - spawns: implementer (Cursor/Grok) ×2 turns in one worker, not reported by host (complete, complete); reviewer ×2 (not reported by host; FAIL, PASS).
+  - **T-19 follow-up:** the Framework portfolio display defect was fixed here (same root cause).
+- **Running totals:** rev-4 tasks 4/5 · rev-4 client **3,981 LOC added** (cap re-based to ≈ 4,500) · review rounds **9/11**.
+- **Forward pointers → T-22:** the IOB Year-change-on-save selection clear (product note); the NgModel `viewModel` hardening (advisory); the earlier T-19 pointers.
+- **Approval:** auto-approved (owner standing direction). The run stops here per the owner ("finish the worker, then stop for today").
+
+## Session resume (2026-11-25)
+
+- `/akili-execute` → T-22 (the only eligible task). No worker spawned: T-22 is docs + a Leader-run live pass + the owner's verdict (Review: checklist).
+
+### T-22 — Docs, family F-4 and the rev-4 HITL pass
+
+- **Status:** in progress — measurements recorded, **waiting for the owner's verdict**. UI still uncommitted.
+- **Docs (Leader, uncommitted):**
+  - `family.md` F-4: the 2026-11-17 Strategy Framework child-3 exception (inline name editing) withdrawn, rev-4 note added; Document Control "Last updated" 2026-11-25.
+  - `docs/ux-ui/design.md` §12.2: new 2026-11-25 entry — ODS Admin tree/level table beside a viewport-fit side panel (D-STF-29…31, D-STF-36), ask-first unsaved changes, inherited area bar, opt-in `keyboardSelectable`.
+  - Client README styles row: not touched — `git diff HEAD -- client/research-indicators/src/styles src/app/theme` is empty (no token changed).
+- **Live pass (Leader, Chrome via the extension, 2026-11-25, local client :4200 + local server :3001 on the shared DB — read-only: no Save, Delete or Carry forward was clicked).**
+  - **Falsifier — 1280×650, tall Indicator selected (`1.1.1 Process efficiency`, 6-line Responsibles):** `.content` scrollHeight/clientHeight 650/650; list slot 294–634 (3,040 scrolls inside 340); panel slot 294–634 (748 scrolls inside 340). Panel scrolled to the end: Save button bottom 634 ≤ `innerHeight` 650. **Not red.**
+  - **1280×800, same selection:** `.content` 800/800; both slots 296–784 (panel 748 inside 489). Table view at 650: 650/650, slots 294–634. IOB at 800 with IOB-1 selected: 800/800, slots 281–784 (panel 526 inside 503).
+  - **800 px wide (800×800):** slots stack (list 378–1781, panel 1797–2491); the page scrolls (`.content` 2,507/800), as designed below 1024 px; no horizontal overflow (`scrollWidth` 800 = `clientWidth` 800).
+  - **Indent step:** at 800×800 the name text starts at 134 / 162 / 190 px for levels 1 / 2 / 3 (28 px step, padding 0 / 28 / 56). **At 1280×800 it is 146 / 174 / 166** — the level-3 (leaf) name sits 8 px *left* of its parent Dimension's name. There the Name column is 251 px, so parent rows wrap their counts onto a second line while the leaf row has no chevron. Same width at 1280×650 renders 138 / 166 / 194 (correct). **Finding F-1.**
+  - **Inherited bar:** every sampled row of area 1 carries `box-shadow: rgb(92,122,20) 4px 0 0 0 inset` on the first cell, levels 1–3; continuous under the selected row (screenshot).
+  - **Selected row:** light-blue background + area bar. The `<tr>` outline is not visible at normal zoom.
+  - **Dark mode:** not reachable — the app has no dark theme (same finding as the T-17 round 1 record; `localStorage.theme=dark` does not set `data-theme` on this build).
+  - **Keyboard — tree:**
+    - From the search box, Tab lands on one row (roving `tabindex`).
+    - ArrowDown moves between rows; Enter and Space select (`aria-selected="true"`, panel header `INDICATOR · LEVEL 3`).
+    - Chevrons are `tabindex=-1` with `aria-label`/`aria-expanded`.
+    - Enter on **+ Indicator** opens create `1.2.5 New Indicator` with focus in Code; the tree stays at 48 rows; no row selected.
+    - From a row, Tab goes through **every visible `+` button (17 tab stops)** before it reaches the panel. **Finding F-2.**
+    - The `p-treeTable` host carries `aria-label="Framework tree"`, but the host has no role and the inner `<table>` has none of its own (forward pointer from T-18 — still open).
+  - **Keyboard — Table view (Indicators):** click a row, then Tab moves to the next row (1 px focus outline); Enter selects 1.2.2; Tab + Space selects 1.2.3; `.content` scrollTop stays 0 (Space does not scroll the page). Tree → Table kept the selection and set the `depth-3` chip.
+  - **Keyboard — IOB:** from search, Tab → Export → 3 sortable headers → first row; Enter selects IOB-1 (`IOB-2 · 2026` header after Tab + Space); Delete at the top.
+  - **Unsaved-changes guard:**
+    - Dirty create form + a row click → *Discard changes?*.
+    - **Keep editing** keeps "HITL draft" and no row gets selected; **Discard** selects the clicked row.
+    - **After either answer, focus is on `<body>`.** **Finding F-3.**
+    - Cancel on a dirty edit reverts the text and returns focus to the selected row.
+  - **Not exercised (shared DB, writes forbidden):** focus after Save when the row is hidden by search or collapse; IOB Year change on save; Delete focus move. These stay covered by jest only.
+  - **Side by side with Organizational Structure (1280×800):**
+    - **Same:** split layout, Tree/Table toggle, summary chips, Delete at the panel top, light-blue selected row.
+    - **Different:**
+      - Org Structure's panel and empty state sit in a white card; the Framework and IOB panels sit on the page background with no card.
+      - Org Structure uses an icon-only **+** in a Status column; Framework uses text buttons ("+ Dimension" / "+ Indicator").
+      - Org Structure's indent step is 16 px; Framework's is 28 px (owner decision: bigger indent).
+      - Org Structure keeps name and count on one line; Framework wraps the count under the name at 1280×800.
+      - Org Structure starts collapsed; Framework starts expanded.
+  - **Other observations:**
+    - "+ + Indicator" (table header) and "+ + Add objective" (IOB) show a plus icon **and** a "+" in the label (F-4).
+    - Responsibles still wraps at about 1 word per line (open owner call from 2026-11-23).
+    - Two Export buttons on the Table view (open owner call).
+    - Search-time toggles are ephemeral (T-18 pointer — R-STF-007 allows it).
+- **Evidence screenshots (local, temporary):** tree at 1280×800 (F-1) `/var/folders/hb/4_fzxxh90715phch17y0txgc0000gn/T/claude-chrome-screenshots-9ufuP6/screenshot-1795617599490-2.png`; Org Structure `…/screenshot-1795617669516-3.jpg`.
+- **Owner verdict on the findings (2026-11-25):** fix **F-1** (leaf indent) and **F-2/F-3** (keyboard). F-4 (double plus) is accepted as is. The owner then reviewed the page and added two more:
+  - **F-5:** the Framework tree search box shows a thick dark outline offset 2 px from the input, cut off by the list slot. Every other input in the app only recolours its own border on focus. Cause: `framework-tree.component.scss:43-49` (`outline: 2px solid …; outline-offset: 2px`). The IOB search is the shared `app-data-table` search, which shows the browser's default outline flush with the input (measured: `outline: rgb(0,95,204) auto 1px`, offset 0). It is the same input as Org Structure's table view and Control Lists, so it is **not changed here** (blast radius).
+  - **F-6:** Org Structure wraps its whole detail panel, empty state and form, in a white card (`organizational-structure.component.html:151`: `rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4`). The Framework and IOB panels sit bare on the page background. Fix it in `side-panel-layout`, so it covers both pages.
+- **Rework:** one Grok worker for F-1, F-2, F-3, F-5 and F-6, then a Reviewer, then the Leader re-measures in Chrome, then the owner's visual OK, then the UI commit.
+- **Rework attempt 1 (2026-11-25).** Grok `grok-4.7-high` via Cursor, dispatch `ctx_de0ac7e85164`, task `task_5dddc051882d`. Brief: scratchpad `brief-T22-fixes.md` (F-1, F-2, F-3, F-5, F-6; skills `angular-developer`, `ui-ux-pro-max`; effort high).
+  - **Files changed:**
+    - `framework-tree.component.{html,scss,ts,spec.ts}`
+    - `side-panel-layout.component.{html,scss,spec.ts}`
+    - `unsaved-changes.util.{ts,spec.ts}`
+  - **Falsifiers (Implementer):**
+    - F-2 binding removed → `framework-tree.component.spec.ts:142` `Expected "0" Received null`.
+    - F-3 restore removed → `unsaved-changes.util.spec.ts:90`.
+    - Both reverted.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest administration + data-table: 33 suites / 674 tests.
+    - lint clean; build exit 0 (framework-tree 3.76 kB, side-panel-layout 0.84 kB); spec tsc 0 under ods-admin.
+  - **Leader live check (Chrome):**
+    - **F-1:** at 1280×800, name x = 146 / 174 / 202 for levels 1 / 2 / 3; counts aligned with the name.
+    - **F-2:** with a Dimension selected, Tab goes row → "Add Indicator under 1.1" → panel Delete. Only that row's + has tabindex 0. From a focused but unselected row, PrimeNG's Tab jumps to the selected row, which is pre-existing `ttRow` behaviour.
+    - **F-3:** after Keep editing and after Discard, focus is on the clicked row, not `<body>`.
+    - **F-5:** the search box recolours its own border.
+    - **F-6:** the card is 8 px radius, 1 px `rgb(232,235,237)` border, 16 px padding.
+    - **Falsifier at 1280×650 with 1.1.1 selected:** card 294–634, Save 617 ≤ 650, `.content` 650/650.
+    - **IOB at 650:** card 271–634, `.content` 650/650.
+  - **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: FAIL`**.
+    - F-1, F-2, F-3 and F-6 are sound.
+    - F-5: `field__control` added to the search input is an encapsulated class with no effect there. Its test asserts only the class's presence, and the scss comment claims it matches the panel Name field. False: the panel fields use a 2 px outline with a 2 px offset.
+    - ADVISORY:
+      - F-3 × create-mode focus depends on timer order; Leader to confirm focus on Code.
+      - `rovingId` moves before the guard (harmless).
+      - Tab after ArrowDown away from the selected row.
+      - The util spec cleanup should use `finally`.
+  - **Leader live confirmation:** the IOB panel Code field focuses with `outline: rgb(17,47,92) solid 2px; outline-offset: 2px`, the same defect the owner reported on the search box.
+  - **Owner decision (2026-11-25):** extend F-5 to every text-like field in both ODS panels; they must use the app-standard focus, where only the field's own border recolours. Scoped to `ods-admin/`.
+- **Rework attempt 2:** sent to the same worker (follow-up dispatch `ctx_eb4953b81d26`, task `task_b1331a91b9f9`). It carries the Reviewer issue verbatim, an attempt-history line, the owner's scope decision, and the util-spec cleanup advisory.
+- **Rework attempt 2 (2026-11-25):** same worker, follow-up dispatch `ctx_eb4953b81d26`.
+  - **Change:**
+    - New shared mixins in `ods-admin/ods-field-focus.scss`: `outline: none; outline-offset: 0; border-color: var(--p-form-field-focus-border-color)`. That token is `roartheme.ts` `formField.focusBorderColor` = `{primary.color}`; `focusRing` is 0.
+    - Included by the tree search and by both panels (inputs, textareas, `p-select`, `p-multiselect`, `p-autoComplete`). The old offset outline was removed from both panels.
+    - `field__control` was removed from the search input, with its presence test.
+    - `afterEach` cleanup added to the util spec.
+  - **Files changed:**
+    - `ods-field-focus.{scss,spec.ts}`
+    - `framework-tree.component.{html,scss,spec.ts}`
+    - `element-panel.component.scss`
+    - `objective-panel.component.scss`
+    - `unsaved-changes.util.spec.ts`
+  - **Falsifier:** offset outline put back in the mixin → `ods-field-focus.spec.ts:22` red; reverted.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest administration + data-table: 34 suites / 675 tests.
+    - lint clean; spec tsc 0 under ods-admin.
+    - build exit 0: framework-tree 3.79 kB, element-panel 1.72 kB, objective-panel 1.33 kB, side-panel-layout 0.84 kB.
+  - **Leader live check (Chrome):**
+    - IOB Code, Statement, Year and Linked indicators, and the Framework Name field, all focus with `outline: none`, offset 0 and border `rgb(3,91,169)`.
+    - Year was reached by a real Tab and screenshotted: the field's own border recolours, with no detached ring.
+  - **Reviewer** (`akili-reviewer`, opus, rework override e): **`STATUS: PASS`**.
+    - The token claim was checked at the source (`roartheme.ts:343-349, 450, 575`).
+    - No offset outline is left on any panel field; buttons keep their rings.
+    - `:host ::ng-deep` stays inside the component.
+    - F-1, F-2, F-3 and F-6 show no regressions.
+  - **ADVISORY** (recorded, not work):
+    - Pin each consumer file to its own mixin in the consumer test.
+    - The autocomplete and multiselect selectors are dead in `objective-panel`.
+    - From attempt 1: create-mode focus after Discard depends on timer order (Leader: Code focus not re-checked live); Tab after ArrowDown away from the selected row is PrimeNG `ttRow` behaviour.
+- **Rework totals:** attempts 2 · checkpoints none · continuations none.
+  - Spawns: implementer (Cursor/Grok) ×2 turns in one worker, not reported by host (complete, complete); reviewer ×2 (FAIL, PASS). The worker was released after the PASS (`already_released`).
+- **Running totals:**
+  - Rev-4 client **4,221 LOC added** (cap ≈ 4,500).
+  - Review rounds **11/11**: at the cap, not exceeded. Any further review round trips the tripwire.
+- **Next:** the owner's visual approval. Then T-22 → `[x]` and one UI commit for T-18…T-22 plus these fixes.
+
+## Spec amendment B-6 — owner at the T-22 HITL (2026-11-25)
+
+- **Owner, after the F-1…F-6 PASS:** the Table view shows only one level at a time. It should list every Performance Area, Dimension and Indicator in one table, like Organizational Structure. The in-table "+ + Performance Area" button is misaligned and duplicates the header **New Performance Area**. The search box and buttons sit on the dark page background, but on Organizational Structure and Results Center they sit inside the table's container. The tree view has the same problem.
+- **Leader finding:** Organizational Structure's whole list column is a card (`organizational-structure.component.html:85`). The ODS list slot is not a card.
+- **This changes an approved requirement (R-STF-008), so it was a Pivot-class amendment, approved by the owner in chat before any code:**
+  - Chips are count summaries only and do not filter.
+  - In the Table view, children are added only from the tree's **+**.
+  - Budget re-based to ≈ 5,000 LOC / 14 rounds.
+- **Edits:**
+  - `requirements.md`: §0b B-6; R-STF-008 rewritten (one table, count chips, no add button, AC.1 = 48 rows); R-STF-016 level-chip trigger removed (details and AC.3).
+  - `design.md`: §2 table and diagram; §6.4 amended paragraph; §6.9 chip trigger and chip-follow struck; D-STF-37 and D-STF-38; §14 re-base row.
+  - `tasks.md`: new T-23 and a dependency-graph edge.
+- **Two-direction sweep:** a forward grep for `level chip`, `per level`, `+ <Level>` and `table per level` across the spec folder. Remaining hits are in historical task text (T-12, T-14, T-19, done), the §13a challenge table (history), counts "per level" (unrelated), and the per-level export workbook (unchanged on purpose). The backward check is §6.9 ↔ R-STF-016, both amended.
+- **Not decided here:** the two Export buttons stay an open owner call.
+- **T-22:** F-1…F-6 PASS stands. T-22 closes with T-23's owner visual OK, because the owner's verdict on the rev-4 pass is pending T-23.
+
+### T-23 — One Table view and list cards (B-6)
+
+- **Attempt 1 (2026-11-25):** fresh Grok `grok-4.7-high` via Cursor, dispatch `ctx_2e02d9415df4`, task `task_423fa742beba`, effort high. Brief: scratchpad `brief-T23.md` (task text pointer + owner decisions + T-19/T-20 lessons).
+  - **Files changed:**
+    - `framework-tables.component.{ts,html,scss,spec.ts}` and a new `ods-table-wrap.scss`.
+    - `framework.component.{ts,html,spec.ts}`.
+    - `framework-url.codec.{ts,spec.ts}`.
+    - `side-panel-layout.component.{html,scss,spec.ts}`.
+    - `institutional-objectives.component.spec.ts`.
+  - **Rewritten assertions:** the Implementer listed each one; the full list is in the worker's `worker_done`. Chips are now a `UL`/`LI` with no `aria-pressed`. The per-level columns test was replaced by Code/Level/Name/Parent/Responsibles. The 48-row test checks the 4/13/31 split. The export file name changed to `strategy-framework.xlsx`. The `+ Level` create test was removed. The old `level=` parameter opens Table and is ignored. The chip guard test was replaced by "does nothing when a level chip is clicked". The codec never serialises `level`.
+  - **Falsifiers (both reverted):**
+    - (a) Filter the table by the active chip → `framework-tables.component.spec.ts:152` *Expected length 48, Received 4*.
+    - (b) Wire the chip back to the guard → `framework.component.spec.ts` (quoted as `:610`; the Reviewer places it at `:607`) *Expected 0 calls, Received 1*.
+  - **Leader re-run (non-author): VERIFIED.**
+    - jest `administration` + `data-table`: 34 suites / 679 tests.
+    - Lint clean; build exit 0; spec tsc 0 errors under ods-admin.
+    - `git status -- client/` shows nothing outside ods-admin or data-table.
+  - **Leader live check (Chrome):**
+    - Table view: one table in a white card (8 px radius, `rgb(232,235,237)` border); chips, search and the table Export are inside the card. Paginator shows 5 pages × 10 = 48 rows. Order is 1, 1.1, 1.1.1, 1.1.2, 1.2, …
+    - 1280×800: `.content` 800/800, slots 296–784.
+    - 1280×650 with indicator `1.1.2` selected (4-line responsibles): `.content` 650/650, list and panel 294–634, Save bottom 617.
+    - Table → Tree keeps the selection and writes no `level` param; the tree list is also a card.
+    - IOB list is a card.
+    - **Still seen:** IOB **"+ + Add objective"** (plus icon plus "+" in the label). Out of B-6 scope; asked at the owner gate.
+  - **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: PASS`**.
+    - Single selectable keyboard table; natural sort on two paths.
+    - Chips are inert; no chip state is left in the page, URL or guard.
+    - Focus after delete is still by `data-row-key`; the list card keeps viewport fit; tokens only; both Exports kept.
+  - **ADVISORY** (recorded, not work):
+    - The codec `levelDepth` call is a no-op.
+    - Dead `actions` rules remain in `ods-table-wrap.scss`.
+    - `FrameworkTableCreate` should move next to the panel.
+    - Spec title at `:348` still says "a level-table row".
+    - Design §6.5 focus sentence: **amended now** as an execute-time edit (`design.md` §6.5, "the next row of the single table in its rendered order on the current page"; carried to the next Reviewer brief if any).
+- **Final status: PASS (attempt 1), 2026-11-25, not committed.**
+  - attempts: 1 · checkpoints: none · continuations: none.
+  - spawns: implementer (Cursor/Grok) — not reported by host (complete); reviewer — not reported by host (PASS).
+  - Worker released (`already_released`).
+- **Running totals:** rev-4 client **4,376 LOC added** (cap ≈ 5,000) · review rounds **12/14**.
+- **Next:** owner visual OK, then T-22 and T-23 `[x]` and one UI commit.
+
+## Owner visual verdict — T-22 and T-23 (2026-11-25)
+
+- **Owner, in chat:** "OK, commit". The owner checked on local `localhost:4200`: Framework in Tree and Table views, and Institutional Objectives.
+- The owner had seen IOB's "+ + Add objective" and **accepted it as is** (same call as F-4).
+- **T-22 final status: PASS.**
+  - Docs: `family.md` F-4 and the ux decision row.
+  - Live pass and fixes F-1…F-6: Reviewer PASS on attempt 2.
+  - The owner's verdict is recorded above.
+  - Open owner calls carried forward, not decided:
+    - the two Export buttons;
+    - Responsibles column wrap;
+    - "+ + Add objective";
+    - the IOB search, which uses the shared DataTable focus.
+- **T-23 final status: PASS** (Reviewer PASS on attempt 1, owner OK).
+- **Not exercised live** (shared DB, writes forbidden): focus after Save when the row is hidden, IOB Year change on save, focus moves after Delete. Jest covers them.
+- **Approval:** owner, explicit.
+
+### T-23 follow-up — header Export button and "Add objective" (owner, 2026-11-25)
+
+- **Owner, after the T-23 commit:**
+  - the Framework header **Export .xlsx** does not look like the app's export button (Results Center "Export metadata results": outlined, `pi-file-excel`, primary blue);
+  - IOB still shows "+ + Add objective", which the owner reversed from the earlier "accept".
+- **Attempt 1:** fresh Grok `grok-4.7-medium`, dispatch `ctx_5491043e7894`, brief `brief-T23b.md`.
+  - Kept a local `p-button`: the shared `app-filters-action-buttons` disables only while loading, so it would drop the page's `editor() === null || loading()` rule.
+  - New styling: outlined, `pi-file-excel`, white background, border and text `--ac-light-blue-400` (`colors.scss:10` = `#035ba9`), 8 px radius.
+  - IOB label is now `Add objective`, icon kept; focus-after-delete still finds the button by `data-testid`.
+- **Leader Chrome check:** Export rendered 27 px tall against ~34 px for its siblings, so it sat lower than the rest of the row. Sent back to the worker (Leader live finding, before review); follow-up dispatch `ctx_46742accf128`: `size="small"`, 13 px, and no `py-1` / `max-h-27` overrides.
+- **Leader re-run (non-author): VERIFIED.** jest administration 33 suites / 664 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome check:** Tree, New Performance Area and Export all render at 146–179 px (34 px tall). Export border and text `rgb(3,91,169)` on white. IOB reads "+ icon Add objective".
+- **Reviewer** (`akili-reviewer`, opus): **`STATUS: PASS`**.
+  - Token checked at source; no hex.
+  - The reason for not reusing the shared component is correct.
+  - The tests assert the outlined class, the icon, the disabled rule and size parity.
+  - 0 `+ Add objective` left in `src`.
+  - Not checked: dark theme (none in the app).
+- **Final:** PASS. attempts 1 (+1 Leader-feedback turn) · checkpoints none · spawns: implementer ×2 turns (not reported by host), reviewer ×1 (PASS). Worker released.
+- **Running totals:** review rounds **13/14** · rev-4 LOC ≈ 4,400 / ≈ 5,000.
+- Waiting for the owner's visual OK before the commit.
+- **Owner visual OK (2026-11-25):** "ok" — committed.

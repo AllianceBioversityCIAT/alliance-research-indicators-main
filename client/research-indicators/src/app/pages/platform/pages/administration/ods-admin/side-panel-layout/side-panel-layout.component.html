@@ -1,0 +1,9 @@
+<div class="side-panel-layout__list side-panel-layout__card">
+  <ng-content select="[list]" />
+</div>
+<aside class="side-panel-layout__panel side-panel-layout__card" [attr.aria-label]="panelLabel()" data-testid="side-panel">
+  @if (!hasSelection() && !creating()) {
+    <p class="side-panel-layout__empty" data-testid="panel-empty">{{ emptyText() }}</p>
+  }
+  <ng-content select="[panel]" />
+</aside>

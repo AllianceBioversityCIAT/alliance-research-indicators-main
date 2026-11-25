@@ -152,3 +152,45 @@ JA4-1…6 and JB4-1…6 applied to `design.md` r7 and `requirements.md` rev 3.1:
 
 ## Status
 **JUDGMENT: APPROVED ✅** — lineage 2 (design r4 → r6), no severe finding after round 2; warning-level follow-ups recorded above as *fixed, not re-judged* (r7).
+
+---
+
+## Lineage 3 — rev 4 layout amendment (design r8), 2026-11-24
+
+- **Target (frozen, uncommitted):** `design.md` r8 — §6.2–§6.6, §6.9, D-STF-29…35, P-38…P-44, §13a, §14 rev-4 row; against `requirements.md` rev 4 and `proposal-layout-amendment.md`. Base commit `db07f43dc`.
+- **Judges:** A and B, blind, read-only (`akili-reviewer` on Sonnet; design authored on Opus — author ≠ auditor). Skills passed: none beyond the reviewer persona.
+- **Round 1 result:** 3 confirmed severe, 2 single-judge severe (both re-checked at source by the orchestrator, see below), 6 shared warnings, several singles.
+
+### Round 1 ledger
+
+| ID | Severity | Judges | Finding | Evidence | Status |
+|---|---|---|---|---|---|
+| JC-1 | severe | A-1, B-1 | Shared `DataTable` rows are click-only (no `tabindex`, no keydown, no row key in the DOM); NFR-STF-004 keyboard selection and "focus back to the selected row" cannot hold in the Table view or on IOB; P-40 proves click only | `data-table.component.html:58-59`, `data-table.component.ts:164-171` | confirmed — needs owner decision (shared component) |
+| JC-2 | severe | A-2, B-3 | Row `keydown.enter/space` also fires from the **+** button and the chevron (keydown bubbles; only click propagation is stopped); Space scrolls the list without `preventDefault`; chevron keyboard reach unspecified (Org's toggler is `tabindex=-1`) | `org-tree.component.html:20,27` | confirmed |
+| JC-3 | severe (A) / warning (B) | A-4, B-7 | "Panel never shows an element absent from the visible list" is broken by the Tree↔Table toggle, and by search or collapse hiding the selected row | design §6.9, §13a #3 | confirmed by both; fixed with the severe set |
+| JS-1 | severe | B-2 only | Selected-row style (`box-shadow: inset 3px` on `td:first-child`) overrides the area bar painted by the same property on the same cell → a selected row loses its area colour | `org-tree.component.scss:13-15` | suspect — **re-checked at source by the orchestrator: holds** |
+| JS-2 | severe | A-3 only | PrimeNG `[ttRow]` already sets `tabindex="0"`, `role=row`, `aria-expanded`, `aria-level` and owns Tab/arrow navigation (`onTabKey` keeps only the highlighted row tabbable); the design's own `tabindex="0"` conflicts; no premise row | `node_modules/primeng/fesm2022/primeng-treetable.mjs:5232-5246,5292,5303` | suspect — **re-checked at source by the orchestrator: holds** |
+| JW-1 | warning | A-5, B-4, B-5 | Viewport-fit geometry has no premise row (`.content` is the scroller with padding-top = navbar + header; page wrapper padding/margins must be zero or subtracted); no `min-height` for the split row at 650 px | `platform.component.scss:5,19-23`, `platform.component.html:9,20` | info |
+| JW-2 | warning | A-6, B-6 | Under 1024 px the page scrolls, contradicting R-STF-016 "at every scroll position" (no width qualifier) | requirements R-STF-016 | info — owner decision |
+| JW-3 | warning | A-11, B-9 | Budget 5 tasks (T-18…T-22) vs proposal 4 (T-18…T-21) | proposal §11, §14 | info |
+| JW-4 | warning/suggestion | A-10, B-12 | P-38 citation lacks `:23`; `outline-filter` listed as retired but §6.3 moves it | design §13, §14 | info |
+| JW-5 | warning | B-8 | D-STF-32 says "six triggers"; §6.9 lists nine | design §12 vs §6.9 | info |
+| JW-6 | warning | B-10 | `depth × 28` ambiguous (PrimeNG `level` is 0-based) | `org-tree.component.html:23` | info |
+| JW-7 | warning | A-7 | Tree's serialized URL slug not stated (`editor` default omitted by the codec; its spec pins `editor`) | `framework-url.codec.ts:8-10` | info |
+| JW-8 | warning | A-8, A-9 | Create-mode dirty baseline (prefilled code/parent) and highlight during create undefined; D-STF-26 failed-save clause missing from §6.5 | requirements R-STF-016 | info |
+| JW-9 | suggestion | A-12, A-13, A-14, B-11 | Rows need `id` / string `selectedKey`; clicking the selected row while dirty and stacked alerts; Q-3 label clash; "parity" widths/380 px | `data-table.component.ts:164-167`, `actions.service.ts:186` | info |
+
+**Premise rows:** P-38, P-39, P-41, P-43 confirmed by both; P-40 confirmed for click only (refuted for keyboard → JC-1); P-42 source and arithmetic confirmed, live numbers not re-run; P-44 confirmed by A, not re-run by B. Missing rows: DataTable keyboard, `.content` geometry, shared first-cell box-shadow, `ttRow` tabindex/keys.
+
+**Next:** ask the owner before the round-1 correction (JC-1 needs a decision).
+
+### Round 1 correction (orchestrator, 2026-11-24)
+Owner decisions before the fix: JC-1 → opt-in `keyboardSelectable` on `DataTable` (D-STF-36); JW-2 → viewport fit from 1024 px wide (R-STF-016 amended). Fixes applied to `design.md` r9 for JC-1…3, JS-1, JS-2, JW-1…9; new rows P-45…P-48.
+
+### Scoped re-judgment 1 (both judges, Sonnet, blind)
+- **Judge A:** all 14 ledger IDs RESOLVED. New: W-1 the 280 px fit claim asserted as checked while P-46 is UNVERIFIED (warning); W-2 the `p-treeTableToggler` adds its own `level × 16px` margin (warning); W-3 requirements' guard list narrower than the design's nine triggers, and the scenario lacks the ≥ 1024 px qualifier (warning); S-1…S-4 suggestions.
+- **Judge B:** JC-1…3, JS-1, JS-2, JW-2…9 RESOLVED (JC-3 "weak", JW-3/JW-4 partial); JW-1 NOT RESOLVED (same as A's W-1). New: the 280 px claim (warning); Framework tables' `keyboardSelectable` only implied (suggestion); chip switch on the Tree→Table toggle not specified for dirty forms (warning); create-mode stale key (suggestion). P-45 toggler citation `:5372`, not `:5346`.
+- **No severe finding left.** Warnings and suggestions from both judges applied as follow-ups in r9 (280 px stated as an estimate gated on T-19's measurement, with a compact-header fallback; own chevron button rather than the PrimeNG toggler; requirements' guard list and scenario aligned; `keyboardSelectable` explicit on Framework tables; chip switch keeps edits without a second prompt; create token; Enter/Space-only stopPropagation; Tab-roving note; outline HITL check; LOC split; total ledger count; `:5372`). These follow-ups are *fixed, not re-judged*.
+
+## Status — lineage 3
+**JUDGMENT: APPROVED ✅** — lineage 3 (design r8 → r9). Round 1 fixed 3 confirmed severe findings plus 2 single-judge severe findings that the orchestrator re-checked at source. The scoped re-judgment found no severe finding. Its warnings were applied as *fixed, not re-judged*.

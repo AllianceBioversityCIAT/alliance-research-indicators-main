@@ -1,12 +1,15 @@
 /**
- * Flat A1e read → nested outline, summary counts, flattened table rows and
- * export sheets (design §2.1, §6.2, §6.4). Sibling order is natural
- * (`1.2` before `1.10`). Counts of descendants are computed here so a
- * fourth level needs no change (R-STF-002 AC.1).
+ * Flat A1e read → nested outline, tree-table nodes, summary counts,
+ * flattened table rows and export sheets (design §2.1, §6.2, §6.3, §6.4).
+ * Sibling order is natural (`1.2` before `1.10`). Counts of descendants
+ * are computed here so a fourth level needs no change (R-STF-002 AC.1).
+ * The tree carries the depth-1 ancestor's index so every descendant
+ * paints that area's accent (D-STF-30).
  *
- * @akili-spec institutional-performance/strategy-framework T-12
+ * @akili-spec institutional-performance/strategy-framework T-12, T-18
  */
 
+import type { TreeNode } from 'primeng/api';
 import { naturalCompare } from '@shared/utils/natural-compare.util';
 import { XlsxExportColumn } from '@shared/utils/xlsx-export.util';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, UsageLabel } from '@shared/interfaces/strategy-framework.interface';
@@ -45,6 +48,23 @@ export interface FrameworkExportSheet {
   name: string;
   columns: XlsxExportColumn<FrameworkTableRow>[];
   rows: FrameworkTableRow[];
+}
+
+/**
+ * One tree-table row. `areaIndex` is the depth-1 ancestor's position among
+ * the roots (0-based, natural order). Accent slot is `(areaIndex % 4) + 1`.
+ */
+export interface FrameworkTreeRow {
+  id: number;
+  code: string;
+  name: string;
+  depth: number;
+  levelName: string;
+  /** Null on the deepest level: the row has no **+** action. */
+  nextLevelName: string | null;
+  countsText: string;
+  responsiblesText: string;
+  areaIndex: number;
 }
 
 interface MutableNode {
@@ -190,10 +210,7 @@ const sheetName = (level: FrameworkLevel): string => {
  * The parent is already the nearest of those columns, so Parent code is not repeated.
  * The workbook does not use this — it stays on `columnsForLevel`.
  */
-export function tableColumnsForLevel(
-  level: FrameworkLevel,
-  levels: readonly FrameworkLevel[]
-): XlsxExportColumn<FrameworkTableRow>[] {
+export function tableColumnsForLevel(level: FrameworkLevel, levels: readonly FrameworkLevel[]): XlsxExportColumn<FrameworkTableRow>[] {
   const columns: XlsxExportColumn<FrameworkTableRow>[] = [
     { field: 'code', header: 'Code' },
     { field: 'name', header: 'Name' }
@@ -221,6 +238,37 @@ export function columnsForLevel(level: FrameworkLevel, levels: readonly Framewor
   }
   if (level.isIndicatorLevel) columns.push({ field: 'responsiblesText', header: 'Responsibles' });
   return columns;
+}
+
+/**
+ * `p-treeTable` nodes, roots in natural order, each subtree stamped with
+ * its depth-1 ancestor's index. Expanded by default; the page collapses
+ * by id without rebuilding this index.
+ */
+export function frameworkTreeNodes(view: FrameworkEditorView): TreeNode<FrameworkTreeRow>[] {
+  const levels = view.levels;
+  const indicatorDepth = levels.find(level => level.isIndicatorLevel)?.depth;
+  const toNode = (node: FrameworkOutlineNode, areaIndex: number): TreeNode<FrameworkTreeRow> => {
+    const element = node.element;
+    const next = levels.find(level => level.depth === element.depth + 1);
+    return {
+      key: String(element.id),
+      expanded: true,
+      data: {
+        id: element.id,
+        code: element.code,
+        name: element.name,
+        depth: element.depth,
+        levelName: levels.find(level => level.depth === element.depth)?.name ?? 'Element',
+        nextLevelName: next?.name ?? null,
+        countsText: descendantCountText(node.descendantCounts, levels, element.usage, view.usageLabels),
+        responsiblesText: responsiblesText(element, indicatorDepth),
+        areaIndex
+      },
+      children: node.children.map(child => toNode(child, areaIndex))
+    };
+  };
+  return nestFramework(view).map((node, index) => toNode(node, index));
 }
 
 /** One sheet per level, in depth order. Rows are sorted by code. */

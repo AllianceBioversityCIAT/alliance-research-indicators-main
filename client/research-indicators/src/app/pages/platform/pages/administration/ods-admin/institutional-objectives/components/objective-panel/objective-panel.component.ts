@@ -1,69 +1,70 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { DrawerModule } from 'primeng/drawer';
-import { FocusTrapModule } from 'primeng/focustrap';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
-import { TooltipModule } from 'primeng/tooltip';
-import { FrameworkObjective, FrameworkView } from '@shared/interfaces/strategy-framework.interface';
+import { CreateInstitutionalObjectivePayload, FrameworkObjective, FrameworkView } from '@shared/interfaces/strategy-framework.interface';
+import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
-import { OverlayEscapeGuardDirective } from '../../../overlay-escape-guard.directive';
 import { PanelHeadingComponent } from '../../../panel-heading/panel-heading.component';
 import { frameworkErrorOf } from '../../../framework/utils/framework-error.util';
 import { indicatorGroups } from '../../objective-view.util';
 
 const CODE_MAX = 30;
 
-// @akili-spec institutional-performance/strategy-framework T-16 — design §6.6, §6.5, P-33, D-STF-26.
-// Side form. No owner and no responsible (R-STF-009 AC.2). pFocusTrap on the content;
-// the page returns focus to the opener. 4xx except 401 stays inline (frameworkErrorOf).
+interface OpenedValues {
+  code: string;
+  year: number | null;
+  statement: string;
+  elementIds: string;
+}
+
+// @akili-spec institutional-performance/strategy-framework T-20 — design §6.6, §6.9, D-STF-29, D-STF-33.
+// The page hosts this form in the side panel. No drawer, no focus trap.
+// dirty compares the form with the values it was opened with. A save snapshots
+// those values before the request; a later refresh must not re-open the form.
 @Component({
   selector: 'app-objective-panel',
   standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    ButtonModule,
-    DrawerModule,
-    SelectModule,
-    MultiSelectModule,
-    FocusTrapModule,
-    TooltipModule,
-    OverlayEscapeGuardDirective,
-    PanelHeadingComponent
-  ],
+  imports: [ReactiveFormsModule, ButtonModule, SelectModule, MultiSelectModule, PanelHeadingComponent],
   templateUrl: './objective-panel.component.html',
   styleUrl: './objective-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ObjectivePanelComponent implements OnInit {
+export class ObjectivePanelComponent {
   private readonly api = inject(ApiService);
+  private readonly actions = inject(ActionsService);
   private readonly formBuilder = inject(FormBuilder);
-  private readonly destroyRef = inject(DestroyRef);
 
-  readonly open = input(false);
   readonly portfolioId = input(0);
-  /** Every year of the portfolio range. The form's Year select. */
   readonly years = input<number[]>([]);
-  /** Page year, used as the create default. */
+  /** Page year. Create mode starts here. */
   readonly selectedYear = input<number | null>(null);
-  readonly objective = input<FrameworkObjective | null>(null);
+  readonly objectiveId = input<number | null>(null);
+  readonly creating = input(false);
+  /** Minted by the page each time a create opens. A late A3 for an older token is ignored. */
+  readonly createToken = input(0);
+  readonly objectives = input<FrameworkObjective[]>([]);
   readonly framework = input<FrameworkView | null>(null);
 
-  readonly closed = output<void>();
-  readonly saved = output<void>();
-  /** The page runs the same confirm and delete the row uses. */
-  readonly deleteRequested = output<Event>();
+  readonly saved = output<number>();
+  readonly cancelled = output<'edit' | 'create'>();
+  readonly deleteRequested = output<void>();
+  readonly dirty = output<boolean>();
 
   readonly saving = signal(false);
   readonly formError = signal<string | null>(null);
-  /** 420px, or the full drawer width under 1024px (design §6.6). jsdom does not apply this. */
-  private readonly narrow = signal(false);
+
+  readonly objective = computed(() => {
+    if (this.creating()) return null;
+    const id = this.objectiveId();
+    if (id === null) return null;
+    return this.objectives().find(item => item.id === id) ?? null;
+  });
 
   readonly groups = computed(() => indicatorGroups(this.framework()));
   readonly yearOptions = computed(() => this.years().map(year => ({ year, label: String(year) })));
-  readonly drawerStyle = computed(() => ({ width: this.narrow() ? '100%' : '420px' }));
   readonly eyebrow = computed(() => 'INSTITUTIONAL OBJECTIVE');
 
   readonly form = this.formBuilder.group({
@@ -73,60 +74,77 @@ export class ObjectivePanelComponent implements OnInit {
     elementIds: this.formBuilder.nonNullable.control<number[]>([])
   });
 
-  private readonly codeValue = toSignal(this.form.controls.code.valueChanges, { initialValue: this.form.controls.code.value });
-  private readonly yearValue = toSignal(this.form.controls.year.valueChanges, { initialValue: this.form.controls.year.value });
+  private readonly formTick = signal(0);
+  private readonly opened = signal<OpenedValues | null>(null);
 
   readonly headerTitle = computed(() => {
-    if (!this.objective()) return 'New institutional objective';
-    const code = (this.codeValue() || this.objective()?.code || '').trim();
-    const year = this.yearValue() ?? this.objective()?.year ?? '';
+    this.formTick();
+    if (this.creating() || !this.objective()) return 'New institutional objective';
+    const code = this.form.controls.code.value.trim() || this.objective()?.code || '';
+    const year = this.form.controls.year.value ?? this.objective()?.year ?? '';
     return `${code} · ${year}`;
   });
 
-  readonly blockerText = computed(() => {
-    const objective = this.objective();
-    if (!objective || objective.deletable) return '';
-    return objective.blockers
-      .map(blocker => blocker.wayOut || blocker.reason)
-      .map(text => text.trim())
-      .filter(text => text !== '')
-      .join(' ');
-  });
-
   private readonly codeField = viewChild<ElementRef<HTMLInputElement>>('codeField');
-  private session = 0;
+  private generation = 0;
+  private preparedKey = '';
   private saveInFlight = false;
+  /** The id just saved. The list catching up must not reload the form over a newer keystroke. */
+  private holdFormFor: number | null = null;
   /** Last code written by A3, so a typed code is not replaced when the year changes. */
   private proposed: string | null = null;
 
   constructor() {
+    this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.formTick.update(value => value + 1));
     effect(() => {
-      const isOpen = this.open();
-      const objective = this.objective();
+      const isDirty = this.dirtyNow();
+      untracked(() => this.dirty.emit(isDirty));
+    });
+    effect(() => {
       const portfolioId = this.portfolioId();
+      const objectiveId = this.objectiveId();
+      const creating = this.creating();
+      const token = this.createToken();
+      const objectives = this.objectives();
       untracked(() => {
-        if (!isOpen || portfolioId === 0) return;
-        void this.prepare(objective, portfolioId);
+        if (portfolioId === 0) return;
+        if (!creating && objectiveId === null) return;
+        // Save re-baselines from the values it sent. A refresh must not re-open the form,
+        // or keystrokes typed while the request was in flight would be discarded.
+        const key = `${portfolioId}:${creating ? 'new' : objectiveId}:${token}`;
+        if (key === this.preparedKey) return;
+        this.preparedKey = key;
+        void this.prepare(creating, objectiveId, portfolioId, token, objectives);
       });
     });
   }
 
-  ngOnInit(): void {
-    this.watchViewport();
+  /** The baseline becomes what was sent, with the server's code when it normalised one. */
+  private adoptSaved(snapshot: OpenedValues, savedCode: string): void {
+    const baseline: OpenedValues = { ...snapshot, code: savedCode };
+    if (this.form.controls.code.value === snapshot.code && savedCode !== snapshot.code) {
+      this.form.controls.code.setValue(savedCode);
+    }
+    this.opened.set(baseline);
   }
 
-  onVisibleChange(visible: boolean): void {
-    if (visible || !this.open()) return;
-    this.requestClose();
+  isDirty(): boolean {
+    return this.dirtyNow();
   }
 
   cancel(): void {
-    this.requestClose();
+    if (!this.creating() && this.objectiveId() !== null) {
+      this.restoreOpened();
+      this.cancelled.emit('edit');
+      return;
+    }
+    this.generation += 1;
+    this.cancelled.emit('create');
   }
 
-  requestDelete(event: Event): void {
-    if (!this.objective()) return;
-    this.deleteRequested.emit(event);
+  async onYearPicked(year: number | null): Promise<void> {
+    if (!this.creating() || year === null) return;
+    await this.proposeCode(year, this.generation, this.portfolioId(), this.createToken(), this.objectiveId());
   }
 
   async save(): Promise<void> {
@@ -138,29 +156,31 @@ export class ObjectivePanelComponent implements OnInit {
     const code = this.form.controls.code.value.trim();
     if (this.form.invalid || year === null || statement === '' || code === '') return;
 
+    const snapshot = this.readForm();
     this.saveInFlight = true;
     this.saving.set(true);
-    const flight = this.session;
+    const generation = this.generation;
+    const objectiveId = this.objectiveId();
+    const token = this.createToken();
+    const creating = this.creating();
+    const elementIds = [...this.form.controls.elementIds.value];
     try {
-      const elementIds = this.form.controls.elementIds.value;
-      const objective = this.objective();
-      const response = objective
-        ? await this.api.PATCH_StrategyFrameworkObjective(objective.id, { year, code, statement, elementIds })
-        : await this.api.POST_StrategyFrameworkObjective({
-            portfolioId: this.portfolioId(),
-            year,
-            code,
-            statement,
-            elementIds
-          });
-      if (flight !== this.session || !this.open()) return;
+      const response =
+        !creating && objectiveId !== null
+          ? await this.api.PATCH_StrategyFrameworkObjective(objectiveId, { year, code, statement, elementIds })
+          : await this.api.POST_StrategyFrameworkObjective(this.createBody(year, code, statement, elementIds));
+      if (!this.accept(generation, objectiveId, token, creating)) return;
       if (!response?.successfulRequest || !response.data) {
         if (response?.status !== 401) this.formError.set(frameworkErrorOf(response?.errorDetail));
         return;
       }
-      this.saved.emit();
+      const savedCode = response.data.code || code;
+      this.adoptSaved(snapshot, savedCode);
+      this.holdFormFor = response.data.id;
+      this.actions.showToast({ severity: 'success', summary: 'Saved', detail: `${savedCode} saved` });
+      this.saved.emit(response.data.id);
     } catch (error) {
-      if (flight !== this.session || !this.open()) return;
+      if (!this.accept(generation, objectiveId, token, creating)) return;
       this.formError.set(frameworkErrorOf(error));
     } finally {
       this.saveInFlight = false;
@@ -168,76 +188,132 @@ export class ObjectivePanelComponent implements OnInit {
     }
   }
 
-  async onYearPicked(year: number | null): Promise<void> {
-    if (this.objective() || year === null) return;
-    await this.proposeCode(year, this.session, this.portfolioId());
+  /** The page runs the existing confirm. A blocked objective still asks; the reason is also on screen. */
+  remove(): void {
+    if (this.saving() || this.objectiveId() === null || this.creating()) return;
+    this.deleteRequested.emit();
   }
 
-  private requestClose(): void {
-    this.session += 1;
-    this.saveInFlight = false;
-    this.closed.emit();
+  blockerText(current: FrameworkObjective): string {
+    return current.blockers
+      .map(blocker => blocker.wayOut || blocker.reason)
+      .map(text => text.trim())
+      .filter(text => text !== '')
+      .join(' ');
   }
 
-  private async prepare(objective: FrameworkObjective | null, portfolioId: number): Promise<void> {
-    const session = ++this.session;
+  private dirtyNow(): boolean {
+    this.formTick();
+    const opened = this.opened();
+    if (!opened) return false;
+    return !sameOpened(opened, this.readForm());
+  }
+
+  private readForm(): OpenedValues {
+    return {
+      code: this.form.controls.code.value,
+      year: this.form.controls.year.value,
+      statement: this.form.controls.statement.value,
+      elementIds: [...this.form.controls.elementIds.value].sort((left, right) => left - right).join(',')
+    };
+  }
+
+  private captureOpened(): void {
+    this.opened.set(this.readForm());
+  }
+
+  private restoreOpened(): void {
+    const opened = this.opened();
+    if (!opened) return;
+    this.form.reset({
+      code: opened.code,
+      year: opened.year,
+      statement: opened.statement,
+      elementIds: opened.elementIds === '' ? [] : opened.elementIds.split(',').map(Number)
+    });
+    this.formError.set(null);
+  }
+
+  /**
+   * True only for the open target that started this request.
+   * A later selection or create token makes the response stale.
+   */
+  private accept(generation: number, objectiveId: number | null, token: number, creating: boolean): boolean {
+    return generation === this.generation && this.objectiveId() === objectiveId && this.createToken() === token && this.creating() === creating;
+  }
+
+  private async prepare(
+    creating: boolean,
+    objectiveId: number | null,
+    portfolioId: number,
+    token: number,
+    objectives: readonly FrameworkObjective[]
+  ): Promise<void> {
+    if (!creating && this.holdFormFor === objectiveId) {
+      this.holdFormFor = null;
+      return;
+    }
+    this.holdFormFor = null;
+    const generation = ++this.generation;
     this.formError.set(null);
     this.saving.set(false);
     this.saveInFlight = false;
     this.proposed = null;
-    if (objective) {
+    if (!creating && objectiveId !== null) {
+      const existing = objectives.find(item => item.id === objectiveId);
+      // The id was just saved and the list has not caught up. Leave the typed form.
+      if (!existing) return;
       this.form.reset({
-        code: objective.code,
-        year: objective.year,
-        statement: objective.statement,
-        elementIds: objective.elements.map(element => element.id)
+        code: existing.code,
+        year: existing.year,
+        statement: existing.statement,
+        elementIds: existing.elements.map(element => element.id)
       });
-      this.focusCode(session);
+      this.captureOpened();
       return;
     }
+    if (!creating) return;
     const year = this.selectedYear() ?? this.years()[0] ?? null;
     this.form.reset({ code: '', year, statement: '', elementIds: [] });
-    this.focusCode(session);
+    this.captureOpened();
+    this.focusFirstField(generation);
     if (year === null) return;
-    await this.proposeCode(year, session, portfolioId);
+    await this.proposeCode(year, generation, portfolioId, token, objectiveId);
   }
 
-  private async proposeCode(year: number, session: number, portfolioId: number): Promise<void> {
+  private async proposeCode(year: number, generation: number, portfolioId: number, token: number, objectiveId: number | null): Promise<void> {
     try {
       const response = await this.api.GET_StrategyFrameworkCodeProposal({ portfolioId, year, kind: 'IOB' });
-      if (session !== this.session || !this.open() || this.objective()) return;
+      if (!this.accept(generation, objectiveId, token, true) || !this.creating()) return;
       const code = response?.successfulRequest ? (response.data?.code ?? '') : '';
       if (code === '') return;
       const current = this.form.controls.code.value.trim();
       if (current !== '' && current !== this.proposed) return;
+      const before = this.readForm();
+      const opened = this.opened();
+      const untouched = opened !== null && sameOpened(opened, before);
       this.proposed = code;
       this.form.controls.code.setValue(code);
+      if (untouched) this.captureOpened();
     } catch {
       // The code field stays as the user left it. A typed code is still required to save.
     }
   }
 
-  private focusCode(session: number): void {
+  private createBody(year: number, code: string, statement: string, elementIds: number[]): CreateInstitutionalObjectivePayload {
+    return { portfolioId: this.portfolioId(), year, code, statement, elementIds };
+  }
+
+  /** Create mode only. Selecting a row leaves focus on that row (NFR-STF-004). */
+  private focusFirstField(generation: number): void {
     setTimeout(() => {
-      if (session !== this.session || !this.open()) return;
+      if (generation !== this.generation || !this.creating()) return;
       const field = this.codeField()?.nativeElement;
       if (field?.isConnected) field.focus();
     }, 0);
   }
+}
 
-  /** Viewport width for the drawer. matchMedia is absent in some test environments. */
-  private watchViewport(): void {
-    if (typeof window.matchMedia !== 'function') return;
-    let media: MediaQueryList;
-    try {
-      media = window.matchMedia('(max-width: 1023px)');
-    } catch {
-      return;
-    }
-    this.narrow.set(media.matches);
-    if (typeof media.addEventListener !== 'function') return;
-    const onChange = (event: MediaQueryListEvent) => this.narrow.set(event.matches);
-    media.addEventListener('change', onChange);
-    this.destroyRef.onDestroy(() => media.removeEventListener('change', onChange));
-  }
+function sameOpened(left: OpenedValues, right: OpenedValues): boolean {
+  return left.code === right.code && left.year === right.year && left.statement === right.statement && left.elementIds === right.elementIds;
 }

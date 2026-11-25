@@ -1,0 +1,100 @@
+<div class="framework-tree__find">
+  <label class="framework-tree__find-label" for="framework-tree-search">Find by code or name</label>
+  <div class="framework-tree__find-field">
+    <input
+      id="framework-tree-search"
+      type="text"
+      class="framework-tree__find-input"
+      data-testid="framework-tree-search"
+      placeholder="Find by code or name"
+      autocomplete="off"
+      [value]="query()"
+      (input)="onSearchInput($event)" />
+    @if (query()) {
+      <button type="button" class="framework-tree__clear" data-testid="framework-tree-search-clear" aria-label="Clear search" (click)="clearSearch()">
+        <i class="pi pi-times" aria-hidden="true"></i>
+      </button>
+    }
+  </div>
+</div>
+
+@if (noMatches()) {
+  <p class="framework-tree__empty" role="status" data-testid="framework-tree-search-empty">No elements match "{{ trimmedQuery() }}"</p>
+}
+
+<p-treeTable
+  [value]="displayNodes()"
+  [autoLayout]="true"
+  styleClass="p-treetable-gridlines table-custom-styles"
+  data-testid="framework-tree"
+  aria-label="Framework tree"
+  (onNodeExpand)="onNodeToggle($event, false)"
+  (onNodeCollapse)="onNodeToggle($event, true)">
+  <ng-template pTemplate="header">
+    <tr>
+      <th class="framework-tree__header framework-tree__col-name" style="width: 50%" data-testid="framework-tree-name-header">Name</th>
+      <th class="framework-tree__header framework-tree__col-fit">Code</th>
+      <th class="framework-tree__header framework-tree__col-fit">Level</th>
+      <th class="framework-tree__header framework-tree__col-responsibles">Responsibles</th>
+      <th class="framework-tree__header framework-tree__col-actions"><span class="sr-only">Add</span></th>
+    </tr>
+  </ng-template>
+
+  <ng-template pTemplate="body" let-rowNode let-row="rowData">
+    <tr
+      appTreeRowKeys
+      [ttRow]="rowNode"
+      class="framework-tree__row"
+      [class.framework-tree__row--selected]="row.id === selectedId()"
+      [attr.data-row-key]="row.id"
+      [attr.aria-selected]="row.id === selectedId()"
+      [attr.data-p-highlight]="row.id === selectedId() ? true : null"
+      [style.--row-accent]="accentToken(row)"
+      (rowActivate)="select(row.id)"
+      (click)="select(row.id)"
+      data-testid="framework-tree-row">
+      <td data-testid="framework-tree-name-cell">
+        <div class="framework-tree__name-wrap" [style.padding-left.px]="rowNode.level * indentStep" data-testid="framework-tree-indent">
+          <div class="framework-tree__identity" data-testid="framework-tree-identity">
+            <button
+              type="button"
+              class="p-treetable-toggler framework-tree__toggle"
+              tabindex="-1"
+              [style.visibility]="hasChildren(rowNode.node) ? 'visible' : 'hidden'"
+              [attr.aria-hidden]="hasChildren(rowNode.node) ? null : 'true'"
+              [attr.aria-label]="(rowNode.node.expanded ? 'Collapse' : 'Expand') + ' ' + row.levelName + ' ' + row.code"
+              [attr.aria-expanded]="rowNode.node.expanded ? 'true' : 'false'"
+              (click)="toggle(row, $event)"
+              data-testid="framework-tree-toggle">
+              <i class="pi" [class.pi-chevron-down]="rowNode.node.expanded" [class.pi-chevron-right]="!rowNode.node.expanded" aria-hidden="true"></i>
+            </button>
+            <span class="framework-tree__name" data-testid="framework-tree-name">{{ row.name }}</span>
+          </div>
+          @if (row.countsText) {
+            <span class="framework-tree__counts" data-testid="framework-tree-counts">{{ row.countsText }}</span>
+          }
+        </div>
+      </td>
+      <td class="framework-tree__col-fit">
+        <span class="framework-tree__code" data-testid="framework-tree-code">{{ row.code }}</span>
+      </td>
+      <td class="framework-tree__level framework-tree__col-fit" data-testid="framework-tree-level">{{ row.levelName }}</td>
+      <td class="framework-tree__responsibles" data-testid="framework-tree-responsibles">{{ row.responsiblesText }}</td>
+      <td class="framework-tree__col-actions">
+        @if (row.nextLevelName; as next) {
+          <button
+            type="button"
+            class="framework-tree__add"
+            data-testid="framework-tree-add"
+            [attr.tabindex]="row.id === activeRowId() ? 0 : -1"
+            [attr.aria-label]="'Add ' + next + ' under ' + row.code"
+            (click)="requestChild($event, row.id)"
+            (keydown.enter)="onAddKey($event, row.id)"
+            (keydown.space)="onAddKey($event, row.id)">
+            + {{ next }}
+          </button>
+        }
+      </td>
+    </tr>
+  </ng-template>
+</p-treeTable>
