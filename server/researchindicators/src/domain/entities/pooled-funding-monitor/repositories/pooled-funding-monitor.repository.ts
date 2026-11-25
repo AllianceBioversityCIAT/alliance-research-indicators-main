@@ -330,7 +330,7 @@ export const mapMonitoredRow = (
     creator: (row.creator_name as string | null) ?? null,
     synced_months: [
       ...new Set(toJsonArray<string>(row.synced_months).map(String)),
-    ].sort(),
+    ].sort((a, b) => a.localeCompare(b)),
   } as PfmMonitoredRow;
 };
 
