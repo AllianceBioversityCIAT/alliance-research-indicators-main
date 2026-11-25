@@ -1,9 +1,7 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { DrawerModule } from 'primeng/drawer';
-import { FocusTrapModule } from 'primeng/focustrap';
 import { SelectModule } from 'primeng/select';
 import {
   CreateFrameworkElementPayload,
@@ -15,54 +13,54 @@ import {
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import type { FrameworkTableCreate } from '../framework-tables/framework-tables.component';
-import { tableRowsForLevel } from '../../utils/framework-view.util';
 import { frameworkErrorOf } from '../../utils/framework-error.util';
-import { FrameworkDeleteHandler } from '../../framework-delete.handler';
-import { OverlayEscapeGuardDirective } from '../../../overlay-escape-guard.directive';
 import { PanelHeadingComponent } from '../../../panel-heading/panel-heading.component';
 import { StaffPickerComponent, StaffPickerPerson } from '../staff-picker/staff-picker.component';
 
 const CODE_MAX = 30;
 const NAME_MAX = 255;
 
-// @akili-spec institutional-performance/strategy-framework T-15 — design §6.5, §6.3, P-33, D-STF-14, D-STF-26.
-// Details panel. pFocusTrap on the content; the page returns focus to the opener.
-// Parent options are elements one level up only. Delete uses FrameworkDeleteHandler.
-// 4xx except 401 stays inline (frameworkErrorOf). jsdom cannot prove the drawer width (KZ-017).
+interface OpenedValues {
+  code: string;
+  name: string;
+  description: string;
+  parentId: number | null;
+  carnets: string;
+  people: StaffPickerPerson[];
+}
+
+// @akili-spec institutional-performance/strategy-framework T-19 — design §6.5, D-STF-29, D-STF-33.
+// The page hosts this form in the side panel. No drawer, no focus trap.
+// dirty compares the form with the values it was opened with (JW-8).
+// A response whose generation is no longer current is ignored.
 @Component({
   selector: 'app-element-panel',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, DrawerModule, SelectModule, FocusTrapModule, StaffPickerComponent, OverlayEscapeGuardDirective, PanelHeadingComponent],
-  providers: [FrameworkDeleteHandler],
+  imports: [ReactiveFormsModule, ButtonModule, SelectModule, StaffPickerComponent, PanelHeadingComponent],
   templateUrl: './element-panel.component.html',
   styleUrl: './element-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ElementPanelComponent implements OnInit {
+export class ElementPanelComponent {
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionsService);
-  private readonly deletes = inject(FrameworkDeleteHandler);
   private readonly formBuilder = inject(FormBuilder);
-  private readonly destroyRef = inject(DestroyRef);
 
-  readonly open = input(false);
   readonly portfolioId = input(0);
   readonly view = input<FrameworkEditorView | null>(null);
   readonly elementId = input<number | null>(null);
   readonly createRequest = input<FrameworkTableCreate | null>(null);
-  /** Which view opened the panel. Delete focus follows that view's order. */
-  readonly surface = input<'editor' | 'table'>('editor');
+  /** Minted by the page each time a create opens. A late A3 for an older token is ignored. */
+  readonly createToken = input(0);
 
-  readonly closed = output<void>();
-  readonly saved = output<void>();
-  readonly removed = output<void>();
-  readonly refreshed = output<FrameworkEditorView>();
+  readonly saved = output<number>();
+  readonly cancelled = output<'edit' | 'create'>();
+  readonly deleteRequested = output<void>();
+  readonly dirty = output<boolean>();
 
   readonly saving = signal(false);
   readonly formError = signal<string | null>(null);
   readonly responsibles = signal<StaffPickerPerson[]>([]);
-  /** 420px, or the full drawer width under 1024px (design §6.5). jsdom does not apply this. */
-  private readonly narrow = signal(false);
 
   readonly element = computed(() => {
     const id = this.elementId();
@@ -94,8 +92,6 @@ export class ElementPanelComponent implements OnInit {
       .map(item => ({ id: item.id, label: `${item.code} · ${item.name}` }));
   });
 
-  readonly drawerStyle = computed(() => ({ width: this.narrow() ? '100%' : '420px' }));
-
   readonly form = this.formBuilder.group({
     code: this.formBuilder.nonNullable.control('', [Validators.required, Validators.maxLength(CODE_MAX)]),
     name: this.formBuilder.nonNullable.control('', [Validators.required, Validators.maxLength(NAME_MAX)]),
@@ -103,19 +99,19 @@ export class ElementPanelComponent implements OnInit {
     parentId: this.formBuilder.control<number | null>(null)
   });
 
-  private readonly codeValue = toSignal(this.form.controls.code.valueChanges, { initialValue: this.form.controls.code.value });
-  private readonly nameValue = toSignal(this.form.controls.name.valueChanges, { initialValue: this.form.controls.name.value });
-  private readonly parentValue = toSignal(this.form.controls.parentId.valueChanges, { initialValue: this.form.controls.parentId.value });
+  private readonly formTick = signal(0);
+  private readonly opened = signal<OpenedValues | null>(null);
 
-  /** No pill until a code exists. Create mode keeps the "New …" title either way. */
   readonly pillCode = computed(() => {
-    const code = this.codeValue().trim();
+    this.formTick();
+    const code = this.form.controls.code.value.trim();
     return code === '' ? null : code;
   });
 
   readonly headerTitle = computed(() => {
+    this.formTick();
     if (!this.element()) return `New ${this.levelName()}`;
-    const typed = this.nameValue().trim();
+    const typed = this.form.controls.name.value.trim();
     return typed !== '' ? typed : (this.element()?.name ?? '');
   });
 
@@ -128,8 +124,9 @@ export class ElementPanelComponent implements OnInit {
    * already loaded; a parent change recomputes the chain. No request.
    */
   readonly derivedAncestors = computed(() => {
+    this.formTick();
     const view = this.view();
-    const parentId = this.parentValue();
+    const parentId = this.form.controls.parentId.value;
     if (!view || parentId === null || this.depth() < 3) return [];
     const byId = new Map(view.elements.map(item => [item.id, item]));
     const parent = byId.get(parentId);
@@ -152,46 +149,75 @@ export class ElementPanelComponent implements OnInit {
   });
 
   private readonly codeField = viewChild<ElementRef<HTMLInputElement>>('codeField');
-  private session = 0;
+  /** Bumped each time the open target changes, so a late response cannot land on the next one. */
+  private generation = 0;
+  private preparedKey = '';
   private saveInFlight = false;
   /** Last code written by A3, so a typed code is not replaced when the parent changes. */
   private proposed: string | null = null;
 
   constructor() {
+    this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.formTick.update(value => value + 1));
     effect(() => {
-      const isOpen = this.open();
+      const isDirty = this.dirtyNow();
+      untracked(() => this.dirty.emit(isDirty));
+    });
+    effect(() => {
       const portfolioId = this.portfolioId();
       const elementId = this.elementId();
       const request = this.createRequest();
+      const token = this.createToken();
       const view = this.view();
       untracked(() => {
-        if (!isOpen || portfolioId === 0 || !view) return;
-        void this.prepare(elementId, request, portfolioId);
+        if (portfolioId === 0 || !view) return;
+        // Save re-baselines from the values it sent. A refresh must not re-open the form,
+        // or keystrokes typed while the request was in flight would be discarded.
+        const key = `${portfolioId}:${elementId ?? ''}:${token}:${request?.depth ?? ''}:${request?.parentId ?? ''}`;
+        if (key === this.preparedKey) return;
+        this.preparedKey = key;
+        void this.prepare(elementId, request, portfolioId, token);
       });
     });
   }
 
-  ngOnInit(): void {
-    this.watchViewport();
+  /** The baseline becomes what was sent, with the server's code when it normalised one. */
+  private adoptSaved(snapshot: OpenedValues, savedCode: string): void {
+    const baseline = { ...snapshot, code: savedCode };
+    if (this.form.controls.code.value === snapshot.code && savedCode !== snapshot.code) {
+      this.form.controls.code.setValue(savedCode);
+    }
+    this.opened.set(baseline);
   }
 
-  onVisibleChange(visible: boolean): void {
-    if (visible || !this.open()) return;
-    this.requestClose();
+  /** Compared with the values the form was opened with, including a prefilled A3 code. */
+  isDirty(): boolean {
+    return this.dirtyNow();
+  }
+
+  /** Edit Cancel puts the opened values back. The selection stays. */
+  revert(): void {
+    this.restoreOpened();
   }
 
   cancel(): void {
-    this.requestClose();
+    if (this.element()) {
+      this.restoreOpened();
+      this.cancelled.emit('edit');
+      return;
+    }
+    this.generation += 1;
+    this.cancelled.emit('create');
   }
 
   onParentPicked(parentId: number | null): void {
     this.form.controls.parentId.setValue(parentId);
     if (this.element()) return;
-    void this.proposeCode(parentId, this.session, this.portfolioId());
+    void this.proposeCode(parentId, this.generation, this.portfolioId(), this.createToken(), this.elementId());
   }
 
   onResponsibles(people: StaffPickerPerson[]): void {
     this.responsibles.set(people);
+    this.formTick.update(value => value + 1);
   }
 
   async save(): Promise<void> {
@@ -204,24 +230,28 @@ export class ElementPanelComponent implements OnInit {
     if (this.form.invalid || code === '' || name === '') return;
     if (this.showParent() && parentId === null) return;
 
+    const snapshot = this.readForm();
     this.saveInFlight = true;
     this.saving.set(true);
-    const flight = this.session;
+    const generation = this.generation;
+    const elementId = this.element()?.id ?? null;
+    const token = this.createToken();
     const element = this.element();
     try {
       const response = element
         ? await this.api.PATCH_StrategyFrameworkElement(element.id, this.updateBody(element, code, name, parentId))
         : await this.api.POST_StrategyFrameworkElement(this.createBody(code, name, parentId));
-      if (flight !== this.session || !this.open()) return;
+      if (!this.accept(generation, elementId, token)) return;
       if (!response?.successfulRequest || !response.data) {
         if (response?.status !== 401) this.formError.set(frameworkErrorOf(response?.errorDetail));
         return;
       }
       const savedCode = response.data.code || code;
+      this.adoptSaved(snapshot, savedCode);
       this.actions.showToast({ severity: 'success', summary: 'Saved', detail: `${savedCode} saved` });
-      this.saved.emit();
+      this.saved.emit(response.data.id);
     } catch (error) {
-      if (flight !== this.session || !this.open()) return;
+      if (!this.accept(generation, elementId, token)) return;
       this.formError.set(frameworkErrorOf(error));
     } finally {
       this.saveInFlight = false;
@@ -229,37 +259,69 @@ export class ElementPanelComponent implements OnInit {
     }
   }
 
-  async remove(event: Event): Promise<void> {
-    const element = this.element();
-    if (!element || this.saving()) return;
-    const button = focusable(event.currentTarget);
-    await this.deletes.request({
-      id: element.id,
-      returnFocus: button,
-      resolveElement: () => {
-        const current = this.element();
-        if (!current) return null;
-        return { element: current, levelName: this.levelName() };
-      },
-      prepareFocus: () => this.focusAfter(element.id),
-      onDeleted: async () => {
-        const response = await this.api.GET_StrategyFrameworkEditor(this.portfolioId());
-        if (response?.successfulRequest && response.data && response.data.portfolioId === this.portfolioId()) {
-          this.refreshed.emit(response.data);
-        }
-        this.removed.emit();
-      }
+  remove(): void {
+    const current = this.element();
+    if (!current || current.deletable !== true || this.saving()) return;
+    this.deleteRequested.emit();
+  }
+
+  blockerText(current: FrameworkEditorElement): string {
+    return current.blockers
+      .map(blocker => blocker.wayOut || blocker.reason)
+      .filter(text => text.trim() !== '')
+      .join(' ');
+  }
+
+  private dirtyNow(): boolean {
+    this.formTick();
+    this.responsibles();
+    const opened = this.opened();
+    if (!opened) return false;
+    return !sameOpened(opened, this.readForm());
+  }
+
+  private readForm(): OpenedValues {
+    const people = this.responsibles().map(person => ({ ...person }));
+    return {
+      code: this.form.controls.code.value,
+      name: this.form.controls.name.value,
+      description: this.form.controls.description.value,
+      parentId: this.form.controls.parentId.value,
+      carnets: people.map(person => person.carnet).join('\n'),
+      people
+    };
+  }
+
+  private captureOpened(): void {
+    this.opened.set(this.readForm());
+  }
+
+  private restoreOpened(): void {
+    const opened = this.opened();
+    if (!opened) return;
+    this.form.reset({
+      code: opened.code,
+      name: opened.name,
+      description: opened.description,
+      parentId: opened.parentId
     });
+    this.responsibles.set(opened.people.map(person => ({ ...person })));
+    this.formError.set(null);
   }
 
-  private requestClose(): void {
-    this.session += 1;
-    this.saveInFlight = false;
-    this.closed.emit();
+  /**
+   * True only for the open target that started this request.
+   * A later selection or create token makes the response stale.
+   */
+  private accept(generation: number, elementId: number | null, token: number): boolean {
+    if (generation !== this.generation) return false;
+    if (this.elementId() !== elementId) return false;
+    if (this.createToken() !== token) return false;
+    return true;
   }
 
-  private async prepare(elementId: number | null, request: FrameworkTableCreate | null, portfolioId: number): Promise<void> {
-    const session = ++this.session;
+  private async prepare(elementId: number | null, request: FrameworkTableCreate | null, portfolioId: number, token: number): Promise<void> {
+    const generation = ++this.generation;
     this.formError.set(null);
     this.saving.set(false);
     this.saveInFlight = false;
@@ -279,29 +341,41 @@ export class ElementPanelComponent implements OnInit {
         parentId: existing.parentId
       });
       this.responsibles.set((existing.responsibles ?? []).map(person => ({ ...person })));
-      this.focusCode(session);
+      this.captureOpened();
       return;
     }
     if (!request) return;
+    const parentId = request.parentId ?? null;
     this.responsibles.set([]);
-    this.form.reset({ code: '', name: '', description: '', parentId: null });
-    this.focusCode(session);
-    if (request.depth > 1) return;
-    await this.proposeCode(null, session, portfolioId);
+    this.form.reset({ code: '', name: '', description: '', parentId });
+    this.captureOpened();
+    this.focusFirstField(generation);
+    if (request.depth > 1 && parentId === null) return;
+    await this.proposeCode(parentId, generation, portfolioId, token, elementId);
   }
 
-  private async proposeCode(parentId: number | null, session: number, portfolioId: number): Promise<void> {
+  private async proposeCode(
+    parentId: number | null,
+    generation: number,
+    portfolioId: number,
+    token: number,
+    elementId: number | null
+  ): Promise<void> {
     const query: FrameworkCodeProposalQuery = { portfolioId };
     if (parentId !== null) query.parentId = parentId;
     try {
       const response = await this.api.GET_StrategyFrameworkCodeProposal(query);
-      if (session !== this.session || !this.open() || this.element()) return;
+      if (!this.accept(generation, elementId, token) || this.element()) return;
       const code = response?.successfulRequest ? (response.data?.code ?? '') : '';
       if (code === '') return;
       const current = this.form.controls.code.value.trim();
       if (current !== '' && current !== this.proposed) return;
+      const before = this.readForm();
+      const opened = this.opened();
+      const untouched = opened !== null && sameOpened(opened, before);
       this.proposed = code;
       this.form.controls.code.setValue(code);
+      if (untouched) this.captureOpened();
     } catch {
       // The code field stays as the user left it. A typed code is still required to save.
     }
@@ -330,101 +404,27 @@ export class ElementPanelComponent implements OnInit {
     return body;
   }
 
-  private focusAfter(id: number): () => HTMLElement | null {
-    if (this.surface() === 'table') return this.focusTableAfter(id);
-    return this.focusOutlineAfter(id);
-  }
-
-  private focusOutlineAfter(id: number): () => HTMLElement | null {
-    const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-testid="outline-row"]'));
-    const index = rows.findIndex(row => row.getAttribute('data-row-key') === `id:${id}`);
-    const previousKey = index > 0 ? rows[index - 1].getAttribute('data-row-key') : null;
-    const parentId = this.element()?.parentId ?? null;
-    return () => {
-      if (previousKey) {
-        const controls = document.querySelector(`[data-row-key="${cssEscape(previousKey)}"] [data-testid="row-controls"]`);
-        const control = firstEnabled(controls);
-        if (control?.isConnected) return control;
-      }
-      if (parentId !== null) {
-        const add = document.querySelector(`[data-row-key="id:${parentId}"] [data-testid="add-child"]`);
-        if (add instanceof HTMLElement && add.isConnected && !add.hasAttribute('disabled')) return add;
-      }
-      const rootAdd = document.querySelector('[data-testid="add-root"]');
-      if (rootAdd instanceof HTMLElement && rootAdd.isConnected) return rootAdd;
-      const pageAdd = document.querySelector('[data-testid="add-root-button"] button, [data-testid="add-root-button"]');
-      return pageAdd instanceof HTMLElement ? pageAdd : null;
-    };
-  }
-
-  private focusTableAfter(id: number): () => HTMLElement | null {
-    const depth = this.depth();
-    const view = this.view();
-    const rows = view ? tableRowsForLevel(view, depth) : [];
-    const index = rows.findIndex(row => row.id === id);
-    const previousId = index > 0 ? rows[index - 1].id : null;
-    return () => {
-      const panel = document.querySelector(`[data-testid="level-table"][data-depth="${depth}"]`);
-      if (previousId !== null && panel) {
-        const edit = panel.querySelector(`[data-testid="edit-row"][data-element-id="${previousId}"]`);
-        if (edit instanceof HTMLElement && edit.isConnected) return edit;
-      }
-      const add = panel?.querySelector('[data-testid="add-level"] button, [data-testid="add-level"]');
-      if (add instanceof HTMLElement && add.isConnected) return add;
-      const pageAdd = document.querySelector('[data-testid="add-root-button"] button, [data-testid="add-root-button"]');
-      return pageAdd instanceof HTMLElement ? pageAdd : null;
-    };
-  }
-
-  private focusCode(session: number): void {
+  /** Create mode only. Selecting a row leaves focus on that row (NFR-STF-004). */
+  private focusFirstField(generation: number): void {
     setTimeout(() => {
-      if (session !== this.session || !this.open()) return;
+      if (generation !== this.generation || this.element()) return;
       const field = this.codeField()?.nativeElement;
       if (field?.isConnected) field.focus();
     }, 0);
   }
+}
 
-  /** Viewport width for the drawer. matchMedia is absent in some test environments. */
-  private watchViewport(): void {
-    if (typeof window.matchMedia !== 'function') return;
-    let media: MediaQueryList;
-    try {
-      media = window.matchMedia('(max-width: 1023px)');
-    } catch {
-      return;
-    }
-    this.narrow.set(media.matches);
-    if (typeof media.addEventListener !== 'function') return;
-    const onChange = (event: MediaQueryListEvent) => this.narrow.set(event.matches);
-    media.addEventListener('change', onChange);
-    this.destroyRef.onDestroy(() => media.removeEventListener('change', onChange));
-  }
+function sameOpened(left: OpenedValues, right: OpenedValues): boolean {
+  return (
+    left.code === right.code &&
+    left.name === right.name &&
+    left.description === right.description &&
+    left.parentId === right.parentId &&
+    left.carnets === right.carnets
+  );
 }
 
 function blankToNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
-}
-
-function focusable(current: EventTarget | null): HTMLElement | null {
-  if (!(current instanceof HTMLElement)) return null;
-  if (current.matches('button')) return current;
-  const button = current.querySelector('button');
-  return button instanceof HTMLElement ? button : current;
-}
-
-function firstEnabled(container: ParentNode | null): HTMLElement | null {
-  if (!container) return null;
-  for (const el of Array.from(container.querySelectorAll<HTMLElement>('input, button'))) {
-    if (el.getAttribute('data-testid') === 'toggle-children') continue;
-    if (el.hasAttribute('disabled')) continue;
-    if (el.getAttribute('aria-disabled') === 'true') continue;
-    if (el instanceof HTMLInputElement && el.readOnly) continue;
-    return el;
-  }
-  return null;
-}
-
-function cssEscape(value: string): string {
-  return typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(value) : value.replace(/"/g, '\\"');
 }

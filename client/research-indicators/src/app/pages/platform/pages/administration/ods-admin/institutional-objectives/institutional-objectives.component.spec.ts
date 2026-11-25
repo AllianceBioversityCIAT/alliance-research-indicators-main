@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { NgZone } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MultiSelect } from 'primeng/multiselect';
+import { Select } from 'primeng/select';
 import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import {
   CarryForwardObjectivesResult,
@@ -13,19 +15,29 @@ import {
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
+import { CacheService } from '@shared/services/cache/cache.service';
+import { ObjectivePanelComponent } from './components/objective-panel/objective-panel.component';
 import InstitutionalObjectivesComponent from './institutional-objectives.component';
 import { linkedIndicatorsText } from './objective-view.util';
 
-// @akili-spec institutional-performance/strategy-framework T-16 — R-STF-009, R-STF-010, R-STF-006, NFR-STF-004.
-// KZ-015: the skeleton is asserted before the context resolves; carry forward, confirm, and the
-// drawer are driven by clicks. The toast assertion is the exact string (not a mock that accepts any text).
-// jsdom cannot prove the focus ring, contrast, drawer width, or animation (KZ-017, HITL T-17).
+// @akili-spec institutional-performance/strategy-framework T-20 — R-STF-009, R-STF-010, R-STF-016, NFR-STF-004.
+// KZ-015: row clicks, Enter, select changes, buttons and the alert callbacks drive the transition.
+// KZ-001: refresh in place compares the <table> element, not its text.
+// KZ-017: jsdom cannot judge viewport fit, scroll, colour, or real Tab order. The column height binding is not that measurement.
 
 const ok = <T>(data: T): MainResponse<T> =>
   ({ data, status: 200, description: 'ok', timestamp: '', path: '', successfulRequest: true }) as MainResponse<T>;
 
 const failed = (status: number, errorDetail: unknown): MainResponse<never> =>
-  ({ data: undefined, status, description: 'error', timestamp: '', path: '', successfulRequest: false, errorDetail }) as unknown as MainResponse<never>;
+  ({
+    data: undefined,
+    status,
+    description: 'error',
+    timestamp: '',
+    path: '',
+    successfulRequest: false,
+    errorDetail
+  }) as unknown as MainResponse<never>;
 
 const CONTEXT: FrameworkContext = {
   currentYear: 2026,
@@ -110,31 +122,61 @@ describe('InstitutionalObjectivesComponent', () => {
     return inner;
   };
   const settle = async () => {
-    for (let turn = 0; turn < 6; turn += 1) {
+    for (let turn = 0; turn < 8; turn += 1) {
       await fixture.whenStable();
       fixture.detectChanges();
     }
+    await new Promise(resolve => setTimeout(resolve, 0));
+    fixture.detectChanges();
   };
   const create = () => {
     fixture = TestBed.createComponent(InstitutionalObjectivesComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   };
-  const pickYear = async (year: number) => {
-    fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: year });
+  const row = (id: number) => root().querySelector(`[data-testid="data-table-row"][data-row-key="${id}"]`) as HTMLElement;
+  const clickRow = async (id: number) => {
+    row(id).click();
     await settle();
   };
+  const pressEnter = async (id: number) => {
+    row(id).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle();
+  };
+  const typeInto = async (selector: string, value: string) => {
+    const field = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement;
+    field.value = value;
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+  };
   const lastAlert = (): GlobalAlert => actions.showGlobalAlert.mock.calls.at(-1)?.[0] as GlobalAlert;
+  const answer = async (label: 'Discard' | 'Keep editing') => {
+    const alert = lastAlert();
+    const callback = label === 'Discard' ? alert.confirmCallback : alert.cancelCallback;
+    callback?.event?.();
+    await settle();
+  };
+  const statement = () => (document.querySelector('#objectiveStatement') as HTMLTextAreaElement).value;
+  const selectLabel = (testId: string) => q(testId)?.querySelector('.p-select-label')?.textContent ?? '';
+  const pickOption = async (testId: string, match: (option: { id?: number; year?: number }) => boolean) => {
+    const select = fixture.debugElement.query(By.css(`[data-testid="${testId}"]`)).componentInstance as Select;
+    const option = (select.options as { id?: number; year?: number }[]).find(match);
+    select.onOptionSelect(new Event('click'), option);
+    await settle();
+  };
 
   beforeEach(async () => {
     defaultYear = 2026;
     api = {
       GET_StrategyFrameworkContext: jest.fn().mockResolvedValue(ok(CONTEXT)),
-      GET_StrategyFrameworkObjectiveYears: jest.fn().mockImplementation(
-        () => Promise.resolve(ok({ years: YEAR_ROWS, defaultYear } satisfies FrameworkObjectiveYears))
-      ),
+      GET_StrategyFrameworkObjectiveYears: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(ok({ years: YEAR_ROWS, defaultYear } satisfies FrameworkObjectiveYears))),
       GET_StrategyFramework: jest.fn().mockResolvedValue(ok(FRAMEWORK)),
-      GET_StrategyFrameworkObjectives: jest.fn().mockImplementation((_portfolioId: number, year: number) => Promise.resolve(ok(year === 2026 ? OBJECTIVES : []))),
+      GET_StrategyFrameworkObjectives: jest
+        .fn()
+        .mockImplementation((_portfolioId: number, year: number) => Promise.resolve(ok(year === 2026 ? OBJECTIVES : []))),
       GET_StrategyFrameworkCodeProposal: jest.fn().mockResolvedValue(ok({ code: 'IOB-29' })),
       POST_StrategyFrameworkCarryForward: jest.fn().mockResolvedValue(ok(COPIED)),
       POST_StrategyFrameworkObjective: jest.fn().mockResolvedValue(ok(OBJECTIVES[0])),
@@ -148,13 +190,8 @@ describe('InstitutionalObjectivesComponent', () => {
     }).compileComponents();
   });
 
-  let restoreMedia: (() => void) | null = null;
-
   afterEach(() => {
     fixture?.destroy();
-    document.querySelectorAll('.p-drawer, .p-drawer-mask, .p-overlay-mask').forEach(node => node.remove());
-    restoreMedia?.();
-    restoreMedia = null;
   });
 
   it('shows a skeleton, then the year label and the server defaultYear', async () => {
@@ -181,6 +218,17 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(button('carry-forward').disabled).toBe(false);
   });
 
+  it('binds the column height from the navbar and header signals', async () => {
+    const cache = TestBed.inject(CacheService);
+    cache.navbarHeight.set(51);
+    cache.headerHeight.set(60.5);
+    create();
+    await settle();
+
+    expect(q('objectives-page')?.style.getPropertyValue('--objectives-column-height').trim()).toBe('calc(100vh - 111.5px)');
+    expect(q('objectives-page')?.classList.contains('pt-3')).toBe(false);
+  });
+
   it('selects defaultYear when it is not the machine year', async () => {
     defaultYear = 2029;
     create();
@@ -195,7 +243,8 @@ describe('InstitutionalObjectivesComponent', () => {
     await settle();
 
     expect(button('carry-forward').disabled).toBe(false);
-    await pickYear(2030);
+    fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: 2030 });
+    await settle();
 
     const carry = button('carry-forward');
     expect(carry.textContent).toContain('Carry forward to 2031');
@@ -208,7 +257,8 @@ describe('InstitutionalObjectivesComponent', () => {
   it('disables carry forward on an empty year', async () => {
     create();
     await settle();
-    await pickYear(2027);
+    fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: 2027 });
+    await settle();
 
     const carry = button('carry-forward');
     expect(carry.textContent).toContain('Carry forward to 2028');
@@ -220,12 +270,14 @@ describe('InstitutionalObjectivesComponent', () => {
   it('confirms carry forward and toasts the exact copied sentence', async () => {
     create();
     await settle();
+    const table = root().querySelector('table');
 
     button('carry-forward').click();
     await settle();
 
     expect(api.POST_StrategyFrameworkCarryForward).not.toHaveBeenCalled();
     const alert = lastAlert();
+    expect(alert.summary).toBe('Carry forward');
     expect(alert.confirmCallback?.label).toBe('Carry forward');
     expect(alert.detail).toContain('Copy 28 objectives from 2026 to 2027?');
     await alert.confirmCallback?.event?.();
@@ -240,6 +292,8 @@ describe('InstitutionalObjectivesComponent', () => {
       detail: '28 objectives copied to 2027; 2026 is unchanged'
     });
     expect(actions.handleBadRequest).not.toHaveBeenCalled();
+    expect(root().querySelector('table')).toBe(table);
+    expect(root().querySelector('app-custom-progress-bar')).toBeNull();
   });
 
   it('shows a carry-forward 409 inline and does not toast', async () => {
@@ -259,11 +313,43 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(actions.handleBadRequest).not.toHaveBeenCalled();
   });
 
-  it('opens the form with no owner, indicator options only, and returns focus', async () => {
+  it('fills the panel from a row click and from Enter, and shows the empty state first', async () => {
     create();
     await settle();
 
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
     expect(document.querySelector('[data-testid="objective-form"]')).toBeNull();
+    expect(root().querySelector('[data-testid="edit-objective"]')).toBeNull();
+    expect(root().querySelector('[data-testid="delete-objective"]')).toBeNull();
+    expect(root().querySelector('[data-testid="column-header-actions"]')).toBeNull();
+    // Concatenated so this absence check is not a use of the retired overlay tag.
+    expect(document.querySelector('p-' + 'drawer')).toBeNull();
+    expect(q('side-panel')?.getAttribute('aria-label')).toBe('Objective details');
+    expect(q('objectives-list')?.closest('.side-panel-layout__list')?.classList.contains('side-panel-layout__card')).toBe(true);
+
+    row(10).focus();
+    await clickRow(10);
+    expect(document.querySelector('[data-testid="panel-level"]')?.textContent?.trim()).toBe('INSTITUTIONAL OBJECTIVE');
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-1 · 2026');
+    expect(statement()).toBe('Raise incomes');
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+    // Clicking a focused row must not move focus into the form. jsdom does not
+    // focus a tabindex row on click the way a browser does (KZ-017).
+    expect(document.activeElement).toBe(row(10));
+    expect(document.activeElement).not.toBe(document.querySelector('#objectiveCode'));
+
+    await pressEnter(11);
+    expect(statement()).toBe('Cut loss');
+    expect(row(11).getAttribute('aria-selected')).toBe('true');
+    expect(row(10).getAttribute('aria-selected')).toBe('false');
+    // Concatenated so this absence check is not a use of the retired overlay tag.
+    expect(document.querySelector('p-' + 'drawer')).toBeNull();
+  });
+
+  it('opens create with no owner, focuses the code, and returns focus to the button on Cancel', async () => {
+    create();
+    await settle();
+
     const opener = button('add-objective');
     opener.focus();
     opener.click();
@@ -273,26 +359,18 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(opened.textContent?.toLowerCase()).not.toContain('owner');
     expect(opened.querySelector('label[for="objectiveIndicators"]')?.textContent?.trim()).toBe('Linked indicators');
     expect((document.querySelector('#objectiveCode') as HTMLInputElement).value).toBe('IOB-29');
+    expect(document.activeElement).toBe(document.querySelector('#objectiveCode'));
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('New institutional objective');
+    expect(document.querySelector('[data-testid="objective-panel-delete"]')).toBeNull();
+    expect(row(10).getAttribute('aria-selected')).toBe('false');
 
     const multi = fixture.debugElement.query(By.directive(MultiSelect)).componentInstance as MultiSelect;
     const labels = (multi.options as { items: { label: string; value: number }[] }[]).flatMap(group => group.items.map(item => item.label));
     expect(labels).toEqual(['1.1.1 · Yield', '1.1.2 · Loss']);
     expect(multi.options as { label: string }[]).toEqual([expect.objectContaining({ label: '1 · Area one' })]);
 
-    const code = document.querySelector('#objectiveCode') as HTMLInputElement;
-    const statement = document.querySelector('#objectiveStatement') as HTMLTextAreaElement;
-    const save = document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement;
-    statement.focus();
-    save.focus();
-    // A real focus() is what sets relatedTarget to Save. A synthetic FocusEvent drops it in jsdom,
-    // and the trap then treats the event as coming from outside.
-    opened.querySelector<HTMLElement>('[data-pc-section="lastfocusableelement"]')?.focus();
-    expect(document.activeElement).toBe(code);
-
-    const cancel = document.querySelector('[data-testid="objective-cancel"] button') as HTMLButtonElement;
-    cancel.click();
+    (document.querySelector('[data-testid="objective-cancel"] button') as HTMLButtonElement).click();
     await settle();
-    await new Promise(resolve => setTimeout(resolve, 0));
     expect(document.activeElement).toBe(opener);
     expect(document.querySelector('[data-testid="objective-form"]')).toBeNull();
   });
@@ -303,14 +381,10 @@ describe('InstitutionalObjectivesComponent', () => {
     button('add-objective').click();
     await settle();
 
-    const statement = document.querySelector('#objectiveStatement') as HTMLTextAreaElement;
-    statement.value = 'A new objective';
-    statement.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    const panel = fixture.debugElement.query(By.css('app-objective-panel')).componentInstance as {
-      form: { controls: { elementIds: { setValue: (value: number[]) => void } } };
-    };
+    await typeInto('#objectiveStatement', 'A new objective');
+    const panel = fixture.debugElement.query(By.directive(ObjectivePanelComponent)).componentInstance as ObjectivePanelComponent;
     panel.form.controls.elementIds.setValue([31]);
+    fixture.detectChanges();
     (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
     await settle();
 
@@ -326,79 +400,369 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(body['responsibleCarnets']).toBeUndefined();
   });
 
-  it('follows deletable: a blocked objective is not deleted, a free one confirms then deletes', async () => {
+  it('saves in place, keeps the row selected, and does not replace the table element', async () => {
     create();
     await settle();
+    await clickRow(10);
+    const table = root().querySelector('table');
+    expect(table).not.toBeNull();
+    await typeInto('#objectiveStatement', 'Raise incomes updated');
+    const saved = { ...OBJECTIVES[0], statement: 'Raise incomes updated' };
+    api.PATCH_StrategyFrameworkObjective.mockResolvedValue(ok(saved));
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([saved, OBJECTIVES[1]]));
 
-    const blocked = root().querySelector('[data-testid="delete-objective"][data-objective-id="11"]') as HTMLButtonElement;
-    expect(blocked.getAttribute('aria-disabled')).toBe('true');
-    expect(blocked.querySelector('.atc-red-1')).toBeNull();
-    expect(blocked.querySelector('.atc-grey-700')).not.toBeNull();
-    expect(root().querySelector('#objective-blocker-11')?.textContent?.trim()).toBe('Remove its 1 record in KPIs first.');
-    blocked.click();
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
     await settle();
-    expect(api.DELETE_StrategyFrameworkObjective).not.toHaveBeenCalled();
-    expect(lastAlert().confirmCallback?.label).toBe('Close');
-    expect(lastAlert().detail).toContain('Remove its 1 record in KPIs first.');
 
-    const free = root().querySelector('[data-testid="delete-objective"][data-objective-id="10"]') as HTMLButtonElement;
-    expect(free.getAttribute('aria-disabled')).toBe('false');
-    expect(free.querySelector('.atc-red-1')).not.toBeNull();
-    free.click();
-    await settle();
-    expect(lastAlert().detail).toBe('Delete Institutional objective IOB-1?');
-    expect(lastAlert().confirmCallback?.label).toBe('Delete');
-    await lastAlert().confirmCallback?.event?.();
-    await settle();
-    expect(api.DELETE_StrategyFrameworkObjective).toHaveBeenCalledTimes(1);
-    expect(api.DELETE_StrategyFrameworkObjective).toHaveBeenCalledWith(10);
-    expect(actions.showToast).not.toHaveBeenCalled();
+    expect(api.PATCH_StrategyFrameworkObjective).toHaveBeenCalledWith(10, {
+      year: 2026,
+      code: 'IOB-1',
+      statement: 'Raise incomes updated',
+      elementIds: [31]
+    });
+    expect(actions.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Saved', detail: 'IOB-1 saved' });
+    expect(root().querySelector('table')).toBe(table);
+    expect(root().querySelector('app-custom-progress-bar')).toBeNull();
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+    expect(row(10).querySelector('[data-testid="cell-statement"]')?.textContent?.trim()).toBe('Raise incomes updated');
+    expect(statement()).toBe('Raise incomes updated');
   });
 
-  it('heads the open objective and deletes from the panel through the same confirm', async () => {
+  it('does not ask to discard a statement that was just saved', async () => {
     create();
     await settle();
-
-    (root().querySelector('[data-testid="edit-objective"][data-objective-id="11"]') as HTMLButtonElement).click();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'Raise incomes updated');
+    const saved = { ...OBJECTIVES[0], statement: 'Raise incomes updated' };
+    api.PATCH_StrategyFrameworkObjective.mockResolvedValue(ok(saved));
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([saved, OBJECTIVES[1]]));
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
     await settle();
-    expect(document.querySelector('[data-testid="panel-level"]')?.textContent?.trim()).toBe('INSTITUTIONAL OBJECTIVE');
-    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-2 · 2026');
+    actions.showGlobalAlert.mockClear();
+
+    await clickRow(11);
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(statement()).toBe('Cut loss');
+  });
+
+  it('keeps the saved statement when Cancel follows Save', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'Raise incomes updated');
+    const saved = { ...OBJECTIVES[0], statement: 'Raise incomes updated' };
+    api.PATCH_StrategyFrameworkObjective.mockResolvedValue(ok(saved));
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([saved, OBJECTIVES[1]]));
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
+    await settle();
+
+    (document.querySelector('[data-testid="objective-cancel"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(statement()).toBe('Raise incomes updated');
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('keeps a created objective when Cancel follows Save', async () => {
+    const created: FrameworkObjective = {
+      id: 40,
+      portfolioId: 2,
+      year: 2026,
+      code: 'IOB-29',
+      statement: 'A new objective',
+      elements: [],
+      deletable: true,
+      blockers: []
+    };
+    api.POST_StrategyFrameworkObjective.mockResolvedValue(ok(created));
+    create();
+    await settle();
+    button('add-objective').click();
+    await settle();
+    await typeInto('#objectiveStatement', 'A new objective');
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([...OBJECTIVES, created]));
+
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
+    await settle();
+    (document.querySelector('[data-testid="objective-cancel"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(statement()).toBe('A new objective');
+    expect((document.querySelector('#objectiveCode') as HTMLInputElement).value).toBe('IOB-29');
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-29 · 2026');
+    expect(row(40).getAttribute('aria-selected')).toBe('true');
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+  });
+
+  it('keeps text typed while a save is in flight and still asks before leaving', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'X');
+    let resolvePatch: (value: MainResponse<FrameworkObjective>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkObjective.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([{ ...OBJECTIVES[0], statement: 'X' }, OBJECTIVES[1]]));
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
+    await typeInto('#objectiveStatement', 'XY');
+    resolvePatch(ok({ ...OBJECTIVES[0], statement: 'X' }));
+    await settle();
+
+    expect(statement()).toBe('XY');
+    actions.showGlobalAlert.mockClear();
+    await clickRow(11);
+    expect(lastAlert().summary).toBe('Discard changes?');
+    expect(statement()).toBe('XY');
+  });
+
+  it('keeps text typed while a create is saving, and edits the new id after refresh', async () => {
+    const created: FrameworkObjective = {
+      id: 40,
+      portfolioId: 2,
+      year: 2026,
+      code: 'IOB-29',
+      statement: 'X',
+      elements: [],
+      deletable: true,
+      blockers: []
+    };
+    create();
+    await settle();
+    button('add-objective').click();
+    await settle();
+    await typeInto('#objectiveStatement', 'X');
+    let resolvePost: (value: MainResponse<FrameworkObjective>) => void = () => undefined;
+    api.POST_StrategyFrameworkObjective.mockReturnValue(new Promise(resolve => (resolvePost = resolve)));
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
+    await typeInto('#objectiveStatement', 'XY');
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([...OBJECTIVES, created]));
+    resolvePost(ok(created));
+    await settle();
+
+    expect(statement()).toBe('XY');
+    expect(document.querySelector('[data-testid="objective-panel-delete"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).not.toContain('New');
+    expect(row(40).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('does not ask to discard a saved edit before the refresh returns', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'Raise incomes updated');
+    let resolvePatch: (value: MainResponse<FrameworkObjective>) => void = () => undefined;
+    let resolveGet: (value: MainResponse<FrameworkObjective[]>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkObjective.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
+    api.GET_StrategyFrameworkObjectives.mockReturnValue(new Promise(resolve => (resolveGet = resolve)));
+    resolvePatch(ok({ ...OBJECTIVES[0], statement: 'Raise incomes updated' }));
+    await Promise.resolve();
+    await Promise.resolve();
+    fixture.detectChanges();
+    actions.showGlobalAlert.mockClear();
+
+    row(11).click();
+    fixture.detectChanges();
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(statement()).toBe('Cut loss');
+    resolveGet(ok(OBJECTIVES));
+    await settle();
+  });
+
+  it('asks before a year change, and Keep editing leaves the year label and the form', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'edited text');
+    const yearSelect = fixture.debugElement.query(By.css('[data-testid="year-select"]')).componentInstance as Select;
+    const rejected = (yearSelect.options as { year: number }[]).find(option => option.year === 2027);
+    yearSelect.onOptionSelect(new Event('click'), rejected);
+    await settle();
+
+    expect(lastAlert().summary).toBe('Discard changes?');
+    expect(lastAlert().detail).toBe('Your edits to IOB-1 will be lost.');
+    expect(lastAlert().cancelCallback?.label).toBe('Keep editing');
+    await answer('Keep editing');
+
+    expect(component.year()).toBe(2026);
+    expect(q('year-select')?.querySelector('.p-select-label')?.textContent).toContain('2026 · 28 objectives');
+    expect(q('year-select')?.querySelector('.p-select-label')?.textContent).not.toContain('2027');
+    expect(statement()).toBe('edited text');
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('shows the current portfolio label again when Keep editing rejects the change', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'portfolio edit');
+    const select = fixture.debugElement.query(By.css('[data-testid="portfolio-select"]')).componentInstance as Select;
+    const rejected = (select.options as { id: number }[]).find(option => option.id === 1);
+    select.onOptionSelect(new Event('click'), rejected);
+    await settle();
+    await answer('Keep editing');
+
+    expect(component.portfolioId()).toBe(2);
+    expect(q('portfolio-select')?.querySelector('.p-select-label')?.textContent).toContain('Portfolio 2');
+    expect(q('portfolio-select')?.querySelector('.p-select-label')?.textContent).not.toContain('Portfolio 1');
+    expect(statement()).toBe('portfolio edit');
+  });
+
+  it('shows the new year label when a clean year change proceeds, and clears the selection', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+
+    await pickOption('year-select', option => option.year === 2027);
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(component.year()).toBe(2027);
+    expect(selectLabel('year-select')).toContain('2027 · 0 objectives');
+    expect(selectLabel('year-select')).not.toContain('2026');
+    expect(component.selectedId()).toBeNull();
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+  });
+
+  it('shows the new year label when Discard proceeds, and clears the selection', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'edited text');
+
+    await pickOption('year-select', option => option.year === 2027);
+    expect(lastAlert().summary).toBe('Discard changes?');
+    await answer('Discard');
+
+    expect(component.year()).toBe(2027);
+    expect(selectLabel('year-select')).toContain('2027 · 0 objectives');
+    expect(selectLabel('year-select')).not.toContain('2026');
+    expect(component.selectedId()).toBeNull();
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+  });
+
+  it('shows the new portfolio label when a clean portfolio change proceeds, and clears the selection', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+
+    await pickOption('portfolio-select', option => option.id === 1);
+
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(component.portfolioId()).toBe(1);
+    expect(selectLabel('portfolio-select')).toContain('Portfolio 1');
+    expect(selectLabel('portfolio-select')).not.toContain('Portfolio 2');
+    expect(component.selectedId()).toBeNull();
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+  });
+
+  it('shows the new portfolio label when Discard proceeds, and clears the selection', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'edited text');
+
+    await pickOption('portfolio-select', option => option.id === 1);
+    expect(lastAlert().summary).toBe('Discard changes?');
+    await answer('Discard');
+
+    expect(component.portfolioId()).toBe(1);
+    expect(selectLabel('portfolio-select')).toContain('Portfolio 1');
+    expect(selectLabel('portfolio-select')).not.toContain('Portfolio 2');
+    expect(component.selectedId()).toBeNull();
+    expect(q('panel-empty')?.textContent?.trim()).toBe('Select an entry to see its details.');
+  });
+
+  it('asks before carry forward while the form is dirty, and Keep editing does not copy', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'edited text');
+
+    button('carry-forward').click();
+    await settle();
+    expect(lastAlert().summary).toBe('Discard changes?');
+    expect(lastAlert().detail).toBe('Your edits to IOB-1 will be lost.');
+    await answer('Keep editing');
+
+    expect(api.POST_StrategyFrameworkCarryForward).not.toHaveBeenCalled();
+    expect(statement()).toBe('edited text');
+    expect(component.year()).toBe(2026);
+
+    button('carry-forward').click();
+    await settle();
+    expect(lastAlert().summary).toBe('Discard changes?');
+    await answer('Discard');
+    expect(lastAlert().summary).toBe('Carry forward');
+    expect(lastAlert().detail).toContain('Copy 28 objectives from 2026 to 2027?');
+  });
+
+  it('asks before create, and Discard opens the new objective', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'edited text');
+
+    button('add-objective').click();
+    await settle();
+    expect(lastAlert().detail).toBe('Your edits to IOB-1 will be lost.');
+    await answer('Keep editing');
+    expect(statement()).toBe('edited text');
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-1 · 2026');
+
+    await answer('Discard');
+    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('New institutional objective');
+    expect((document.querySelector('#objectiveCode') as HTMLInputElement).value).toBe('IOB-29');
+  });
+
+  it('deletes from the panel with the same confirm, and focuses the next row', async () => {
+    create();
+    await settle();
+    await clickRow(11);
+
     const blocked = document.querySelector('[data-testid="objective-panel-delete"] button') as HTMLButtonElement;
     expect(blocked.getAttribute('aria-disabled')).toBe('true');
-    expect(blocked.classList.contains('p-button-outlined')).toBe(true);
-    expect(blocked.classList.contains('p-button-danger')).toBe(false);
-    expect(document.querySelector('#objective-panel-blocker-11')?.textContent?.trim()).toBe('Remove its 1 record in KPIs first.');
+    expect(document.querySelector('[data-testid="objective-delete-reason"]')?.textContent?.trim()).toBe('Remove its 1 record in KPIs first.');
     blocked.click();
     await settle();
     expect(api.DELETE_StrategyFrameworkObjective).not.toHaveBeenCalled();
+    expect(lastAlert().summary).toBe('Cannot delete');
     expect(lastAlert().confirmCallback?.label).toBe('Close');
+    expect(lastAlert().hasNoCancelButton).toBe(true);
     expect(lastAlert().detail).toContain('Remove its 1 record in KPIs first.');
 
     (document.querySelector('[data-testid="objective-cancel"] button') as HTMLButtonElement).click();
     await settle();
-    (root().querySelector('[data-testid="edit-objective"][data-objective-id="10"]') as HTMLButtonElement).click();
-    await settle();
-    expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-1 · 2026');
-    const free = document.querySelector('[data-testid="objective-panel-delete"] button') as HTMLButtonElement;
-    expect(free.getAttribute('aria-disabled')).toBe('false');
-    expect(free.classList.contains('p-button-outlined')).toBe(true);
-    expect(free.classList.contains('p-button-danger')).toBe(true);
-    free.click();
-    await settle();
+    await clickRow(10);
+    api.GET_StrategyFrameworkObjectives.mockResolvedValue(ok([OBJECTIVES[1]]));
+    const table = root().querySelector('table');
+    fixture.autoDetectChanges(true);
+    (document.querySelector('[data-testid="objective-panel-delete"] button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
     expect(lastAlert().detail).toBe('Delete Institutional objective IOB-1?');
     expect(lastAlert().confirmCallback?.label).toBe('Delete');
-    await lastAlert().confirmCallback?.event?.();
-    await settle();
+    expect(lastAlert().hideCloseButton).toBe(true);
+    await TestBed.inject(NgZone).run(() => lastAlert().confirmCallback?.event?.());
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
     expect(api.DELETE_StrategyFrameworkObjective).toHaveBeenCalledTimes(1);
     expect(api.DELETE_StrategyFrameworkObjective).toHaveBeenCalledWith(10);
+    expect(actions.showToast).not.toHaveBeenCalled();
+    expect(root().querySelector('[data-row-key="10"]')).toBeNull();
+    expect(document.activeElement?.getAttribute('data-row-key')).toBe('11');
+    expect(root().querySelector('table')).toBe(table);
+    expect(root().querySelector('app-custom-progress-bar')).toBeNull();
   });
 
   it('shows a delete 409 inline and does not toast', async () => {
     api.DELETE_StrategyFrameworkObjective.mockResolvedValue(failed(409, { description: 'Cannot delete IOB-1: linked by 1 record.' }));
     create();
     await settle();
+    await clickRow(10);
 
-    (root().querySelector('[data-testid="delete-objective"][data-objective-id="10"]') as HTMLButtonElement).click();
+    (document.querySelector('[data-testid="objective-panel-delete"] button') as HTMLButtonElement).click();
     await settle();
     await lastAlert().confirmCallback?.event?.();
     await settle();
@@ -406,6 +770,37 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(q('delete-error')?.textContent?.trim()).toBe('Cannot delete IOB-1: linked by 1 record.');
     expect(actions.showToast).not.toHaveBeenCalled();
     expect(actions.handleBadRequest).not.toHaveBeenCalled();
+    expect(statement()).toBe('Raise incomes');
+  });
+
+  it('keeps a failed save in the panel', async () => {
+    api.PATCH_StrategyFrameworkObjective.mockResolvedValue(failed(409, { description: 'code is taken', field: 'code' }));
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'Raise incomes edited');
+    (document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).click();
+    await settle();
+
+    expect(statement()).toBe('Raise incomes edited');
+    expect(document.querySelector('[data-testid="objective-error"]')?.textContent?.trim()).toBe('code is taken');
+    expect(actions.showToast).not.toHaveBeenCalled();
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('leaves the form open when Escape is pressed in a field', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    await typeInto('#objectiveStatement', 'Unsaved statement');
+
+    const code = document.querySelector('#objectiveCode') as HTMLElement;
+    code.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+    await settle();
+
+    expect(document.querySelector('[data-testid="objective-form"]')).not.toBeNull();
+    expect(statement()).toBe('Unsaved statement');
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
   });
 
   it('puts each linked indicator on its own line', () => {
@@ -416,79 +811,4 @@ describe('InstitutionalObjectivesComponent', () => {
       ])
     ).toBe('1.1.1 Process efficiency\n1.1.2 Loss');
   });
-
-  it('closes only the Year select on Escape, then the drawer, and returns focus to the opener', async () => {
-    restoreMedia = installMatchMedia().restore;
-    create();
-    await settle();
-    const opener = button('add-objective');
-    opener.focus();
-    opener.click();
-    await settle();
-
-    const statement = document.querySelector('#objectiveStatement') as HTMLTextAreaElement;
-    statement.value = 'Unsaved statement';
-    statement.dispatchEvent(new Event('input', { bubbles: true }));
-    fixture.detectChanges();
-
-    const year = document.querySelector('[data-testid="objective-year"]') as HTMLElement;
-    year.click();
-    await settle();
-    expect(document.querySelector('.p-select-overlay')).not.toBeNull();
-    const yearTarget = document.querySelector('[data-testid="objective-year"] [role="combobox"]') ?? year;
-    pressEscape(yearTarget);
-    await settle();
-
-    expect(document.querySelector('[data-testid="objective-form"]')).not.toBeNull();
-    expect(document.querySelector('.p-select-overlay')).toBeNull();
-    expect((document.querySelector('#objectiveStatement') as HTMLTextAreaElement).value).toBe('Unsaved statement');
-
-    const indicators = document.querySelector('[data-testid="objective-indicators"]') as HTMLElement;
-    indicators.click();
-    await settle();
-    expect(document.querySelector('.p-multiselect-overlay')).not.toBeNull();
-    const filter = document.querySelector('.p-multiselect-filter') ?? document.querySelector('.p-multiselect-overlay [role="searchbox"]') ?? indicators;
-    pressEscape(filter);
-    await settle();
-    expect(document.querySelector('[data-testid="objective-form"]')).not.toBeNull();
-    expect(document.querySelector('.p-multiselect-overlay')).toBeNull();
-    expect((document.querySelector('#objectiveStatement') as HTMLTextAreaElement).value).toBe('Unsaved statement');
-
-    pressEscape(document.querySelector('#objectiveCode') as HTMLElement);
-    await settle();
-    await new Promise(resolve => setTimeout(resolve, 0));
-    expect(document.querySelector('[data-testid="objective-form"]')).toBeNull();
-    expect(document.activeElement).toBe(opener);
-  });
 });
-
-function pressEscape(target: EventTarget): void {
-  const event = new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true });
-  Object.defineProperty(event, 'which', { configurable: true, get: () => 27 });
-  target.dispatchEvent(event);
-}
-
-function installMatchMedia(): { restore: () => void } {
-  if (typeof Element.prototype.scrollIntoView !== 'function') Element.prototype.scrollIntoView = () => undefined;
-  const original = Object.getOwnPropertyDescriptor(window, 'matchMedia');
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: jest.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      dispatchEvent: jest.fn()
-    }))
-  });
-  return {
-    restore: () => {
-      if (original) Object.defineProperty(window, 'matchMedia', original);
-      else delete (window as Partial<Window>).matchMedia;
-    }
-  };
-}

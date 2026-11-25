@@ -1,0 +1,22 @@
+// Text-like fields recolour their own border on focus and draw no offset outline.
+// The colour is PrimeNG's form-field focus border, --p-form-field-focus-border-color
+// (token form.field.focus.border.color). roartheme.ts sets formField.focusBorderColor
+// to {primary.color} and formField.focusRing to width 0, offset 0, shadow none
+// (semantic.formField.focusRing). Aura inputtext and select both read that token.
+
+@mixin ods-field-focus {
+  outline: none;
+  outline-offset: 0;
+  border-color: var(--p-form-field-focus-border-color);
+}
+
+@mixin ods-panel-field-focus {
+  .field__control:focus,
+  .field__control:focus-visible,
+  :host ::ng-deep .p-select:not(.p-disabled).p-focus,
+  :host ::ng-deep .p-multiselect:not(.p-disabled).p-focus,
+  :host ::ng-deep .p-autocomplete:not(.p-disabled).p-focus .p-autocomplete-input,
+  :host ::ng-deep .p-autocomplete:not(.p-disabled).p-focus .p-autocomplete-input-multiple {
+    @include ods-field-focus;
+  }
+}

@@ -1,5 +1,5 @@
-<div class="app-page-wrapper pt-3">
-  <div class="flex w-full flex-col gap-[18px]">
+<div class="app-page-wrapper objectives-page" [style.--objectives-column-height]="columnHeight()" data-testid="objectives-page">
+  <div class="objectives-page__body">
     <section class="flex w-full min-w-0 flex-col gap-[18px]" [attr.aria-busy]="loading()">
       <div class="flex flex-wrap items-start justify-between gap-4" data-testid="page-header">
         <div class="flex flex-col gap-[2px]">
@@ -12,6 +12,7 @@
         <div class="flex flex-col gap-1">
           <label for="objectivePortfolio" class="text-sm font-medium atc-grey-800">Portfolio</label>
           <p-select
+            #portfolioSelect
             inputId="objectivePortfolio"
             [options]="portfolioOptions()"
             optionLabel="label"
@@ -30,6 +31,7 @@
         <div class="flex flex-col gap-1">
           <label for="objectivePageYear" class="text-sm font-medium atc-grey-800">Year</label>
           <p-select
+            #yearSelect
             inputId="objectivePageYear"
             [options]="yearOptions()"
             optionLabel="label"
@@ -73,86 +75,63 @@
         <p class="m-0 text-sm leading-[1.5] atc-red-1" role="alert" data-testid="delete-error">{{ message }}</p>
       }
 
-      <div
-        class="flex min-h-[320px] w-full flex-col rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]"
-        data-testid="objectives-body">
-        @if (loading()) {
-          <app-custom-progress-bar></app-custom-progress-bar>
-        } @else if (loadError()) {
-          <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
-            <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
-            <p-button
-              label="Retry"
-              icon="pi pi-refresh !text-[12px]"
-              severity="secondary"
-              size="small"
-              styleClass="!rounded-[9px] !text-[13px]"
-              (onClick)="load()"
-              data-testid="retry-button">
-            </p-button>
+      @if (loading()) {
+        <app-custom-progress-bar></app-custom-progress-bar>
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+          <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
+          <p-button
+            label="Retry"
+            icon="pi pi-refresh !text-[12px]"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="load()"
+            data-testid="retry-button">
+          </p-button>
+        </div>
+      } @else {
+        <app-side-panel-layout
+          [hasSelection]="selectedId() !== null"
+          [creating]="creating()"
+          emptyText="Select an entry to see its details."
+          panelLabel="Objective details">
+          <div list data-testid="objectives-list">
+            <div data-testid="objectives-table">
+              <app-data-table
+                [columns]="columns"
+                [rows]="objectiveRows()"
+                [searchFields]="searchFields"
+                [exportFileName]="exportFileName()"
+                [selectable]="true"
+                [keyboardSelectable]="true"
+                [selectedKey]="selectedKey()"
+                (rowSelected)="onRowSelected($event)"
+                searchPlaceholder="Search code or statement"
+                emptyMessage="No institutional objectives for this year yet.">
+              </app-data-table>
+            </div>
           </div>
-        } @else {
-          <div class="p-3" data-testid="objectives-table">
-            <app-data-table
-              [columns]="columns"
-              [rows]="objectiveRows()"
-              [searchFields]="searchFields"
-              [exportFileName]="exportFileName()"
-              searchPlaceholder="Search code or statement"
-              emptyMessage="No institutional objectives for this year yet.">
-              <ng-template #rowActions let-row>
-                @if (objectiveById(row.id); as objective) {
-                  <div class="flex gap-2" [attr.data-objective-id]="objective.id">
-                    <button
-                      type="button"
-                      data-testid="edit-objective"
-                      [attr.data-objective-id]="objective.id"
-                      [attr.aria-label]="'Edit ' + objective.code"
-                      (click)="openEdit(objective, $event)"
-                      class="row-action inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
-                      <i class="pi pi-pencil !text-[12px] atc-light-blue-400" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="delete-objective"
-                      [attr.data-objective-id]="objective.id"
-                      [attr.aria-label]="'Delete Institutional objective ' + objective.code"
-                      [attr.aria-disabled]="objective.deletable ? 'false' : 'true'"
-                      [attr.aria-describedby]="!objective.deletable && blockerText(objective) ? 'objective-blocker-' + objective.id : null"
-                      [pTooltip]="objective.deletable ? '' : blockerText(objective)"
-                      tooltipPosition="top"
-                      tooltipEvent="both"
-                      [tooltipDisabled]="objective.deletable || blockerText(objective) === ''"
-                      (click)="requestDelete(objective, $event)"
-                      class="row-action inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
-                      <i
-                        class="pi pi-trash !text-[12px]"
-                        [class.atc-red-1]="objective.deletable"
-                        [class.atc-grey-700]="!objective.deletable"
-                        aria-hidden="true"></i>
-                    </button>
-                    @if (!objective.deletable && blockerText(objective)) {
-                      <span class="sr-only" [id]="'objective-blocker-' + objective.id">{{ blockerText(objective) }}</span>
-                    }
-                  </div>
-                }
-              </ng-template>
-            </app-data-table>
+          <div panel data-testid="objective-panel-slot">
+            @if (selectedId() !== null || creating()) {
+              <app-objective-panel
+                [portfolioId]="portfolioId() ?? 0"
+                [years]="yearNumbers()"
+                [selectedYear]="year()"
+                [objectiveId]="selectedId()"
+                [creating]="creating()"
+                [createToken]="createToken()"
+                [objectives]="objectives()"
+                [framework]="framework()"
+                (dirty)="onDirty($event)"
+                (saved)="onSaved($event)"
+                (cancelled)="onCancelled($event)"
+                (deleteRequested)="onDelete()">
+              </app-objective-panel>
+            }
           </div>
-        }
-      </div>
-
-      <app-objective-panel
-        [open]="panelOpen()"
-        [portfolioId]="portfolioId() ?? 0"
-        [years]="yearNumbers()"
-        [selectedYear]="year()"
-        [objective]="editing()"
-        [framework]="framework()"
-        (closed)="closePanel()"
-        (saved)="onSaved()"
-        (deleteRequested)="onPanelDelete($event)">
-      </app-objective-panel>
+        </app-side-panel-layout>
+      }
     </section>
   </div>
 </div>

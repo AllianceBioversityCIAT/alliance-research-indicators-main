@@ -67,6 +67,12 @@ export class DataTableComponent<T extends object> {
    */
   @Input() selectable = false;
   @Input() selectedKey: string | null = null;
+  /**
+   * Opt-in keyboard row selection (strategy-framework D-STF-36). When this and `selectable`
+   * are true, each body row is tabbable and Enter/Space emit `rowSelected`. Default false
+   * leaves the rendered row DOM unchanged (P-47).
+   */
+  @Input() keyboardSelectable = false;
   @Output() rowSelected = new EventEmitter<T>();
 
   // Row-actions slot (design §6.3 "an actions template"). The parent projects
@@ -168,6 +174,22 @@ export class DataTableComponent<T extends object> {
 
   onRowClick(row: T): void {
     if (this.selectable) this.rowSelected.emit(row);
+  }
+
+  /** `data-row-key` value; the same `String(row.id)` that `isSelected` compares. */
+  rowKey(row: T): string {
+    return String((row as Record<string, unknown>)['id']);
+  }
+
+  // Enter and Space share the click emit. A key that starts on a button, link or input
+  // (`target !== currentTarget`) is left alone, and Space is prevented only on the row
+  // itself so the page does not scroll.
+  onRowKeydown(event: Event, row: T): void {
+    if (!this.selectable || !this.keyboardSelectable) return;
+    if (event.target !== event.currentTarget) return;
+    // `keydown.enter` / `keydown.space` type `$event` as `Event` under strict templates.
+    if (event instanceof KeyboardEvent && event.key === ' ') event.preventDefault();
+    this.onRowClick(row);
   }
 
   cellValue(row: T, column: DataTableColumn<T>): unknown {

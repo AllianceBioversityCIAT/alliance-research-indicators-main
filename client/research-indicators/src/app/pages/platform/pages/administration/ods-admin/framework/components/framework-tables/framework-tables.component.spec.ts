@@ -1,26 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import {
-  FrameworkEditorElement,
-  FrameworkEditorView,
-  FrameworkElementBlockers,
-  FrameworkLevel,
-  FrameworkResponsible
-} from '@shared/interfaces/strategy-framework.interface';
-import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
-import { MainResponse } from '@shared/interfaces/responses.interface';
-import { ActionsService } from '@shared/services/actions.service';
-import { ApiService } from '@shared/services/api.service';
+import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, FrameworkResponsible } from '@shared/interfaces/strategy-framework.interface';
 import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
-import { FrameworkTableCreate, FrameworkTablesComponent } from './framework-tables.component';
+import { FrameworkTablesComponent } from './framework-tables.component';
 
-// @akili-spec institutional-performance/strategy-framework T-14 — R-STF-008 AC.1–AC.2, design §6.4,
-// D-STF-12, P-23. KZ-001: chips, columns and row actions are read from the DOM.
-// KZ-015: the chip and the row action are clicked. KZ-017: jsdom cannot drag a column to measure resize.
-
-const ok = <T>(data: T): MainResponse<T> =>
-  ({ data, status: 200, description: 'ok', timestamp: '', path: '', successfulRequest: true }) as MainResponse<T>;
+// @akili-spec institutional-performance/strategy-framework T-23 — R-STF-008 AC.1, design §6.4, D-STF-37.
+// KZ-001: chips, columns and the selected row are read from the DOM.
+// KZ-015: the row is clicked and Enter/Space are dispatched on it. The chip is clicked too.
+// KZ-017: jsdom cannot judge the card, the toolbar or column alignment.
 
 const LEVELS: FrameworkLevel[] = [
   { id: 1, depth: 1, name: 'Performance Area', pluralName: 'Performance Areas', shortLabel: 'AREA', isIndicatorLevel: false },
@@ -38,7 +26,9 @@ const responsibles: FrameworkResponsible[] = [
   { carnet: 'PA', name: 'Philippe Attey', email: null, isActiveStaff: false }
 ];
 
-const element = (partial: Partial<FrameworkEditorElement> & Pick<FrameworkEditorElement, 'id' | 'depth' | 'code' | 'name'>): FrameworkEditorElement => ({
+const element = (
+  partial: Partial<FrameworkEditorElement> & Pick<FrameworkEditorElement, 'id' | 'depth' | 'code' | 'name'>
+): FrameworkEditorElement => ({
   levelId: partial.depth,
   description: null,
   parentId: null,
@@ -57,8 +47,6 @@ const viewOf = (elements: FrameworkEditorElement[], levels: FrameworkLevel[] = L
   usageLabels: []
 });
 
-const freeBlockers = (): FrameworkElementBlockers => ({ children: 0, objectives: 0, consumers: [], wayOut: [] });
-
 /** One chain through four levels. The fourth level is not named anywhere in the component. */
 const fourLevelView = (): FrameworkEditorView =>
   viewOf(
@@ -72,14 +60,24 @@ const fourLevelView = (): FrameworkEditorView =>
     9
   );
 
+/** 4 areas, 13 dimensions, 31 indicators. Same shape as the seed counts. */
+const seed48 = (): FrameworkEditorView => {
+  const elements: FrameworkEditorElement[] = [];
+  for (let area = 1; area <= 4; area++) {
+    elements.push(element({ id: area, depth: 1, code: String(area), name: `Area ${area}` }));
+  }
+  for (let dimension = 1; dimension <= 13; dimension++) {
+    const area = dimension <= 10 ? 1 : 2;
+    elements.push(element({ id: 100 + dimension, depth: 2, code: `${area}.${dimension}`, name: `Dimension ${dimension}`, parentId: area }));
+  }
+  for (let indicator = 1; indicator <= 31; indicator++) {
+    elements.push(element({ id: 1000 + indicator, depth: 3, code: `1.1.${indicator}`, name: `Indicator ${indicator}`, parentId: 101 }));
+  }
+  return viewOf(elements);
+};
+
 describe('FrameworkTablesComponent', () => {
   let fixture: ComponentFixture<FrameworkTablesComponent>;
-  let api: {
-    GET_StrategyFrameworkEditor: jest.Mock;
-    DELETE_StrategyFrameworkElement: jest.Mock;
-    GET_StrategyFrameworkElementBlockers: jest.Mock;
-  };
-  let alerts: GlobalAlert[];
 
   const root = () => fixture.nativeElement as HTMLElement;
   const settle = async () => {
@@ -88,42 +86,31 @@ describe('FrameworkTablesComponent', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     fixture.detectChanges();
   };
-  const mount = async (view: FrameworkEditorView, level: number | null = null) => {
+  const mount = async (view: FrameworkEditorView) => {
     fixture = TestBed.createComponent(FrameworkTablesComponent);
     fixture.componentRef.setInput('view', view);
-    fixture.componentRef.setInput('level', level);
+    fixture.componentRef.setInput('selectedKey', null);
     await settle();
   };
-  const chips = () => Array.from(root().querySelectorAll('[data-testid="level-chip"]')) as HTMLButtonElement[];
-  const chip = (depth: number) => root().querySelector(`[data-testid="level-chip"][data-depth="${depth}"]`) as HTMLButtonElement;
-  const panel = (depth: number) => root().querySelector(`[data-testid="level-table"][data-depth="${depth}"]`) as HTMLElement;
-  const visible = () => root().querySelector('[data-testid="level-table"]:not([hidden])') as HTMLElement;
-  const headers = (depth: number) =>
-    Array.from(panel(depth).querySelectorAll('th')).map(cell => cell.textContent?.replace(/\s+/g, ' ').trim());
-  const codes = (depth: number) =>
-    Array.from(panel(depth).querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
+  const chips = () => Array.from(root().querySelectorAll('[data-testid="level-chip"]')) as HTMLElement[];
+  const chip = (depth: number) => root().querySelector(`[data-testid="level-chip"][data-depth="${depth}"]`) as HTMLElement;
+  const headers = () => Array.from(root().querySelectorAll('th')).map(cell => cell.textContent?.replace(/\s+/g, ' ').trim());
+  const codes = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
+  const row = (key: string) => root().querySelector(`[data-testid="data-table-row"][data-row-key="${key}"]`) as HTMLElement;
+  const showAll = async () => {
+    const paginator = fixture.debugElement.query(By.css('p-paginator')).componentInstance as {
+      rows: number;
+      changePage: (page: number) => void;
+    };
+    paginator.rows = 100;
+    paginator.changePage(0);
+    await settle();
+  };
 
   beforeEach(async () => {
-    alerts = [];
-    api = {
-      GET_StrategyFrameworkEditor: jest.fn().mockResolvedValue(ok(viewOf([]))),
-      DELETE_StrategyFrameworkElement: jest.fn().mockResolvedValue(ok({ id: 1 })),
-      GET_StrategyFrameworkElementBlockers: jest.fn().mockResolvedValue(ok(freeBlockers()))
-    };
     await TestBed.configureTestingModule({
       imports: [FrameworkTablesComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: ApiService, useValue: api },
-        {
-          provide: ActionsService,
-          useValue: {
-            showGlobalAlert: jest.fn((alert: GlobalAlert) => {
-              alerts.push(alert);
-            })
-          }
-        }
-      ]
+      providers: [provideNoopAnimations()]
     }).compileComponents();
   });
 
@@ -141,65 +128,73 @@ describe('FrameworkTablesComponent', () => {
       'Sub-indicators · 1'
     ]);
     expect(chips()).toHaveLength(4);
-    const group = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="level-chips"]');
-    expect(group?.getAttribute('role')).toBe('group');
+    const group = root().querySelector('[data-testid="level-chips"]');
+    expect(group?.tagName).toBe('UL');
     expect(group?.getAttribute('aria-label')).toBe('Levels');
-    expect(chip(1).getAttribute('role')).toBeNull();
+    expect(chip(1).tagName).toBe('LI');
+    expect(chip(1).getAttribute('aria-pressed')).toBeNull();
     expect(chip(1).getAttribute('aria-checked')).toBeNull();
-    expect(chip(1).getAttribute('aria-pressed')).toBe('true');
-    expect(chip(2).getAttribute('aria-pressed')).toBe('false');
-    expect(chip(1).classList.contains('level-chip--active')).toBe(true);
-    expect(visible().getAttribute('data-depth')).toBe('1');
+    expect(chip(2).getAttribute('aria-pressed')).toBeNull();
+    expect(root().querySelectorAll('app-data-table')).toHaveLength(1);
   });
 
   it('labels the seeded three levels with their counts', async () => {
-    const elements: FrameworkEditorElement[] = [];
-    for (let area = 1; area <= 4; area++) {
-      elements.push(element({ id: area, depth: 1, code: String(area), name: `Area ${area}` }));
-    }
-    for (let dimension = 1; dimension <= 13; dimension++) {
-      const area = dimension <= 10 ? 1 : 2;
-      elements.push(element({ id: 100 + dimension, depth: 2, code: `${area}.${dimension}`, name: `Dimension ${dimension}`, parentId: area }));
-    }
-    for (let indicator = 1; indicator <= 31; indicator++) {
-      elements.push(element({ id: 1000 + indicator, depth: 3, code: `1.1.${indicator}`, name: `Indicator ${indicator}`, parentId: 101 }));
-    }
-    await mount(viewOf(elements));
+    await mount(seed48());
 
     expect(chips().map(item => item.textContent?.trim())).toEqual(['Performance Areas · 4', 'Dimensions · 13', 'Indicators · 31']);
   });
 
-  it('shows each level’s columns after its chip is clicked, and marks an inactive responsible', async () => {
+  it('renders 48 rows from every level in one table', async () => {
+    await mount(seed48());
+    await showAll();
+
+    const levels = Array.from(root().querySelectorAll('[data-testid="cell-levelName"]')).map(cell => cell.textContent?.trim());
+    expect(root().querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(48);
+    expect(levels.filter(name => name === 'Performance Area')).toHaveLength(4);
+    expect(levels.filter(name => name === 'Dimension')).toHaveLength(13);
+    expect(levels.filter(name => name === 'Indicator')).toHaveLength(31);
+    expect(row('1').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('');
+    expect(row('101').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('1 · Area 1');
+    expect(row('1001').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('1.1 · Dimension 1');
+    expect(row('1001').querySelector('[data-testid="cell-responsiblesText"]')?.textContent?.trim()).toBe('');
+  });
+
+  it('shows Level and Parent for every depth, and marks an inactive responsible', async () => {
     await mount(fourLevelView());
 
-    expect(headers(1)).toEqual(['Code', 'Name', 'Actions']);
+    expect(headers()).toEqual(['Code', 'Level', 'Name', 'Parent', 'Responsibles']);
+    expect(codes()).toEqual(['1', '1.1', '1.1.1', '1.1.1.1']);
+    expect(row('1').querySelector('[data-testid="cell-levelName"]')?.textContent?.trim()).toBe('Performance Area');
+    expect(row('1').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('');
+    expect(row('2').querySelector('[data-testid="cell-levelName"]')?.textContent?.trim()).toBe('Dimension');
+    expect(row('2').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('1 · Area');
+    expect(row('3').querySelector('[data-testid="cell-levelName"]')?.textContent?.trim()).toBe('Indicator');
+    expect(row('3').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('1.1 · Dimension');
+    expect(row('3').querySelector('[data-testid="cell-responsiblesText"]')?.textContent?.trim()).toBe('Idris Jones; Philippe Attey (inactive)');
+    expect(row('4').querySelector('[data-testid="cell-levelName"]')?.textContent?.trim()).toBe('Sub-indicator');
+    expect(row('4').querySelector('[data-testid="cell-parentLabel"]')?.textContent?.trim()).toBe('1.1.1 · Indicator');
+    expect(row('4').querySelector('[data-testid="cell-responsiblesText"]')?.textContent?.trim()).toBe('');
+    expect(root().querySelector('[data-testid="column-header-actions"]')).toBeNull();
+    expect(root().querySelector('[data-testid="add-level"]')).toBeNull();
+    expect(root().textContent).not.toContain('+ Sub-indicator');
+    expect(root().textContent).not.toContain('+ Performance Area');
+  });
 
-    chip(2).click();
-    await settle();
-    expect(chip(2).getAttribute('aria-pressed')).toBe('true');
-    expect(chip(1).getAttribute('aria-pressed')).toBe('false');
-    expect(chip(2).getAttribute('aria-checked')).toBeNull();
-    expect(visible().getAttribute('data-depth')).toBe('2');
-    expect(headers(2)).toEqual(['Code', 'Name', 'Performance Area', 'Actions']);
-    expect(panel(2).querySelector('[data-testid="cell-parentCode"]')).toBeNull();
-    expect(panel(2).querySelector('[data-testid="cell-1Ancestor"]')?.textContent?.trim()).toBe('1 · Area');
+  it('does nothing when a level chip is clicked', async () => {
+    const selected: number[] = [];
+    await mount(seed48());
+    await showAll();
+    fixture.componentInstance.rowSelected.subscribe(id => selected.push(id));
+    const before = codes();
 
+    chip(1).click();
     chip(3).click();
     await settle();
-    expect(headers(3)).toEqual(['Code', 'Name', 'Performance Area', 'Dimension', 'Responsibles', 'Actions']);
-    expect(panel(3).querySelector('[data-testid="cell-responsiblesText"]')?.textContent?.trim()).toBe('Idris Jones; Philippe Attey (inactive)');
-    expect(panel(3).querySelector('[data-testid="cell-parentCode"]')).toBeNull();
-    expect(panel(3).querySelector('[data-testid="cell-1Ancestor"]')?.textContent?.trim()).toBe('1 · Area');
-    expect(panel(3).querySelector('[data-testid="cell-2Ancestor"]')?.textContent?.trim()).toBe('1.1 · Dimension');
-    expect(panel(3).querySelector('[data-testid="edit-row"]')?.getAttribute('aria-label')).toBe('Edit details of Indicator 1.1.1');
 
-    chip(4).click();
-    await settle();
-    expect(headers(4)).toEqual(['Code', 'Name', 'Performance Area', 'Dimension', 'Indicator', 'Actions']);
-    expect(panel(4).querySelector('[data-testid="cell-responsiblesText"]')).toBeNull();
-    expect(panel(4).querySelector('[data-testid="cell-parentCode"]')).toBeNull();
-    expect(panel(4).querySelector('[data-testid="cell-3Ancestor"]')?.textContent?.trim()).toBe('1.1.1 · Indicator');
-    expect(panel(4).querySelector('[data-testid="add-level"]')?.textContent).toContain('+ Sub-indicator');
+    expect(codes()).toEqual(before);
+    expect(root().querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(48);
+    expect(selected).toEqual([]);
+    expect(chip(3).getAttribute('aria-pressed')).toBeNull();
   });
 
   it('sorts by code naturally, pages 10 rows, searches, and exports every filtered row', async () => {
@@ -217,164 +212,61 @@ describe('FrameworkTablesComponent', () => {
       )
     ];
     await mount(viewOf(elements));
-    chip(2).click();
-    await settle();
 
-    const naturalFirstPage = ['1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '1.10'];
-    expect(codes(2)).toEqual(naturalFirstPage);
-    expect(panel(2).querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(10);
+    const naturalFirstPage = ['1', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9'];
+    expect(codes()).toEqual(naturalFirstPage);
+    expect(root().querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(10);
 
-    const paginator = fixture.debugElement.query(By.css('[data-testid="level-table"][data-depth="2"] p-paginator')).componentInstance as {
+    const paginator = fixture.debugElement.query(By.css('p-paginator')).componentInstance as {
       rows: number;
       rowsPerPageOptions: number[];
       changePage: (page: number) => void;
     };
-    expect(panel(2).querySelector('.p-paginator-rpp-dropdown')).not.toBeNull();
+    expect(root().querySelector('.p-paginator-rpp-dropdown')).not.toBeNull();
     expect(paginator.rowsPerPageOptions).toEqual([10, 25, 50, 100]);
     paginator.rows = 25;
     paginator.changePage(0);
     await settle();
-    expect(codes(2)).toEqual(['1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '1.10', '1.11', '1.12']);
+    expect(codes()).toEqual(['1', '1.1', '1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9', '1.10', '1.11', '1.12']);
 
     paginator.rows = 10;
     paginator.changePage(0);
     await settle();
-    const search = panel(2).querySelector('[data-testid="data-table-search"]') as HTMLInputElement;
+    const search = root().querySelector('[data-testid="data-table-search"]') as HTMLInputElement;
     search.value = 'Ten';
     search.dispatchEvent(new Event('input'));
     await settle();
-    expect(codes(2)).toEqual(['1.10']);
+    expect(codes()).toEqual(['1.10']);
 
     const exportSpy = jest.spyOn(xlsxExportUtil, 'exportRowsToXlsx').mockResolvedValue(undefined);
-    (panel(2).querySelector('[data-testid="data-table-export"]') as HTMLButtonElement).click();
+    (root().querySelector('[data-testid="data-table-export"]') as HTMLButtonElement).click();
     await settle();
 
     expect(exportSpy).toHaveBeenCalledTimes(1);
     const exported = exportSpy.mock.calls[0][0] as { rows: { code: string }[]; fileName: string };
-    expect(exported.rows.map(row => row.code)).toEqual(['1.10']);
-    expect(exported.fileName).toBe('strategy-framework_dimensions.xlsx');
+    expect(exported.rows.map(item => item.code)).toEqual(['1.10']);
+    expect(exported.fileName).toBe('strategy-framework.xlsx');
   });
 
-  it('opens the details selection from the edit action', async () => {
+  it('selects a row from click, Enter and Space, and highlights the string selectedKey', async () => {
     const selected: number[] = [];
     await mount(fourLevelView());
-    fixture.componentInstance.editRequested.subscribe(id => selected.push(id));
+    fixture.componentInstance.rowSelected.subscribe(id => selected.push(id));
 
-    (panel(1).querySelector('[data-testid="edit-row"]') as HTMLButtonElement).click();
+    const area = row('1');
+    expect(area.getAttribute('tabindex')).toBe('0');
+    area.click();
+    row('2').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    row('3').dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     await settle();
 
-    expect(selected).toEqual([1]);
-    expect(panel(1).querySelector('[data-testid="edit-row"]')?.getAttribute('aria-label')).toBe('Edit details of Performance Area 1');
-  });
+    expect(selected).toEqual([1, 2, 3]);
+    expect(root().querySelector('[data-testid="edit-row"]')).toBeNull();
+    expect(root().querySelector('[data-testid="delete-row"]')).toBeNull();
 
-  it('asks for an empty panel from + Level, and requires the parent below depth 1', async () => {
-    const created: FrameworkTableCreate[] = [];
-    await mount(fourLevelView());
-    fixture.componentInstance.createRequested.subscribe(request => created.push(request));
-
-    (panel(1).querySelector('[data-testid="add-level"] button') as HTMLButtonElement).click();
+    fixture.componentRef.setInput('selectedKey', '1');
     await settle();
-    chip(4).click();
-    await settle();
-    (panel(4).querySelector('[data-testid="add-level"] button') as HTMLButtonElement).click();
-    await settle();
-
-    expect(created).toEqual([
-      { depth: 1, parentRequired: false },
-      { depth: 4, parentRequired: true }
-    ]);
-  });
-
-  it('confirms a free delete with the editor’s alert and moves focus to the previous row', async () => {
-    const first = element({ id: 1, depth: 1, code: '1', name: 'Area one' });
-    const second = element({ id: 2, depth: 1, code: '2', name: 'Area two' });
-    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(viewOf([first])));
-    await mount(viewOf([first, second]));
-
-    const button = panel(1).querySelector('[data-testid="delete-row"][data-element-id="2"]') as HTMLButtonElement;
-    expect(button.getAttribute('aria-label')).toBe('Delete Performance Area 2');
-    button.click();
-    await settle();
-
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0].detail).toBe('Delete Performance Area 2 · Area two?');
-    expect(alerts[0].confirmCallback?.label).toBe('Delete');
-    expect(alerts[0].cancelCallback?.label).toBe('Cancel');
-    expect(alerts[0].hideCloseButton).toBe(true);
-
-    await alerts[0].confirmCallback?.event?.();
-    await settle();
-
-    expect(api.DELETE_StrategyFrameworkElement).toHaveBeenCalledWith(2);
-    expect(panel(1).querySelector('[data-element-id="2"]')).toBeNull();
-    expect(document.activeElement).toBe(panel(1).querySelector('[data-testid="edit-row"][data-element-id="1"]'));
-  });
-
-  it('returns focus to the delete button when the confirmation is cancelled', async () => {
-    await mount(viewOf([element({ id: 1, depth: 1, code: '1', name: 'Area' })]));
-    const button = panel(1).querySelector('[data-testid="delete-row"]') as HTMLButtonElement;
-    button.click();
-    await settle();
-
-    expect(alerts[0].hideCloseButton).toBe(true);
-    (document.body as HTMLElement).focus();
-    alerts[0].cancelCallback?.event?.();
-    expect(document.activeElement).toBe(button);
-  });
-
-  it('lists the blocker and the way out, and returns focus to the delete button', async () => {
-    api.GET_StrategyFrameworkElementBlockers.mockResolvedValue(
-      ok({
-        children: 6,
-        objectives: 0,
-        consumers: [],
-        wayOut: ['Delete or move its 6 dimensions first.']
-      })
-    );
-    await mount(viewOf([element({ id: 1, depth: 1, code: '1', name: 'Area', deletable: false })]));
-    const button = panel(1).querySelector('[data-testid="delete-row"]') as HTMLButtonElement;
-    button.click();
-    await settle();
-
-    expect(api.DELETE_StrategyFrameworkElement).not.toHaveBeenCalled();
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0].summary).toBe('Cannot delete');
-    expect(alerts[0].confirmCallback?.label).toBe('Close');
-    expect(alerts[0].hasNoCancelButton).toBe(true);
-    expect(alerts[0].hideCloseButton).toBe(true);
-    expect(alerts[0].detail).toContain('6 children');
-    expect(alerts[0].detail).toContain('Delete or move its 6 dimensions first.');
-
-    (document.body as HTMLElement).focus();
-    alerts[0].confirmCallback?.event?.();
-    expect(document.activeElement).toBe(button);
-  });
-
-  it('keeps the newer view when two refreshes resolve out of order', async () => {
-    const first = element({ id: 1, depth: 1, code: '1', name: 'Area one' });
-    const second = element({ id: 2, depth: 1, code: '2', name: 'Area two' });
-    const pending: ((value: MainResponse<FrameworkEditorView>) => void)[] = [];
-    api.GET_StrategyFrameworkEditor.mockImplementation(() => new Promise(resolve => pending.push(resolve)));
-    await mount(viewOf([first, second]));
-
-    (panel(1).querySelector('[data-testid="delete-row"][data-element-id="2"]') as HTMLButtonElement).click();
-    await settle();
-    (panel(1).querySelector('[data-testid="delete-row"][data-element-id="1"]') as HTMLButtonElement).click();
-    await settle();
-
-    const older = alerts[0].confirmCallback?.event?.();
-    for (let i = 0; i < 8 && pending.length < 1; i++) await Promise.resolve();
-    const newer = alerts[1].confirmCallback?.event?.();
-    for (let i = 0; i < 8 && pending.length < 2; i++) await Promise.resolve();
-    expect(pending).toHaveLength(2);
-
-    pending[1](ok(viewOf([])));
-    await Promise.resolve();
-    pending[0](ok(viewOf([first])));
-    await older;
-    await newer;
-    await settle();
-
-    expect(codes(1)).toEqual([]);
+    expect(row('1').getAttribute('aria-selected')).toBe('true');
+    expect(row('2').getAttribute('aria-selected')).toBe('false');
   });
 });

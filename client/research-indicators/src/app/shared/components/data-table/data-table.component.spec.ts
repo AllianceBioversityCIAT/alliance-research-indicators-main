@@ -396,4 +396,92 @@ describe('DataTableComponent row selection (opt-in)', () => {
     expect(rowEls(fixture)[0].classList.contains('data-table-row--selectable')).toBe(false);
     expect(rowEls(fixture)[0].getAttribute('aria-selected')).toBeNull();
   });
+
+  // D-STF-36 / P-47: the default (input absent) must stay click-only. `selectable` is true
+  // here — a non-selectable table would not prove the opt-out. jsdom cannot move real Tab
+  // order or paint a focus ring (KZ-017); this asserts the attribute is absent.
+  it('with keyboardSelectable absent, selectable rows have no tabindex, no data-row-key, and Enter emits nothing', async () => {
+    const fixture = await mount(true);
+    const row = rowEls(fixture)[0];
+
+    expect(row.hasAttribute('tabindex')).toBe(false);
+    expect(row.hasAttribute('data-row-key')).toBe(false);
+
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.picked).toEqual([]);
+  });
+});
+
+// Opt-in keyboard selection (strategy-framework D-STF-36). Events are dispatched on the
+// rendered <tr> (KZ-015); calling the handler would not prove the binding.
+@Component({
+  standalone: true,
+  imports: [DataTableComponent],
+  template: `<app-data-table [columns]="columns" [rows]="rows" [selectable]="true" [keyboardSelectable]="true" (rowSelected)="picked.push($event)">
+    <ng-template #rowActions>
+      <button type="button" data-testid="row-action">Edit</button>
+    </ng-template>
+  </app-data-table>`
+})
+class KeyboardSelectableHost {
+  columns = columns;
+  rows = buildRows().slice(0, 3);
+  picked: ValueRow[] = [];
+}
+
+describe('DataTableComponent keyboard row selection (keyboardSelectable)', () => {
+  async function mount(): Promise<ComponentFixture<KeyboardSelectableHost>> {
+    await TestBed.configureTestingModule({
+      imports: [KeyboardSelectableHost],
+      providers: [provideNoopAnimations()]
+    }).compileComponents();
+    const fixture = TestBed.createComponent(KeyboardSelectableHost);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  const rowEls = (f: ComponentFixture<KeyboardSelectableHost>) =>
+    Array.from((f.nativeElement as HTMLElement).querySelectorAll('[data-testid="data-table-row"]')) as HTMLElement[];
+
+  it('keyboardSelectable rows are tab-focusable and carry data-row-key', async () => {
+    const fixture = await mount();
+    const rows = rowEls(fixture);
+
+    expect(rows.map(row => row.getAttribute('tabindex'))).toEqual(['0', '0', '0']);
+    expect(rows.map(row => row.getAttribute('data-row-key'))).toEqual(['1', '2', '3']);
+  });
+
+  it('Enter on a row emits rowSelected with that row', async () => {
+    const fixture = await mount();
+    const row = rowEls(fixture)[1];
+
+    row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.picked).toEqual([fixture.componentInstance.rows[1]]);
+  });
+
+  it('Space on a row emits rowSelected and prevents the default; a key on a button inside a cell emits nothing', async () => {
+    const fixture = await mount();
+    const row = rowEls(fixture)[1];
+    const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+
+    row.dispatchEvent(space);
+    fixture.detectChanges();
+
+    expect(space.defaultPrevented).toBe(true);
+    expect(fixture.componentInstance.picked).toEqual([fixture.componentInstance.rows[1]]);
+
+    const button = row.querySelector('[data-testid="row-action"]') as HTMLButtonElement;
+    const onButton = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    button.dispatchEvent(onButton);
+    fixture.detectChanges();
+
+    expect(onButton.defaultPrevented).toBe(false);
+    expect(fixture.componentInstance.picked).toEqual([fixture.componentInstance.rows[1]]);
+  });
 });

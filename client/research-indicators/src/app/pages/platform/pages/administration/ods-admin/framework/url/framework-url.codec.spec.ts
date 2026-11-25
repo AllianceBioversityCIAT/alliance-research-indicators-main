@@ -1,15 +1,15 @@
 import { parseFrameworkUrl, serializeFrameworkUrl, FrameworkUrlParams, FrameworkUrlState } from './framework-url.codec';
 
-// @akili-spec institutional-performance/strategy-framework T-12 — design §2.1.
-// Frozen slugs: view is editor|table, level is depth-<n>. Display names are
-// not slugs, so an unknown token falls back instead of being parsed.
+// @akili-spec institutional-performance/strategy-framework T-23 — design §6.4, D-STF-37.
+// `view` is editor|table. An old `level=depth-<n>` still parses and is dropped.
+// Serialize never writes `level`.
 
 const paramsOf = (record: Record<string, string | null>): FrameworkUrlParams => ({
   get: name => record[name] ?? null
 });
 
 describe('framework-url.codec', () => {
-  it('round-trips the default, a table view, and a fourth-level depth', () => {
+  it('round-trips the view and drops a level', () => {
     const states: FrameworkUrlState[] = [
       { view: 'editor', level: null },
       { view: 'table', level: null },
@@ -17,13 +17,20 @@ describe('framework-url.codec', () => {
       { view: 'editor', level: 4 }
     ];
     for (const state of states) {
-      expect(parseFrameworkUrl(paramsOf(serializeFrameworkUrl(state)))).toEqual(state);
+      expect(parseFrameworkUrl(paramsOf(serializeFrameworkUrl(state)))).toEqual({ view: state.view, level: null });
     }
   });
 
-  it('omits the default view and an empty level from the query', () => {
+  it('writes the view and never the level', () => {
     expect(serializeFrameworkUrl({ view: 'editor', level: null })).toEqual({ view: null, level: null });
-    expect(serializeFrameworkUrl({ view: 'table', level: 4 })).toEqual({ view: 'table', level: 'depth-4' });
+    expect(serializeFrameworkUrl({ view: 'table', level: null })).toEqual({ view: 'table', level: null });
+    expect(serializeFrameworkUrl({ view: 'table', level: 4 })).toEqual({ view: 'table', level: null });
+    expect(serializeFrameworkUrl({ view: 'editor', level: 4 })).toEqual({ view: null, level: null });
+  });
+
+  it('opens Table from an old level param and ignores the depth', () => {
+    expect(parseFrameworkUrl(paramsOf({ view: 'table', level: 'depth-3' }))).toEqual({ view: 'table', level: null });
+    expect(parseFrameworkUrl(paramsOf({ view: 'table', level: 'depth-2' }))).toEqual({ view: 'table', level: null });
   });
 
   it('falls back when the view or level slug is not in the frozen vocabulary', () => {

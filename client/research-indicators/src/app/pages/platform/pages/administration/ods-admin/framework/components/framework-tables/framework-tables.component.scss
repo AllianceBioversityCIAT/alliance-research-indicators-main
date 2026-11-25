@@ -1,33 +1,16 @@
 @use '../../../ods-code-pill' as pill;
 
-// strategy-framework T-14 / T-17 — design §6.4, §6.7. Tokens only.
+// strategy-framework T-23 — design §6.4, §6.7. Tokens only.
+// Chips are counts. They are not controls.
 
 :host {
   display: block;
 }
 
 .level-chip {
-  border: 1px solid var(--ac-grey-200);
   border-radius: 999px;
-  background: var(--ac-white-1);
+  background: var(--ac-grey-100);
   color: var(--ac-grey-800);
-  font-weight: 600;
-  transition:
-    background-color 150ms,
-    color 150ms,
-    border-color 150ms;
-}
-
-.level-chip:focus-visible,
-.row-action:focus-visible {
-  outline: 2px solid var(--ac-primary-blue-600);
-  outline-offset: 2px;
-}
-
-.level-chip--active {
-  background: var(--ac-primary-blue-600);
-  border-color: var(--ac-primary-blue-600);
-  color: var(--ac-white-1);
   font-weight: 600;
 }
 
@@ -39,8 +22,4 @@
 :host ::ng-deep td[data-testid='cell-name'] {
   color: var(--ac-primary-blue-600);
   font-weight: 600;
-}
-
-.level-table[hidden] {
-  display: none !important;
 }

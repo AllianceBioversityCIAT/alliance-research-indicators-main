@@ -1,0 +1,198 @@
+@use '../../../ods-code-pill' as pill;
+@use '../../../ods-field-focus' as fieldFocus;
+
+// strategy-framework T-18 — design §6.3, §6.7, D-STF-30.
+// Tokens only. The bar and the outline are judged in Chrome (T-22).
+// Indent is `indentStep` (28px) times the PrimeNG level, set on the name cell.
+// A `calc(var(--framework-tree-indent-step))` binding is stripped by the style sanitizer.
+
+:host {
+  display: block;
+}
+
+.framework-tree__find {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.framework-tree__find-label {
+  color: var(--ac-grey-800);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.framework-tree__find-field {
+  position: relative;
+}
+
+.framework-tree__find-input {
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.25rem 2rem 0.25rem 0.5rem;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 0.5rem;
+  background: var(--ac-white-1);
+  color: var(--ac-grey-800);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+// Search field: shared border recolour. Clear, toggle and add keep the ring below.
+.framework-tree__find-input:focus,
+.framework-tree__find-input:focus-visible {
+  @include fieldFocus.ods-field-focus;
+}
+
+.framework-tree__clear:focus-visible,
+.framework-tree__toggle:focus-visible,
+.framework-tree__add:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}
+
+.framework-tree__clear {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ac-grey-700);
+  font-size: 12px;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.framework-tree__empty {
+  margin: 0 0 12px;
+  color: var(--ac-grey-700);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.framework-tree__header {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ac-grey-800);
+  text-align: left;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Toggle and name stay one row. The name wraps inside its own box.
+// Counts sit on the next line, indented to the name, not under the toggle (T-22 F-1).
+.framework-tree__name-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.framework-tree__identity {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.framework-tree__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ac-grey-900);
+}
+
+.framework-tree__code {
+  @include pill.ods-code-pill;
+}
+
+.framework-tree__counts,
+.framework-tree__level,
+.framework-tree__responsibles {
+  color: var(--ac-grey-700);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.framework-tree__counts {
+  min-width: 0;
+  margin-left: calc(1.75rem + 8px);
+  font-size: 12px;
+}
+
+// Auto layout. Name keeps half the table. Code, Level and Actions stay one line,
+// so their columns are only as wide as that text. Responsibles has no width and
+// takes the leftover. jsdom cannot measure the used widths (KZ-017).
+.framework-tree__col-fit,
+.framework-tree__col-actions {
+  white-space: nowrap;
+}
+
+.framework-tree__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--ac-grey-700);
+  cursor: pointer;
+}
+
+.framework-tree__add {
+  min-height: 1.75rem;
+  padding: 0.125rem 0.5rem;
+  white-space: nowrap;
+  border: 1px solid var(--ac-primary-blue-600);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--ac-primary-blue-600);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+// The area bar owns the first cell's box-shadow. Selection is background plus an outline on the row.
+:host ::ng-deep tr.framework-tree__row {
+  cursor: pointer;
+}
+
+:host ::ng-deep tr.framework-tree__row > td:first-child {
+  box-shadow: inset 4px 0 0 var(--row-accent);
+}
+
+:host ::ng-deep tr.framework-tree__row--selected,
+:host ::ng-deep tr.framework-tree__row--selected > td {
+  background: var(--ac-light-blue-50);
+}
+
+:host ::ng-deep tr.framework-tree__row--selected {
+  outline: 1px solid var(--ac-light-blue-400);
+  outline-offset: -1px;
+}

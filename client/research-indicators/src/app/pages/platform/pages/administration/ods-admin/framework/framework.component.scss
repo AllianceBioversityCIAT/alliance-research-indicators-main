@@ -1,9 +1,56 @@
-// strategy-framework T-12 — design §6.7. Tokens only; the accent colours belong to the outline cards (T-13).
-// Contains the sr-only blocker spans so they stay inside the page's scroll container.
+// strategy-framework T-19 — design §6.2, §6.9, P-46, D-STF-31. Tokens only.
+// The root cancels `.app-page-wrapper`'s vertical margin so the column height
+// is the visible area below the fixed chrome. jsdom cannot judge that fit (KZ-017).
+// Global `.app-page-wrapper` is `flex: 1 1 0%` (`styles.scss`). Inside this column
+// host, which has no definite height, that basis wins over `height` and the page
+// grows with its content. `flex: none` lets the height bind.
 :host {
-  display: block;
-  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  min-height: 0;
+}
+
+.framework-page.app-page-wrapper {
+  flex: none;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 16px;
+  min-height: 0;
+  height: var(--framework-column-height);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.framework-page__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 18px;
+}
+
+.framework-page__body > section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 18px;
+}
+
+@media (max-width: 1023px) {
+  // `flex: none` stays. `height: auto` sizes the page to its content, so the
+  // stacked list and panel scroll with the page.
+  .framework-page.app-page-wrapper {
+    height: auto;
+    overflow: visible;
+  }
+
+  .framework-page__body,
+  .framework-page__body > section {
+    flex: none;
+  }
 }
 
 .view-toggle__button {

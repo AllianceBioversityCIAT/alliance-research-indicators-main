@@ -1,16 +1,58 @@
 @use '../ods-code-pill' as pill;
 
-// strategy-framework T-16 / T-17 — design §6.7. Tokens only.
-// Contains the sr-only blocker spans so they stay inside the page's scroll container.
+// strategy-framework T-20 — design §6.6, §6.9, P-46, D-STF-31. Tokens only.
+// The root cancels `.app-page-wrapper`'s vertical margin so the column height
+// is the visible area below the fixed chrome. jsdom cannot judge that fit (KZ-017).
+// Global `.app-page-wrapper` is `flex: 1 1 0%` (`custom-fields.scss`). Inside this
+// column host, which has no definite height, that basis wins over `height` and the
+// page grows with its content. `flex: none` lets the height bind.
 :host {
-  display: block;
-  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  min-height: 0;
 }
 
-.row-action:focus-visible {
-  outline: 2px solid var(--ac-primary-blue-600);
-  outline-offset: 2px;
+.objectives-page.app-page-wrapper {
+  flex: none;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 16px;
+  min-height: 0;
+  height: var(--objectives-column-height);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.objectives-page__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 18px;
+}
+
+.objectives-page__body > section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 18px;
+}
+
+@media (max-width: 1023px) {
+  // `flex: none` stays. `height: auto` sizes the page to its content, so the
+  // stacked list and panel scroll with the page.
+  .objectives-page.app-page-wrapper {
+    height: auto;
+    overflow: visible;
+  }
+
+  .objectives-page__body,
+  .objectives-page__body > section {
+    flex: none;
+  }
 }
 
 :host ::ng-deep td[data-testid='cell-code'] > span {

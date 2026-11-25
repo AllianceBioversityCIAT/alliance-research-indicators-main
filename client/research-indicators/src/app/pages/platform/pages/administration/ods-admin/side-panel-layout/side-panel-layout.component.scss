@@ -1,0 +1,59 @@
+// strategy-framework T-19 — design §6.9. Tokens only.
+// 60/40 split from 1024px. Below that the panel stacks and the page scrolls.
+// jsdom does not apply this media query to layout (KZ-017).
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 16px;
+  min-height: 280px;
+  min-width: 0;
+  align-items: stretch;
+}
+
+.side-panel-layout__list {
+  flex: 1 1 60%;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.side-panel-layout__panel {
+  flex: 1 1 40%;
+  min-width: 380px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+// List and panel share one card: radius, border, white, 16px (D-STF-38).
+// The list keeps min-height 0 and overflow-y auto, so it still scrolls inside the column.
+.side-panel-layout__card {
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 0.5rem;
+  background: var(--ac-white-1);
+  padding: 16px;
+}
+
+.side-panel-layout__empty {
+  margin: 0;
+  color: var(--ac-grey-700);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+
+  .side-panel-layout__list,
+  .side-panel-layout__panel {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+}

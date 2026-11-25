@@ -1,6 +1,6 @@
-<div class="app-page-wrapper pt-3">
-  <div class="flex w-full flex-col gap-[18px]">
-    <section class="flex w-full min-w-0 flex-col gap-[18px]" [attr.aria-busy]="loading()" (click)="rememberOpener($event)">
+<div class="app-page-wrapper framework-page" [style.--framework-column-height]="columnHeight()" data-testid="framework-page">
+  <div class="framework-page__body">
+    <section class="flex w-full min-w-0 flex-col gap-[18px]" [attr.aria-busy]="loading()">
       <div class="flex flex-wrap items-start justify-between gap-4" data-testid="page-header">
         <div class="flex flex-col gap-[2px]">
           <p class="m-0 text-[12px] font-semibold tracking-wide atc-primary-blue-600" data-testid="eyebrow">ADMIN · ODS</p>
@@ -34,8 +34,8 @@
               [class.view-toggle__button--active]="view() === 'editor'"
               [attr.aria-pressed]="view() === 'editor'"
               (click)="setView('editor')"
-              data-testid="view-editor">
-              Editor
+              data-testid="view-tree">
+              Tree
             </button>
             <button
               type="button"
@@ -47,6 +47,18 @@
               Table
             </button>
           </div>
+
+          @if (!loading() && !loadError() && editor()) {
+            <p-button
+              [label]="newLabel()"
+              icon="pi pi-plus !text-[12px]"
+              severity="info"
+              size="small"
+              styleClass="!rounded-[9px] !text-[13px]"
+              (onClick)="onNew($event)"
+              data-testid="new-element">
+            </p-button>
+          }
 
           <p-button
             label="Export .xlsx"
@@ -61,11 +73,26 @@
         </div>
       </div>
 
-      @if (!loading() && !loadError() && editor() && !empty()) {
-        <p class="m-0 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ summary() }}</p>
-      }
+      @if (loading()) {
+        <app-custom-progress-bar></app-custom-progress-bar>
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+          <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
+          <p-button
+            label="Retry"
+            icon="pi pi-refresh !text-[12px]"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="load()"
+            data-testid="retry-button">
+          </p-button>
+        </div>
+      } @else if (editor()) {
+        @if (!empty()) {
+          <p class="m-0 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ summary() }}</p>
+        }
 
-      @if (!loading() && !loadError() && editor()) {
         <div
           class="flex items-start gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2"
           role="note"
@@ -73,80 +100,59 @@
           <i class="pi pi-check mt-0.5 atc-primary-blue-600" aria-hidden="true"></i>
           <p class="m-0 text-sm leading-[1.5] atc-grey-800">Changes apply to every module that uses the framework. Items in use cannot be deleted.</p>
         </div>
+
+        <app-side-panel-layout
+          [hasSelection]="selectedId() !== null"
+          [creating]="createRequest() !== null"
+          emptyText="Select an entry to see its details."
+          panelLabel="Element details">
+          <div list data-testid="framework-list">
+            @if (empty()) {
+              <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
+                <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                <p class="m-0 text-sm atc-grey-700">This portfolio has no framework yet</p>
+                <p-button
+                  [label]="addRootLabel()"
+                  severity="info"
+                  size="small"
+                  styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="onNew($event)"
+                  data-testid="add-root-button">
+                </p-button>
+              </div>
+            } @else if (view() === 'editor') {
+              <app-framework-tree
+                data-testid="framework-tree-slot"
+                [nodes]="treeNodes()"
+                [selectedId]="highlightedId()"
+                [collapsedIds]="collapsedIds()"
+                (elementSelected)="selectElement($event)"
+                (childRequested)="onChildRequested($event)"
+                (expansionChanged)="onExpansion($event)">
+              </app-framework-tree>
+            } @else {
+              <div data-testid="framework-tables-slot">
+                <app-framework-tables [view]="editor()!" [selectedKey]="selectedKey()" (rowSelected)="selectElement($event)"> </app-framework-tables>
+              </div>
+            }
+          </div>
+          <div panel data-testid="element-panel-slot">
+            @if (selectedId() !== null || createRequest() !== null) {
+              <app-element-panel
+                [portfolioId]="portfolioId() ?? 0"
+                [view]="editor()"
+                [elementId]="selectedId()"
+                [createRequest]="createRequest()"
+                [createToken]="createToken()"
+                (dirty)="onDirty($event)"
+                (saved)="onSaved($event)"
+                (cancelled)="onCancelled($event)"
+                (deleteRequested)="onDelete()">
+              </app-element-panel>
+            }
+          </div>
+        </app-side-panel-layout>
       }
-
-      <div
-        class="flex min-h-[320px] w-full flex-col rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]"
-        data-testid="framework-body">
-        @if (loading()) {
-          <app-custom-progress-bar></app-custom-progress-bar>
-        }
-
-        @if (loadError()) {
-          <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
-            <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
-            <p-button
-              label="Retry"
-              icon="pi pi-refresh !text-[12px]"
-              severity="secondary"
-              size="small"
-              styleClass="!rounded-[9px] !text-[13px]"
-              (onClick)="load()"
-              data-testid="retry-button">
-            </p-button>
-          </div>
-        } @else if (!loading() && empty() && !rootDraftRequested()) {
-          <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
-            <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
-            <p class="m-0 text-sm atc-grey-700">This portfolio has no framework yet</p>
-            <p-button
-              [label]="addRootLabel()"
-              severity="info"
-              size="small"
-              styleClass="!rounded-[9px] !text-[13px]"
-              (onClick)="requestRootDraft()"
-              data-testid="add-root-button">
-            </p-button>
-          </div>
-        } @else if (!loading() && editor()) {
-          @if (view() === 'editor') {
-            <app-outline-editor
-              data-testid="outline-editor-slot"
-              [view]="editor()!"
-              [requestRootDraft]="rootDraftRequested()"
-              (viewChange)="applyEditor($event)"
-              (detailsRequested)="onDetails($event)"
-              (rootDraftDismissed)="dismissRootDraft()">
-            </app-outline-editor>
-          } @else {
-            <div data-testid="framework-tables-slot">
-              <app-framework-tables
-                [view]="editor()!"
-                [level]="level()"
-                (levelSelected)="setLevel($event)"
-                (editRequested)="onDetails($event)"
-                (createRequested)="onCreate($event)"
-                (viewChange)="applyEditor($event)">
-              </app-framework-tables>
-            </div>
-          }
-        }
-      </div>
-
-      <div data-testid="element-panel-slot" [attr.data-element-id]="detailsElementId()">
-        <app-element-panel
-          [open]="detailsElementId() !== null || createRequest() !== null"
-          [portfolioId]="portfolioId() ?? 0"
-          [view]="editor()"
-          [elementId]="detailsElementId()"
-          [createRequest]="createRequest()"
-          [surface]="view()"
-          (closed)="finishPanel(true)"
-          (removed)="finishPanel(false)"
-          (refreshed)="applyEditor($event)"
-          (saved)="onPanelSaved()">
-        </app-element-panel>
-      </div>
     </section>
   </div>
 </div>
