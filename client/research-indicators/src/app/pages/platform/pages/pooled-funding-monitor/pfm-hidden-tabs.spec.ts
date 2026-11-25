@@ -6,10 +6,12 @@ import { ApiService } from '@services/api.service';
 import { RolesService } from '@shared/services/cache/roles.service';
 import PooledFundingMonitorComponent from './pooled-funding-monitor.component';
 import { PfmStoreService } from './services/pfm-store.service';
-import { PFM_HIDDEN_TABS, PFM_VISIBLE_TABS, PfmQueue, PfmSummary } from './pfm.interfaces';
+import { PFM_HIDDEN_TABS, PFM_VISIBLE_TABS, PfmQueue, PfmSummary, pfmHiddenTabs } from './pfm.interfaces';
 import { savePfmReturnState } from './pfm-return-state';
 
-// Today only the Stats tab is shown: Portfolio coverage and Results queue are hidden.
+// In production only the Stats tab is shown: Portfolio coverage and Results queue are hidden.
+jest.mock('@envs/environment', () => ({ environment: { ...jest.requireActual('@envs/environment').environment, production: true } }));
+
 const ok = <T>(data: T) => ({ successfulRequest: true, data });
 
 const summary: PfmSummary = {
@@ -55,7 +57,12 @@ describe('CGIAR Portfolio Contribution Monitor with hidden tabs', () => {
 
   beforeEach(() => sessionStorage.clear());
 
-  it('hides Portfolio coverage and Results queue, leaving only Stats', () => {
+  it('hides nothing outside production, so testing shows every tab', () => {
+    expect(pfmHiddenTabs(false)).toEqual([]);
+    expect(pfmHiddenTabs(true)).toEqual(['coverage', 'queue']);
+  });
+
+  it('hides Portfolio coverage and Results queue in production, leaving only Stats', () => {
     expect(PFM_HIDDEN_TABS).toEqual(['coverage', 'queue']);
     expect(PFM_VISIBLE_TABS).toEqual(['stats']);
   });
