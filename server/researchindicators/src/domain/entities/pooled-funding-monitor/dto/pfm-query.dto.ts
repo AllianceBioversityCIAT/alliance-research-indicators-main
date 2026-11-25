@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from 'class-validator';
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
@@ -51,6 +52,15 @@ export class PfmQueueQueryDto extends PfmSummaryQueryDto {
   @Type(() => Number)
   @IsInt()
   type?: number;
+
+  @ApiPropertyOptional({
+    example: '2026-06',
+    description:
+      'UTC month (YYYY-MM): only results with an ACCEPTED sync to PRMS that month (a Sync activity bar).',
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-(0[1-9]|1[0-2])$/)
+  synced_month?: string;
 
   @ApiPropertyOptional({ enum: PfmChipEnum })
   @IsOptional()

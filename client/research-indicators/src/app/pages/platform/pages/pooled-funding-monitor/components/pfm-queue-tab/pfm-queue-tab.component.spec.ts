@@ -43,7 +43,8 @@ function setup(over: { queue?: PfmQueue | null; scope?: PfmScope; chip?: PfmChip
     setGroupView: jest.fn(),
     setFilter: jest.fn(),
     setChip: jest.fn(),
-    resetFilters: jest.fn()
+    resetFilters: jest.fn(),
+    clearSyncedMonth: jest.fn()
   };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [PfmQueueTabComponent], providers: [{ provide: PfmStoreService, useValue: store }] });
@@ -224,5 +225,18 @@ describe('PfmQueueTabComponent', () => {
       expect(cmp.typeOptions()).toEqual([{ label: 'All types', value: '__all__' }]);
       expect(cmp.countLine()).toBe('');
     });
+  });
+
+  it('has no Managed in TIP view: TIP mapping counts in the STAR views (DD-PFM-43)', () => {
+    expect(setup().q('pfm-chip-managed_in_tip')).toBeNull();
+  });
+
+  it('shows the Sync activity month as a removable tag that keeps the rest (DD-PFM-45)', () => {
+    const { el, store } = setup({ filters: { project: null, sp: null, type: null, synced_month: '2026-06' } });
+    const tag = el.querySelector('[data-testid="pfm-month-filter"]');
+    expect(tag?.textContent).toContain('Showing: synced in Jun 2026');
+    (el.querySelector('[data-testid="pfm-month-filter-clear"]') as HTMLElement).click();
+    expect(store.clearSyncedMonth).toHaveBeenCalled();
+    expect(setup().el.querySelector('[data-testid="pfm-month-filter"]')).toBeNull();
   });
 });

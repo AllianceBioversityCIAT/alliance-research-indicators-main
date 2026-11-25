@@ -385,4 +385,77 @@ describe('pfm-derivation', () => {
       ).toBe(4);
     });
   });
+
+  describe('DD-PFM-40: TIP knowledge products', () => {
+    const tip = (o: Partial<PfmRawRow> = {}): PfmRawRow =>
+      raw({
+        platform_code: 'TIP',
+        result_status_id: 20,
+        result_status_name: 'Completed in TIP',
+        approved_at: null,
+        ...o,
+      });
+
+    it('keeps the TIP status name and counts Completed in TIP as approved', () => {
+      const d = derivePfmRow(tip());
+      expect(d.starLabel).toBe('Completed in TIP');
+      expect(d.isExternal).toBe(true);
+      expect(d.isApproved).toBe(true);
+    });
+
+    it('DD-PFM-43: its mapping counts like a STAR one, never as Pending approval', () => {
+      const pending = derivePfmRow(tip({ mapping_complete: 0 }));
+      expect(pending.needsAttention).toBe(true);
+      expect(matchesChip(pending, PfmChipEnum.NEED_ATTENTION)).toBe(true);
+      expect(matchesChip(pending, PfmChipEnum.MAPPING_INCOMPLETE)).toBe(true);
+      expect(matchesChip(pending, PfmChipEnum.READY_TO_SYNC)).toBe(false);
+
+      const notAnswered = derivePfmRow(
+        tip({
+          has_alignment: 0,
+          has_contribution: null,
+          mapping_complete: null,
+        }),
+      );
+      expect(matchesChip(notAnswered, PfmChipEnum.MAPPING_INCOMPLETE)).toBe(
+        true,
+      );
+
+      const mapped = derivePfmRow(tip());
+      expect(matchesChip(mapped, PfmChipEnum.READY_TO_SYNC)).toBe(true);
+      expect(matchesChip(mapped, PfmChipEnum.NEED_ATTENTION)).toBe(true);
+
+      for (const d of [pending, notAnswered, mapped]) {
+        expect(matchesChip(d, PfmChipEnum.AWAITING_PI)).toBe(false);
+      }
+    });
+
+    it('keeps its real state: a mapped TIP row not in PRMS is still ready (pipeline)', () => {
+      expect(derivePfmRow(tip()).isReady).toBe(true);
+    });
+
+    it('is done once it is in PRMS or out of scope, like a STAR row', () => {
+      const synced = derivePfmRow(tip({ is_synced_to_prms: 1 }));
+      expect(synced.needsAttention).toBe(false);
+      expect(matchesChip(synced, PfmChipEnum.SYNCED)).toBe(true);
+      const noSp = derivePfmRow(tip({ has_contribution: 0 }));
+      expect(noSp.needsAttention).toBe(false);
+      expect(matchesChip(noSp, PfmChipEnum.NO_SP_CONTRIBUTION)).toBe(true);
+    });
+
+    it('a STAR row (or one without platform) is not external', () => {
+      for (const platform_code of ['STAR', undefined, null]) {
+        const d = derivePfmRow(raw({ platform_code, mapping_complete: 0 }));
+        expect(d.isExternal).toBe(false);
+        expect(d.needsAttention).toBe(true);
+      }
+    });
+
+    it('status 20 on a STAR row is not treated as approved', () => {
+      const d = derivePfmRow(
+        raw({ result_status_id: 20, result_status_name: 'Completed in TIP' }),
+      );
+      expect(d.isApproved).toBe(false);
+    });
+  });
 });

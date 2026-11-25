@@ -158,21 +158,38 @@ describe('PfmStoreService', () => {
     expect(store.tab()).toBe('queue');
   });
 
-  it('filter change sets chip null and refetches the queue (R-PFM-009)', async () => {
+  // DD-PFM-46: a filter narrows the quick view on screen, so the order of the two never matters.
+  it('filter change keeps the quick view and refetches the queue with both (R-PFM-009)', async () => {
     const store = build();
     store.init();
     await new Promise(r => setTimeout(r));
-    store.setChip('synced');
-    expect(store.chip()).toBe('synced');
+    store.setChip('mapping_incomplete');
+    expect(store.chip()).toBe('mapping_incomplete');
     api.GET_PfmQueue.mockClear();
 
-    store.setFilter('project', 'P1');
+    store.setFilter('type', 3);
     await new Promise(r => setTimeout(r));
 
-    expect(store.chip()).toBeNull();
-    expect(store.filters().project).toBe('P1');
+    expect(store.chip()).toBe('mapping_incomplete');
+    expect(store.filters().type).toBe(3);
     expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
-    expect(api.GET_PfmQueue.mock.calls[0][0]).toEqual(expect.objectContaining({ project: 'P1', chip: null }));
+    expect(api.GET_PfmQueue.mock.calls[0][0]).toEqual(expect.objectContaining({ type: 3, chip: 'mapping_incomplete' }));
+  });
+
+  it('quick view then filter equals filter then quick view', async () => {
+    const store = build();
+    store.init();
+    store.setChip('mapping_incomplete');
+    store.setFilter('type', 3);
+    const chipFirst = store.query();
+
+    store.resetFilters();
+    store.setFilter('type', 3);
+    store.setChip('mapping_incomplete');
+    await new Promise(r => setTimeout(r));
+
+    expect(chipFirst).toEqual(expect.objectContaining({ chip: 'mapping_incomplete', type: 3 }));
+    expect(store.query()).toEqual(chipFirst);
   });
 
   // Coverage-tab click: the queue must show exactly what was clicked, so earlier filters go.
@@ -189,7 +206,7 @@ describe('PfmStoreService', () => {
     store.openQueue({ chip: 'ready_to_sync' });
     expect(store.tab()).toBe('queue');
     expect(store.chip()).toBe('ready_to_sync');
-    expect(store.filters()).toEqual({ project: null, sp: null, type: null });
+    expect(store.filters()).toEqual({ project: null, sp: null, type: null, synced_month: null });
     expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
     expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ chip: 'ready_to_sync', project: null, type: null }));
     expect(router.navigate).toHaveBeenCalled();
@@ -336,7 +353,7 @@ describe('PfmStoreService', () => {
 
       expect(store.scope()).toBe('all');
       expect(store.tab()).toBe('queue');
-      expect(store.filters()).toEqual({ project: 'P1', sp: 'SP01', type: 3 });
+      expect(store.filters()).toEqual({ project: 'P1', sp: 'SP01', type: 3, synced_month: null });
       expect(store.chip()).toBe('synced');
       expect(store.groupViews()).toEqual({ P1: view });
       expect([...store.openGroups()]).toEqual(['P1', 'P2']);
@@ -433,7 +450,7 @@ describe('PfmStoreService', () => {
     store.resetFilters();
     await new Promise(r => setTimeout(r));
 
-    expect(store.filters()).toEqual({ project: null, sp: null, type: null });
+    expect(store.filters()).toEqual({ project: null, sp: null, type: null, synced_month: null });
     expect(store.chip()).toBeNull();
     expect(store.groupRows()).toEqual({});
     expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
@@ -548,6 +565,33 @@ describe('PfmStoreService', () => {
       slowFail.reject(new Error('late'));
       await new Promise(r => setTimeout(r));
       expect(store.groupState()['P2']).toBeUndefined();
+    });
+  });
+
+  describe('Stats charts open the queue on exactly their results (DD-PFM-45)', () => {
+    it('a result type opens Synced with PRMS narrowed to that type', async () => {
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+      store.openQueue({ chip: 'synced', type: 6 });
+      expect(store.tab()).toBe('queue');
+      expect(store.chip()).toBe('synced');
+      expect(store.filters()).toEqual({ project: null, sp: null, type: 6, synced_month: null });
+      expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ chip: 'synced', type: 6 }));
+    });
+
+    it('a month opens the queue on the results synced that month, and removing it keeps the rest', async () => {
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+      store.openQueue({ synced_month: '2026-06' });
+      expect(store.filters().synced_month).toBe('2026-06');
+      expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ synced_month: '2026-06' }));
+      store.setChip('need_attention');
+      store.clearSyncedMonth();
+      expect(store.filters().synced_month).toBeNull();
+      expect(store.chip()).toBe('need_attention');
+      expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ synced_month: null, chip: 'need_attention' }));
     });
   });
 });

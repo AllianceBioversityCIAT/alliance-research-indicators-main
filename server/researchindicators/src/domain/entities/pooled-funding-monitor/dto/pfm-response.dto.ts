@@ -54,9 +54,14 @@ export class PfmJourneyDto {
   projects: { total: number; with_results: number; without_results: number };
   @ApiProperty({
     description:
-      'Every result by STAR status. Draft includes Returned; Submitted includes Under review.',
+      'Every result by status. Draft includes Returned; Submitted includes Under review; approved is STAR only; completed_in_tip are the TIP Knowledge Products (final in TIP).',
   })
-  star: { draft: number; submitted: number; approved: number };
+  star: {
+    draft: number;
+    submitted: number;
+    approved: number;
+    completed_in_tip: number;
+  };
   @ApiProperty({
     description: 'Approved results by their CGIAR Portfolio answer.',
   })
@@ -166,6 +171,13 @@ export class PfmSummaryResponseDto {
   })
   synced_this_year: number;
   @ApiProperty({
+    nullable: true,
+    example: 2026,
+    description:
+      'The monitored report year (OICR.REPORTING_YEAR) every number of the page belongs to.',
+  })
+  report_year: number | null;
+  @ApiProperty({
     type: [PfmSyncedTypeDto],
     description:
       'Results already in PRMS (any review status) by result type, most first.',
@@ -274,6 +286,11 @@ export class PfmResultRowDto {
   })
   result_code: string;
   @ApiProperty({ example: 'STAR' }) platform_code: string;
+  @ApiProperty({
+    description:
+      'Reported in another platform (TIP); its mapping counts like a STAR one (DD-PFM-43).',
+  })
+  is_external: boolean;
   @ApiProperty({ example: 1234 }) official_code: number;
   @ApiProperty() report_year: number;
   @ApiProperty({

@@ -11,6 +11,8 @@ export const PFM_HELP = {
   readyToSync: 'Mapping complete and not in PRMS yet: these can be sent now.',
   rejected: 'Sent to PRMS and returned by its reviewers. Check the reason, fix the result and sync it again.',
   synced: 'Already in PRMS, whatever its review status: pending review, approved or rejected. Done on our side.',
+  fromTip: 'Knowledge product reported and completed in TIP. Its CGIAR Portfolio mapping follows the same steps as a STAR result.',
+  completedInTip: 'Reported and approved in TIP, ready for the next stage',
 
   // Terms
   outOfScope:

@@ -9,6 +9,8 @@ import {
   formatLastFirstName,
   formatPersonName,
 } from '../../../shared/utils/name-format.util';
+import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
 
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-02
 
@@ -18,8 +20,8 @@ import {
  * no caller can pass someone else's carnet or a free-text project list.
  */
 export type PfmRepositoryScope =
-  | { scope: PfmScopeEnum.ALL }
-  | { scope: PfmScopeEnum.MINE; userId: number };
+  | { scope: PfmScopeEnum.ALL; reportYear: number }
+  | { scope: PfmScopeEnum.MINE; userId: number; reportYear: number };
 
 export interface PfmSpRef {
   code: string;
@@ -63,6 +65,11 @@ export interface PfmMonitoredRow extends PfmRawRow {
   primary_sp: PfmSpRef | null;
   /** Every active SP of the alignment except the primary one. */
   contributing_sps: PfmSpRef[];
+  /**
+   * UTC months ('YYYY-MM') with an ACCEPTED sync of this result, oldest first: the same log rows
+   * the monthly series counts, so a month bar and the queue it opens agree (DD-PFM-45).
+   */
+  synced_months: string[];
 }
 
 /** A contributing project of the scope, whether it has results or not (coverage stage 1). */
@@ -104,12 +111,19 @@ export interface PfmFilterOptions {
 export const PFM_MONITORED_INDICATOR_IDS = [1, 2, 3, 4, 6] as const;
 export const PFM_PLATFORM_CODE = 'STAR';
 /**
- * The monitor counts ONLY results of this report year (`results.report_year_id`
- * holds the year value itself): queue, chips, KPIs, coverage, pipeline, monthly
- * series, filter options. Bound as a parameter in `monitoredWhere`.
+ * DD-PFM-40: TIP results are monitored too, but only Knowledge Products. AICCRA
+ * stays out, and the report year rule applies to every platform.
  */
-// TODO(pfm): read the report year from a configuration variable (app_config) instead of this constant — owner, HITL 2026-10-09.
-export const PFM_REPORT_YEAR = 2026;
+export const PFM_TIP_PLATFORM_CODE = 'TIP';
+export const PFM_KNOWLEDGE_PRODUCT_INDICATOR_ID = 3;
+/**
+ * The monitor counts ONLY results of one report year (`results.report_year_id`
+ * holds the year value itself): queue, chips, KPIs, coverage, pipeline, monthly
+ * series, filter options. The year is the `app_config` value of this key, read
+ * on every request (no cache: an admin save shows on the next load), resolved
+ * ONCE per request into the scope and bound as a parameter in `monitoredWhere`.
+ */
+export const PFM_REPORT_YEAR_CONFIG_KEY = AppConfigKey.OICR_REPORTING_YEAR;
 /** Status the approval date is read from (D-4). */
 const APPROVED_STATUS_ID = 6;
 
@@ -139,6 +153,21 @@ const utcIso = (column: string): string =>
 
 /** `result_prms_sync_*` store the official code as VARCHAR; `results` as BIGINT. */
 const CODE_AS_TEXT_SQL = `(CAST(r.result_official_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
+
+/**
+ * Official codes are numbered per platform, so STAR 123 and TIP 123 can share a
+ * year (DD-PFM-40). The sync tables carry the platform; the explicit COLLATE
+ * keeps the comparison valid whichever collation those tables have (1267). The
+ * CAST comes first because `results.platform_code` is not utf8mb4 on every
+ * schema (utf8mb3 on the scratch one), and a utf8mb4 COLLATE on it fails.
+ */
+const PLATFORM_AS_TEXT_SQL = `(CAST(r.platform_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
+
+/**
+ * The reference a sync-log row stores: the bare code for STAR, `<platform>-<code>`
+ * for any other platform (`prmsRef`, prms-external-reference.ts).
+ */
+const PRMS_REF_AS_TEXT_SQL = `(CAST(IF(r.platform_code = 'STAR', r.result_official_code, CONCAT(r.platform_code, '-', r.result_official_code)) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
 
 /**
  * `result_pool_funding_alignment_sp.sp_code` is utf8mb4_0900_ai_ci while
@@ -172,6 +201,10 @@ const ALIGNMENT_ID_SQL = `(
           WHERE ${SAME_RESULT_YEAR_SQL('ra')}
             AND a.is_active = 1
         )`;
+
+/** 'YYYY-MM' of a TIMESTAMP in UTC, the month key of the monthly series. */
+const UTC_MONTH_SQL = (column: string): string =>
+  `DATE_FORMAT(DATE_ADD(CAST('1970-01-01' AS DATETIME), INTERVAL FLOOR(UNIX_TIMESTAMP(${column})) SECOND), '%Y-%m')`;
 
 const toDate = (value: unknown): Date | null => {
   if (value == null || value === '') return null;
@@ -295,6 +328,9 @@ export const mapMonitoredRow = (
     prms_history_status: latest?.status ?? null,
     prms_justification: latest?.justification ?? null,
     creator: (row.creator_name as string | null) ?? null,
+    synced_months: [
+      ...new Set(toJsonArray<string>(row.synced_months).map(String)),
+    ].sort((a, b) => a.localeCompare(b)),
   } as PfmMonitoredRow;
 };
 
@@ -315,7 +351,33 @@ interface Fragment {
  */
 @Injectable()
 export class PooledFundingMonitorRepository {
+  private readonly logger = new LoggerUtil({
+    name: PooledFundingMonitorRepository.name,
+  });
+
   constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * The monitored report year: the active `OICR.REPORTING_YEAR` value. When it is
+   * missing or not a year, the current UTC calendar year, with a warning, so no
+   * year is ever written in code.
+   */
+  async findReportYear(now: Date = new Date()): Promise<number> {
+    const rows: { simple_value: string | null }[] = await this.dataSource.query(
+      'SELECT simple_value FROM app_config WHERE `key` = ? AND is_active = TRUE LIMIT 1',
+      [PFM_REPORT_YEAR_CONFIG_KEY],
+    );
+    const raw = rows?.[0]?.simple_value;
+    const trimmed = typeof raw === 'string' ? raw.trim() : '';
+    if (/^\d{4}$/.test(trimmed)) return Number(trimmed);
+    const fallback = now.getUTCFullYear();
+    this.logger._warn(
+      `Unusable app_config value for key "${PFM_REPORT_YEAR_CONFIG_KEY}" raw=${JSON.stringify(
+        raw ?? null,
+      )}. Falling back to the current year ${fallback}.`,
+    );
+    return fallback;
+  }
 
   /** R-PFM-003 + R-PFM-004: one row per monitored result in scope. */
   async findMonitoredResults(
@@ -387,13 +449,23 @@ export class PooledFundingMonitorRepository {
           FROM result_prms_sync_history h
           WHERE h.result_official_code = ${CODE_AS_TEXT_SQL}
             AND h.result_year = r.report_year_id
+            AND h.platform_code = ${PLATFORM_AS_TEXT_SQL}
             AND h.correlation_outcome = 'CORRELATED'
             AND h.duplicate_of_id IS NULL
             AND h.is_active = 1
             AND h.status IS NOT NULL
           ORDER BY COALESCE(h.decided_at, h.occurred_at) DESC, h.id DESC
           LIMIT 1
-        ) AS prms_latest
+        ) AS prms_latest,
+        (
+          SELECT JSON_ARRAYAGG(${UTC_MONTH_SQL('l.created_at')})
+          FROM result_prms_sync_log l
+          WHERE l.external_reference = ${PRMS_REF_AS_TEXT_SQL}
+            AND l.platform_code = ${PLATFORM_AS_TEXT_SQL}
+            AND l.result_year = r.report_year_id
+            AND l.outcome = 'ACCEPTED'
+            AND l.is_active = 1
+        ) AS synced_months
       ${this.monitoredFrom()}
       LEFT JOIN indicators i ON i.indicator_id = r.indicator_id
       LEFT JOIN result_status rs ON rs.result_status_id = r.result_status_id
@@ -413,7 +485,7 @@ export class PooledFundingMonitorRepository {
   /**
    * R-PFM-005 sub-line: every contributing project in the portfolio. Deliberately
    * NOT restricted by report year: it counts pool-funding PROJECTS (the "of N in
-   * portfolio" denominator), not results, so a project with no 2026 result is
+   * portfolio" denominator), not results, so a project with no result of the report year is
    * still part of the portfolio and shows as uncovered.
    */
   async countContributingProjects(): Promise<number> {
@@ -532,11 +604,12 @@ export class PooledFundingMonitorRepository {
     const rows: { month: string; synced: string | number }[] =
       await this.dataSource.query(
         `SELECT
-           DATE_FORMAT(DATE_ADD(CAST('1970-01-01' AS DATETIME), INTERVAL FLOOR(UNIX_TIMESTAMP(l.created_at)) SECOND), '%Y-%m') AS month,
+           ${UTC_MONTH_SQL('l.created_at')} AS month,
            COUNT(DISTINCT r.result_id) AS synced
          ${this.monitoredFrom()}
          INNER JOIN result_prms_sync_log l
-           ON l.external_reference = ${CODE_AS_TEXT_SQL}
+           ON l.external_reference = ${PRMS_REF_AS_TEXT_SQL}
+          AND l.platform_code = ${PLATFORM_AS_TEXT_SQL}
           AND l.result_year = r.report_year_id
           AND l.outcome = 'ACCEPTED'
           AND l.is_active = 1
@@ -569,7 +642,8 @@ export class PooledFundingMonitorRepository {
       `SELECT COUNT(DISTINCT r.result_id) AS synced
        ${this.monitoredFrom()}
        INNER JOIN result_prms_sync_log l
-         ON l.external_reference = ${CODE_AS_TEXT_SQL}
+         ON l.external_reference = ${PRMS_REF_AS_TEXT_SQL}
+        AND l.platform_code = ${PLATFORM_AS_TEXT_SQL}
         AND l.result_year = r.report_year_id
         AND l.outcome = 'ACCEPTED'
         AND l.is_active = 1
@@ -738,9 +812,19 @@ export class PooledFundingMonitorRepository {
    * so no AND can bind across it (KZ-017); the integration spec asserts it on rows.
    */
   private monitoredWhere(scope: PfmRepositoryScope): Fragment {
-    const params: unknown[] = [PFM_PLATFORM_CODE, PFM_REPORT_YEAR];
+    if (!Number.isInteger(scope.reportYear)) {
+      // Never count every year by accident: the year is always bound.
+      throw new Error('The monitor scope requires the report year');
+    }
+    const params: unknown[] = [
+      PFM_PLATFORM_CODE,
+      PFM_TIP_PLATFORM_CODE,
+      PFM_KNOWLEDGE_PRODUCT_INDICATOR_ID,
+      scope.reportYear,
+    ];
     const clauses = [
-      `r.platform_code = ?`,
+      // STAR, or a TIP Knowledge Product (DD-PFM-40). One parenthesised unit (KZ-017).
+      `(r.platform_code = ? OR (r.platform_code = ? AND r.indicator_id = ?))`,
       `r.report_year_id = ?`,
       `r.is_snapshot = 0`,
       `r.is_active = 1`,
