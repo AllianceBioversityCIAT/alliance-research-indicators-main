@@ -1,4 +1,4 @@
-import { Component, inject, signal, WritableSignal } from '@angular/core';
+import { Component, computed, effect, inject, signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CacheService } from '../../../../../../shared/services/cache/cache.service';
 import { ApiService } from '../../../../../../shared/services/api.service';
@@ -23,6 +23,26 @@ import { SelectComponent } from '@shared/components/custom-fields/select/select.
 import { RolesService } from '@shared/services/cache/roles.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
 import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
+import { DialogModule } from 'primeng/dialog';
+import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
+import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
+import { ShortOutcome2026Component } from './components/short-outcome-2026/short-outcome-2026.component';
+import { GetQuantificationUnitCategoriesService } from '@shared/services/control-list/get-quantification-unit-categories.service';
+import { QuantificationUnitCategory } from '@shared/interfaces/oicr-catalogs.interface';
+
+/** First report year that uses the OICR Details 2026 layout and rules. */
+export const OICR_DETAILS_2026_YEAR = 2026;
+const OICR_2026_FIELDS = [
+  'problem_statement',
+  'alliance_solution',
+  'beneficiaries',
+  'outcome_achieved',
+  'outcome_achieved_edited',
+  'acknowledgments',
+  'audiences',
+  'thematic_keywords'
+] as const;
+const ORCID_PATTERN = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
 
 // OICR quantification number field bounds — mirrors Innovation Use's signed-decimal
 // extension (2026-09-24). Scale 4 matches the `DECIMAL(24,4)` column; max/min are
@@ -36,7 +56,7 @@ const OICR_QUANTIFICATION_PLACEHOLDER = 'Enter a number';
 
 @Component({
   selector: 'app-oicr-details',
-  imports: [NavigationButtonsComponent, FormsModule, FormHeaderComponent, CheckboxModule, AccordionModule, NgTemplateOutlet, AuthorsContactPersonsTableComponent, OicrFormFieldsComponent, QuantificationItemComponent, InputComponent, ImpactAreasComponent, SelectComponent],
+  imports: [NavigationButtonsComponent, FormsModule, FormHeaderComponent, CheckboxModule, AccordionModule, NgTemplateOutlet, AuthorsContactPersonsTableComponent, OicrFormFieldsComponent, QuantificationItemComponent, InputComponent, ImpactAreasComponent, SelectComponent, DialogModule, MultiselectComponent, TextareaComponent, ShortOutcome2026Component],
   templateUrl: './oicr-details.component.html'
 })
 export default class OicrDetailsComponent {
@@ -65,6 +85,19 @@ export default class OicrDetailsComponent {
   readonly oicrQuantificationPlaceholder = OICR_QUANTIFICATION_PLACEHOLDER;
 
   quantifications = signal<QuantificationItemData[]>([]);
+  unitCategoriesService = inject(GetQuantificationUnitCategoriesService);
+  unitCategories = this.unitCategoriesService.list;
+  unitCategoriesDialogOpen = signal(false);
+  /** Suggested-categories modal rows: macro-category -> its categories, in catalog order. */
+  unitCategoryGroups = computed(() => {
+    const groups: { macro: string; categories: string[] }[] = [];
+    for (const row of this.unitCategories() as QuantificationUnitCategory[]) {
+      const group = groups.find(g => g.macro === row.macro_category);
+      if (group) group.categories.push(row.name);
+      else groups.push({ macro: row.macro_category, categories: [row.name] });
+    }
+    return groups;
+  });
   extrapolatedEstimates = signal<QuantificationItemData[]>([]);
   contactPersons = signal<ContactPersonRow[]>([]);
 
@@ -120,6 +153,7 @@ export default class OicrDetailsComponent {
       affiliation: item.user?.affiliation || item.user?.center || '-',
       email: item.user?.email || '-',
       role: item.informativeRole?.name || '-',
+      orcid: item.orcid || '-',
       user_id: item.user_id,
       informative_role_id: item.informative_role_id
     }));
@@ -139,6 +173,8 @@ export default class OicrDetailsComponent {
   }
 
   cache = inject(CacheService);
+  /** Year gate: report year >= 2026 gets the new layout, payload and modal; anything older stays as it was. */
+  is2026 = computed(() => Number(this.cache.currentMetadata().report_year) >= OICR_DETAILS_2026_YEAR);
   actions = inject(ActionsService);
   loading = signal(false);
   submission = inject(SubmissionService);
@@ -147,6 +183,9 @@ export default class OicrDetailsComponent {
   allModalsService = inject(AllModalsService);
 
   constructor() {
+    effect(() => {
+      if (this.is2026()) this.unitCategoriesService.main();
+    });
     this.versionWatcher.onVersionChange(() => {
       this.getData();
     });
@@ -168,9 +207,16 @@ export default class OicrDetailsComponent {
       return;
     }
     
+    const orcid = (data.orcid ?? '').trim();
+    if (this.is2026() && orcid && !ORCID_PATTERN.test(orcid)) {
+      this.actions.showToast({ severity: 'error', summary: 'Error', detail: 'ORCID must look like 0000-0002-1825-0097' });
+      return;
+    }
+
     const contactPersonData = {
       user_id: data.contact_person_id,
-      informative_role_id: data.role_id
+      informative_role_id: data.role_id,
+      ...(this.is2026() && orcid ? { orcid } : {})
     };
     
     try {
@@ -207,7 +253,8 @@ export default class OicrDetailsComponent {
           return {
             number: parsedNumber,
             unit: q?.unit ?? '',
-            comments: q?.description ?? ''
+            comments: q?.description ?? '',
+            ...(this.is2026() ? { unit_macro_category: q?.unit_macro_category ?? '' } : {})
           };
         })
       );
@@ -229,7 +276,8 @@ export default class OicrDetailsComponent {
           return {
             number: parsedNumber,
             unit: q?.unit ?? '',
-            comments: q?.description ?? ''
+            comments: q?.description ?? '',
+            ...(this.is2026() ? { unit_macro_category: q?.unit_macro_category ?? '' } : {})
           };
         })
       );
@@ -277,6 +325,36 @@ export default class OicrDetailsComponent {
     this.loading.set(false);
   }
 
+  /** Quantification row as sent to the API; `unit_macro_category` only travels for report year >= 2026. */
+  private toQuantificationPayload(q: QuantificationItemData): QuantificationPayload {
+    return {
+      quantification_number: q.number ?? 0,
+      unit: q.unit ?? '',
+      description: q.comments ?? '',
+      ...(this.is2026() ? { unit_macro_category: q.unit_macro_category ?? null } : {})
+    };
+  }
+
+  /** The 2026-only fields of the PATCH payload; empty for older years so their payload is unchanged. */
+  private build2026Payload(current: PatchOicr): Partial<PatchOicr> {
+    if (!this.is2026()) {
+      // The GET may echo the 2026 columns (null) for an older result; they must not travel back in its PATCH.
+      const blank: Partial<PatchOicr> = {};
+      for (const key of OICR_2026_FIELDS) if (key in current) blank[key] = undefined as never;
+      return blank;
+    }
+    return {
+      problem_statement: current.problem_statement ?? '',
+      alliance_solution: current.alliance_solution ?? '',
+      beneficiaries: current.beneficiaries ?? '',
+      outcome_achieved: current.outcome_achieved ?? '',
+      outcome_achieved_edited: !!current.outcome_achieved_edited,
+      acknowledgments: current.acknowledgments ?? '',
+      audiences: (current.audiences ?? []).map(a => ({ oicr_audience_id: a.oicr_audience_id })),
+      thematic_keywords: (current.thematic_keywords ?? []).map(k => ({ oicr_thematic_keyword_id: k.oicr_thematic_keyword_id }))
+    };
+  }
+
   async saveData(page?: 'back' | 'next'): Promise<void> {
     try {
       this.loading.set(true);
@@ -289,17 +367,10 @@ export default class OicrDetailsComponent {
 
         const payload: PatchOicr = {
           ...current,
-          actual_count: this.quantifications().map<QuantificationPayload>(q => ({
-            quantification_number: q.number ?? 0,
-            unit: q.unit ?? '',
-            description: q.comments ?? ''
-          })),
-          extrapolate_estimates: this.extrapolatedEstimates().map<QuantificationPayload>(q => ({
-            quantification_number: q.number ?? 0,
-            unit: q.unit ?? '',
-            description: q.comments ?? ''
-          })),
-          result_impact_areas: current.result_impact_areas || []
+          actual_count: this.quantifications().map(q => this.toQuantificationPayload(q)),
+          extrapolate_estimates: this.extrapolatedEstimates().map(q => this.toQuantificationPayload(q)),
+          result_impact_areas: current.result_impact_areas || [],
+          ...this.build2026Payload(current)
         };
 
         const response = await this.api.PATCH_Oicr(numericResultId, payload);
