@@ -1058,3 +1058,24 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Reviewer** (`akili-reviewer`, opus, round **21/22**): **`STATUS: PASS`**. Advisory: the IOB spec's year change uses `triggerEventHandler`. This is pre-existing (it is a context line in the diff), not new.
 - **Pending:** Leader Chrome measurement. Leader's Chrome tab renders a blank app (`app-root` empty), so the owner was asked to check.
 - **Owner (2026-11-26): commit authorized** ("haz commit"); no push. The Leader's Chrome scroll measurement was not run, because the Leader's tab rendered a blank app. The owner's own view stands as the visual check.
+
+### Session handoff (2026-11-26)
+The owner is closing this session and will continue in a new one with more UI changes. State at close:
+- **Branch** `institutional-kpis`, HEAD `8e7daaae7`. The working tree is clean, except that this handoff entry is committed on its own. **Nothing is pushed**; the owner pushes.
+- **Done in rev 4:** T-18…T-23 plus T-23 follow-ups 1–6, all with a Reviewer PASS and owner OK. Last commits: `7e19284ca` / `0f46dde5f` (follow-up 5: one page layout, Delete in the footer with a tooltip reason) and `ed247b839` / `8e7daaae7` (follow-up 6: Framework banner removed, count line inside the list card).
+- **Budget:** review rounds **21 of 22** used. Any new change needs an owner re-base first (§14 of `design.md`). LOC cap ≈ 5,400 (not re-measured since follow-up 4).
+- **Not verified:** the Leader's Chrome check that the page does not scroll at ≥ 1024 px (D-STF-31) after follow-ups 5–6. The Leader's tab at `localhost:4200` rendered a blank app (`app-root` empty). The owner's own view was the visual check. Run this first in the next session.
+- **Open owner calls (undecided):**
+  1. "1 linked indicators" should be singular.
+  2. The IOB find label says "code or name", but it searches code and statement.
+  3. The empty-year state shows "Carry forward to …".
+  4. The Responsibles column wraps.
+- **Next steps:** further owner UI changes (new follow-up: re-base, spec amendment, Grok worker, Reviewer, owner OK, commit). Then the owner pushes and merges to dev, T-17 Dev checks run, and `/akili-validate`.
+- **Standing rules:**
+  - No push.
+  - Commit only after the owner's visual OK.
+  - No co-author trailer.
+  - Never write to the shared DB (no Save, Delete or Carry forward clicks).
+  - All code goes to a fresh Grok worker (`orca orchestration worker-start --agent cursor --model grok-4.7-high`), released after Reviewer PASS.
+  - The Reviewer is `akili-reviewer`.
+  - Chat in Spanish; the repo is written in English.
