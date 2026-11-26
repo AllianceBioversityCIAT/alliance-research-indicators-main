@@ -62,6 +62,15 @@ export class ResultUser extends AuditableEntity {
   })
   informative_role_id?: number;
 
+  @ApiProperty({ type: String, required: false })
+  @Column({
+    type: 'varchar',
+    length: 19,
+    name: 'orcid',
+    nullable: true,
+  })
+  orcid?: string;
+
   @ManyToOne(
     () => InformativeRole,
     (informativeRole) => informativeRole.result_users,

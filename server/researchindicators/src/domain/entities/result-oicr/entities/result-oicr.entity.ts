@@ -102,6 +102,48 @@ export class ResultOicr extends AuditableEntity {
   })
   for_external_use_description: string;
 
+  @Column({
+    type: 'text',
+    name: 'problem_statement',
+    nullable: true,
+  })
+  problem_statement: string;
+
+  @Column({
+    type: 'text',
+    name: 'alliance_solution',
+    nullable: true,
+  })
+  alliance_solution: string;
+
+  @Column({
+    type: 'text',
+    name: 'beneficiaries',
+    nullable: true,
+  })
+  beneficiaries: string;
+
+  @Column({
+    type: 'text',
+    name: 'outcome_achieved',
+    nullable: true,
+  })
+  outcome_achieved: string;
+
+  @Column({
+    type: 'boolean',
+    name: 'outcome_achieved_edited',
+    default: false,
+  })
+  outcome_achieved_edited: boolean;
+
+  @Column({
+    type: 'text',
+    name: 'acknowledgments',
+    nullable: true,
+  })
+  acknowledgments: string;
+
   @ManyToOne(() => AllianceUserStaffGroup, (ausg) => ausg.staffGroupOicr)
   @JoinColumn([
     { name: 'mel_regional_expert', referencedColumnName: 'carnet' },
