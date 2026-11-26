@@ -51,6 +51,16 @@ class HostComponent {
   rows = signal<ValueRow[]>(buildRows());
 }
 
+@Component({
+  standalone: true,
+  imports: [DataTableComponent],
+  template: `<app-data-table [columns]="columns" [rows]="rows" [searchFields]="['value']" [showToolbar]="false" exportFileName="values.xlsx"></app-data-table>`
+})
+class HiddenToolbarHost {
+  columns = columns;
+  rows = buildRows();
+}
+
 describe('DataTableComponent', () => {
   let fixture: ComponentFixture<HostComponent>;
 
@@ -337,6 +347,31 @@ describe('DataTableComponent', () => {
     loadingFixture.detectChanges();
 
     expect((loadingFixture.nativeElement as HTMLElement).querySelector('[data-testid="progress-bar"], p-progressbar')).toBeTruthy();
+  });
+
+  // ─── showToolbar (strategy-framework D-STF-40). Default stays on; false hides the row. ────
+
+  it('renders the search and export toolbar by default', async () => {
+    await setup();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="data-table-search"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="data-table-export"]')).not.toBeNull();
+  });
+
+  it('renders neither search nor export when showToolbar is false', async () => {
+    await TestBed.configureTestingModule({
+      imports: [HiddenToolbarHost],
+      providers: [provideNoopAnimations()]
+    }).compileComponents();
+    const hidden = TestBed.createComponent(HiddenToolbarHost);
+    hidden.detectChanges();
+    await hidden.whenStable();
+    hidden.detectChanges();
+
+    const root = hidden.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="data-table-search"]')).toBeNull();
+    expect(root.querySelector('[data-testid="data-table-export"]')).toBeNull();
+    expect(root.querySelector('[data-testid="data-table"]')).not.toBeNull();
   });
 });
 

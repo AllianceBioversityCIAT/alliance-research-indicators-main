@@ -23,3 +23,11 @@
   color: var(--ac-primary-blue-600);
   font-weight: 600;
 }
+
+// Same treatment as the tree's "No elements match" line.
+.framework-tables__empty {
+  margin: 0 0 12px;
+  color: var(--ac-grey-700);
+  font-size: 13px;
+  line-height: 1.5;
+}

@@ -1,0 +1,67 @@
+@use '../ods-field-focus' as fieldFocus;
+
+// strategy-framework T-23 — D-STF-40. The tree's find field, moved so both pages share it.
+// Tokens only. The border recolour is the shared ods-field-focus mixin.
+
+:host {
+  display: block;
+}
+
+.ods-find {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.ods-find__label {
+  color: var(--ac-grey-800);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ods-find__field {
+  position: relative;
+}
+
+.ods-find__input {
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.25rem 2rem 0.25rem 0.5rem;
+  border: 1px solid var(--ac-grey-200);
+  border-radius: 0.5rem;
+  background: var(--ac-white-1);
+  color: var(--ac-grey-800);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ods-find__input:focus,
+.ods-find__input:focus-visible {
+  @include fieldFocus.ods-field-focus;
+}
+
+.ods-find__clear:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
+}
+
+.ods-find__clear {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ac-grey-700);
+  font-size: 12px;
+  cursor: pointer;
+  transform: translateY(-50%);
+}

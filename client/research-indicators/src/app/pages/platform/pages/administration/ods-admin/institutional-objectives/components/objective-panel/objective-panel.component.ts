@@ -4,6 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
+import { TooltipModule } from 'primeng/tooltip';
 import { CreateInstitutionalObjectivePayload, FrameworkObjective, FrameworkView } from '@shared/interfaces/strategy-framework.interface';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
@@ -27,7 +28,7 @@ interface OpenedValues {
 @Component({
   selector: 'app-objective-panel',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, SelectModule, MultiSelectModule, PanelHeadingComponent],
+  imports: [ReactiveFormsModule, ButtonModule, SelectModule, MultiSelectModule, TooltipModule, PanelHeadingComponent],
   templateUrl: './objective-panel.component.html',
   styleUrl: './objective-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -188,7 +189,7 @@ export class ObjectivePanelComponent {
     }
   }
 
-  /** The page runs the existing confirm. A blocked objective still asks; the reason is also on screen. */
+  /** The page runs the existing confirm. A blocked objective still asks; the reason is the tooltip. */
   remove(): void {
     if (this.saving() || this.objectiveId() === null || this.creating()) return;
     this.deleteRequested.emit();

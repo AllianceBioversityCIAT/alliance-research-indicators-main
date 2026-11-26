@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MultiSelect } from 'primeng/multiselect';
+import { Tooltip } from 'primeng/tooltip';
 import { FrameworkObjective, FrameworkView } from '@shared/interfaces/strategy-framework.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
@@ -83,6 +84,8 @@ describe('ObjectivePanelComponent', () => {
   };
 
   const form = () => document.querySelector('[data-testid="objective-form"]') as HTMLElement | null;
+  const deleteTip = (button: HTMLElement) =>
+    fixture.debugElement.queryAll(By.directive(Tooltip)).find(node => node.nativeElement === button)?.injector.get(Tooltip);
 
   const typeInto = async (selector: string, value: string) => {
     const field = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement;
@@ -154,20 +157,33 @@ describe('ObjectivePanelComponent', () => {
     expect(fixture.componentInstance.isDirty()).toBe(false);
   });
 
-  it('puts Delete above the fields and shows the blocker reason when the objective cannot be deleted', async () => {
+  it('puts Delete, Cancel and Save in the footer and shows the blocker reason when the objective cannot be deleted', async () => {
     fixture.componentRef.setInput('objectiveId', 11);
     fixture.detectChanges();
     await settle();
 
     expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-2 · 2026');
-    const remove = document.querySelector('[data-testid="objective-panel-delete"] button') as HTMLButtonElement;
+    const footer = form()?.querySelector('[data-testid="objective-actions"]') as HTMLElement;
+    const order = ['objective-panel-delete', 'objective-cancel', 'objective-save'].map(id => footer.querySelector(`[data-testid="${id}"]`));
+    expect(order.every(element => element !== null)).toBe(true);
+    for (let index = 1; index < order.length; index += 1) {
+      expect(order[index - 1]!.compareDocumentPosition(order[index]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
     const code = document.querySelector('#objectiveCode') as HTMLInputElement;
-    expect(remove.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(form()?.querySelector('[data-testid="objective-panel-delete"]')).toBeNull();
-    expect(form()?.querySelector('[data-testid="objective-cancel"]')).not.toBeNull();
+    const remove = order[0]!.querySelector('button') as HTMLButtonElement;
+    expect(code.compareDocumentPosition(order[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(remove.getAttribute('aria-disabled')).toBe('true');
+    expect(remove.hasAttribute('disabled')).toBe(false);
+    expect(remove.getAttribute('aria-describedby')).toBe('objective-delete-reason');
     expect(remove.classList.contains('p-button-outlined')).toBe(true);
-    expect(document.querySelector('[data-testid="objective-delete-reason"]')?.textContent?.trim()).toBe('Remove its 1 record in KPIs first.');
+    const reason = document.querySelector('[data-testid="objective-delete-reason"]');
+    expect(reason?.id).toBe('objective-delete-reason');
+    expect(reason?.classList.contains('sr-only')).toBe(true);
+    expect(reason?.textContent?.trim()).toBe('Remove its 1 record in KPIs first.');
+    const tip = deleteTip(remove);
+    expect(tip?.content).toBe('Remove its 1 record in KPIs first.');
+    expect(tip?.tooltipPosition).toBe('top');
+    expect(tip?.tooltipEvent).toBe('both');
     expect(document.activeElement).not.toBe(code);
   });
 
@@ -197,6 +213,10 @@ describe('ObjectivePanelComponent', () => {
     await settle();
 
     expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('IOB-1 · 2026');
+    const enabledDelete = document.querySelector('[data-testid="objective-panel-delete"] button') as HTMLButtonElement;
+    expect(enabledDelete.getAttribute('aria-disabled')).toBeNull();
+    expect(deleteTip(enabledDelete)?.content ?? null).toBeNull();
+    expect(document.querySelector('[data-testid="objective-delete-reason"]')).toBeNull();
     const statement = document.querySelector('#objectiveStatement') as HTMLTextAreaElement;
     expect(statement.value).toBe('Raise incomes');
     await typeInto('#objectiveStatement', 'Updated incomes');

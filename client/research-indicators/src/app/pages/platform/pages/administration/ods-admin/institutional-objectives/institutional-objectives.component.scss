@@ -53,6 +53,14 @@
   @include pill.ods-code-pill;
 }
 
+// Same treatment as the tree's "No elements match" line.
+.objectives-search-empty {
+  margin: 0 0 12px;
+  color: var(--ac-grey-700);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 // Newlines from linkedIndicatorsText. The shared wrap rules live in ods-table-wrap.scss.
 :host ::ng-deep .p-datatable-resizable-table > .p-datatable-tbody > tr > td[data-testid='cell-linkedIndicatorsText'] {
   white-space: pre-line;

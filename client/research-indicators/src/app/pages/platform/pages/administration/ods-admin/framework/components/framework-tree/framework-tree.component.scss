@@ -1,5 +1,4 @@
 @use '../../../ods-code-pill' as pill;
-@use '../../../ods-field-focus' as fieldFocus;
 
 // strategy-framework T-18 — design §6.3, §6.7, D-STF-30.
 // Tokens only. The bar and the outline are judged in Chrome (T-22).
@@ -10,66 +9,10 @@
   display: block;
 }
 
-.framework-tree__find {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.framework-tree__find-label {
-  color: var(--ac-grey-800);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.framework-tree__find-field {
-  position: relative;
-}
-
-.framework-tree__find-input {
-  width: 100%;
-  min-height: 2rem;
-  padding: 0.25rem 2rem 0.25rem 0.5rem;
-  border: 1px solid var(--ac-grey-200);
-  border-radius: 0.5rem;
-  background: var(--ac-white-1);
-  color: var(--ac-grey-800);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-// Search field: shared border recolour. Clear, toggle and add keep the ring below.
-.framework-tree__find-input:focus,
-.framework-tree__find-input:focus-visible {
-  @include fieldFocus.ods-field-focus;
-}
-
-.framework-tree__clear:focus-visible,
 .framework-tree__toggle:focus-visible,
 .framework-tree__add:focus-visible {
   outline: 2px solid var(--ac-primary-blue-600);
   outline-offset: 2px;
-}
-
-.framework-tree__clear {
-  position: absolute;
-  top: 50%;
-  right: 0.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ac-grey-700);
-  font-size: 12px;
-  cursor: pointer;
-  transform: translateY(-50%);
 }
 
 .framework-tree__empty {

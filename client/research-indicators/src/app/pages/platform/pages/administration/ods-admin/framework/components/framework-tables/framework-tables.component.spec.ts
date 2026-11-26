@@ -2,7 +2,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, FrameworkResponsible } from '@shared/interfaces/strategy-framework.interface';
-import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
 import { FrameworkTablesComponent } from './framework-tables.component';
 
 // @akili-spec institutional-performance/strategy-framework T-23 — R-STF-008 AC.1, design §6.4, D-STF-37.
@@ -197,7 +196,7 @@ describe('FrameworkTablesComponent', () => {
     expect(chip(3).getAttribute('aria-pressed')).toBeNull();
   });
 
-  it('sorts by code naturally, pages 10 rows, searches, and exports every filtered row', async () => {
+  it('sorts by code naturally, pages 10 rows, and filters by code and by name', async () => {
     const codesOutOfOrder = ['1.12', '1.2', '1.10', '1.1', '1.11', '1.3', '1.9', '1.4', '1.8', '1.5', '1.7', '1.6'];
     const elements = [
       element({ id: 1, depth: 1, code: '1', name: 'Area' }),
@@ -232,20 +231,66 @@ describe('FrameworkTablesComponent', () => {
     paginator.rows = 10;
     paginator.changePage(0);
     await settle();
-    const search = root().querySelector('[data-testid="data-table-search"]') as HTMLInputElement;
+
+    fixture.componentRef.setInput('selectedKey', '1');
+    await settle();
+    expect(row('1').getAttribute('aria-selected')).toBe('true');
+    const selected: number[] = [];
+    fixture.componentInstance.rowSelected.subscribe(id => selected.push(id));
+
+    const search = root().querySelector('[data-testid="framework-table-search"]') as HTMLInputElement;
+    expect(root().querySelector('label[for="framework-table-search"]')?.textContent?.trim()).toBe('Find by code or name');
     search.value = 'Ten';
-    search.dispatchEvent(new Event('input'));
+    search.dispatchEvent(new Event('input', { bubbles: true }));
     await settle();
     expect(codes()).toEqual(['1.10']);
+    expect(row('1')).toBeNull();
+    expect(selected).toEqual([]);
 
-    const exportSpy = jest.spyOn(xlsxExportUtil, 'exportRowsToXlsx').mockResolvedValue(undefined);
-    (root().querySelector('[data-testid="data-table-export"]') as HTMLButtonElement).click();
+    (root().querySelector('[data-testid="framework-table-search-clear"]') as HTMLButtonElement).click();
+    await settle();
+    expect(row('1').getAttribute('aria-selected')).toBe('true');
+
+    search.value = '1.12';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    expect(codes()).toEqual(['1.12']);
+    expect(root().querySelector('[data-testid="data-table-search"]')).toBeNull();
+    expect(root().querySelector('[data-testid="data-table-export"]')).toBeNull();
+    expect(chips().length).toBeGreaterThan(0);
+  });
+
+  it('says nothing matches instead of the true-empty message, then restores the rows', async () => {
+    await mount(fourLevelView());
+    const before = codes();
+    const search = root().querySelector('[data-testid="framework-table-search"]') as HTMLInputElement;
+
+    search.value = 'zzz';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
     await settle();
 
-    expect(exportSpy).toHaveBeenCalledTimes(1);
-    const exported = exportSpy.mock.calls[0][0] as { rows: { code: string }[]; fileName: string };
-    expect(exported.rows.map(item => item.code)).toEqual(['1.10']);
-    expect(exported.fileName).toBe('strategy-framework.xlsx');
+    expect(root().querySelector('[data-testid="framework-table-search-empty"]')?.textContent?.trim()).toBe('No elements match "zzz"');
+    expect(root().querySelector('[data-testid="framework-table-search-empty"]')?.getAttribute('role')).toBe('status');
+    expect(root().querySelector('[data-testid="data-table-empty"]')).toBeNull();
+    expect(root().textContent).not.toContain('No elements yet.');
+
+    (root().querySelector('[data-testid="framework-table-search-clear"]') as HTMLButtonElement).click();
+    await settle();
+
+    expect(codes()).toEqual(before);
+    expect(root().querySelector('[data-testid="framework-table-search-empty"]')).toBeNull();
+  });
+
+  it('shows the true-empty message when a query is typed over no elements', async () => {
+    await mount(viewOf([]));
+    const search = root().querySelector('[data-testid="framework-table-search"]') as HTMLInputElement;
+
+    search.value = 'zzz';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+
+    expect(root().querySelector('[data-testid="data-table-empty"]')?.textContent?.trim()).toBe('No elements yet.');
+    expect(root().querySelector('[data-testid="framework-table-search-empty"]')).toBeNull();
   });
 
   it('selects a row from click, Enter and Space, and highlights the string selectedKey', async () => {

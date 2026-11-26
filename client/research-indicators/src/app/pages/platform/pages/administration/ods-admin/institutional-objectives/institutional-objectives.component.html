@@ -7,65 +7,79 @@
           <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal atc-primary-blue-600" data-testid="page-title">
             Institutional Objectives
           </h1>
+          <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.5] atc-grey-700" data-testid="page-subtitle">
+            Define each year's institutional objectives and link them to framework indicators.
+          </p>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <label for="objectivePortfolio" class="text-sm font-medium atc-grey-800">Portfolio</label>
-          <p-select
-            #portfolioSelect
-            inputId="objectivePortfolio"
-            [options]="portfolioOptions()"
-            optionLabel="label"
-            optionValue="id"
-            [ngModel]="portfolioId()"
-            (onChange)="onPortfolioChange($event.value)"
-            [disabled]="portfolioOptions().length === 0"
-            styleClass="min-w-[240px]"
-            ariaLabel="Portfolio"
-            data-testid="portfolio-select">
-          </p-select>
+        <div class="flex flex-wrap items-end gap-3" data-testid="header-actions">
+          <div class="flex flex-col gap-1">
+            <label for="objectivePortfolio" class="text-sm font-medium atc-grey-800">Portfolio</label>
+            <p-select
+              #portfolioSelect
+              inputId="objectivePortfolio"
+              [options]="portfolioOptions()"
+              optionLabel="label"
+              optionValue="id"
+              [ngModel]="portfolioId()"
+              (onChange)="onPortfolioChange($event.value)"
+              [disabled]="portfolioOptions().length === 0"
+              styleClass="min-w-[240px]"
+              ariaLabel="Portfolio"
+              data-testid="portfolio-select">
+            </p-select>
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label for="objectivePageYear" class="text-sm font-medium atc-grey-800">Year</label>
+            <p-select
+              #yearSelect
+              inputId="objectivePageYear"
+              [options]="yearOptions()"
+              optionLabel="label"
+              optionValue="year"
+              [ngModel]="year()"
+              (onChange)="onYearChange($event.value)"
+              [disabled]="yearOptions().length === 0 || loading()"
+              styleClass="min-w-[220px]"
+              ariaLabel="Year"
+              data-testid="year-select">
+            </p-select>
+          </div>
+
+          <p-button
+            [label]="carryLabel()"
+            icon="pi pi-copy !text-[12px]"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            [disabled]="!canCarryForward()"
+            (onClick)="requestCarryForward()"
+            data-testid="carry-forward">
+          </p-button>
+
+          <p-button
+            label="Add objective"
+            icon="pi pi-plus !text-[12px]"
+            severity="info"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            [disabled]="loading() || portfolioId() === null"
+            (onClick)="openCreate($event)"
+            data-testid="add-objective">
+          </p-button>
+
+          <p-button
+            label="Export .xlsx"
+            icon="pi pi-file-excel !text-[12px]"
+            [outlined]="true"
+            size="small"
+            styleClass="!rounded-[8px] !text-[13px] !bg-white !text-[var(--ac-light-blue-400)] !border-[var(--ac-light-blue-400)]"
+            [disabled]="loading() || exporting() || objectiveRows().length === 0"
+            (onClick)="exportObjectives()"
+            data-testid="export-button">
+          </p-button>
         </div>
-      </div>
-
-      <div class="flex flex-wrap items-end gap-3" data-testid="objective-toolbar">
-        <div class="flex flex-col gap-1">
-          <label for="objectivePageYear" class="text-sm font-medium atc-grey-800">Year</label>
-          <p-select
-            #yearSelect
-            inputId="objectivePageYear"
-            [options]="yearOptions()"
-            optionLabel="label"
-            optionValue="year"
-            [ngModel]="year()"
-            (onChange)="onYearChange($event.value)"
-            [disabled]="yearOptions().length === 0 || loading()"
-            styleClass="min-w-[220px]"
-            ariaLabel="Year"
-            data-testid="year-select">
-          </p-select>
-        </div>
-
-        <p-button
-          [label]="carryLabel()"
-          icon="pi pi-copy !text-[12px]"
-          severity="secondary"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          [disabled]="!canCarryForward()"
-          (onClick)="requestCarryForward()"
-          data-testid="carry-forward">
-        </p-button>
-
-        <p-button
-          label="Add objective"
-          icon="pi pi-plus !text-[12px]"
-          severity="info"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          [disabled]="loading() || portfolioId() === null"
-          (onClick)="openCreate($event)"
-          data-testid="add-objective">
-        </p-button>
       </div>
 
       @if (carryError(); as message) {
@@ -91,6 +105,9 @@
           </p-button>
         </div>
       } @else {
+        @if (objectiveCounts().objectives > 0) {
+          <p class="m-0 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ objectiveSummary() }}</p>
+        }
         <app-side-panel-layout
           [hasSelection]="selectedId() !== null"
           [creating]="creating()"
@@ -101,20 +118,30 @@
             subtitle="Select an objective to see its statement, year and linked indicators."
             [rows]="emptyRows()" />
           <div list data-testid="objectives-list">
-            <div data-testid="objectives-table">
-              <app-data-table
-                [columns]="columns"
-                [rows]="objectiveRows()"
-                [searchFields]="searchFields"
-                [exportFileName]="exportFileName()"
-                [selectable]="true"
-                [keyboardSelectable]="true"
-                [selectedKey]="selectedKey()"
-                (rowSelected)="onRowSelected($event)"
-                searchPlaceholder="Search code or statement"
-                emptyMessage="No institutional objectives for this year yet.">
-              </app-data-table>
-            </div>
+            <app-ods-find-field
+              label="Find by code or name"
+              placeholder="Find by code or name"
+              inputId="objectives-search"
+              inputTestId="objectives-search"
+              clearTestId="objectives-search-clear"
+              [value]="query()"
+              (queryChange)="onQuery($event)" />
+            @if (noMatches()) {
+              <p class="objectives-search-empty" role="status" data-testid="objectives-search-empty">No objectives match "{{ trimmedQuery() }}"</p>
+            } @else {
+              <div data-testid="objectives-table">
+                <app-data-table
+                  [columns]="columns"
+                  [rows]="visibleRows()"
+                  [showToolbar]="false"
+                  [selectable]="true"
+                  [keyboardSelectable]="true"
+                  [selectedKey]="selectedKey()"
+                  (rowSelected)="onRowSelected($event)"
+                  emptyMessage="No institutional objectives for this year yet.">
+                </app-data-table>
+              </div>
+            }
           </div>
           <div panel data-testid="objective-panel-slot">
             @if (selectedId() !== null || creating()) {

@@ -1,4 +1,13 @@
 <div class="flex flex-col gap-3" data-testid="framework-tables">
+  <app-ods-find-field
+    label="Find by code or name"
+    placeholder="Find by code or name"
+    inputId="framework-table-search"
+    inputTestId="framework-table-search"
+    clearTestId="framework-table-search-clear"
+    [value]="query()"
+    (queryChange)="onQuery($event)" />
+
   <ul class="m-0 flex list-none flex-wrap gap-2 p-0" aria-label="Levels" data-testid="level-chips">
     @for (level of counts(); track level.depth) {
       <li class="level-chip px-3 py-1 text-[13px]" [attr.data-depth]="level.depth" data-testid="level-chip">
@@ -7,17 +16,19 @@
     }
   </ul>
 
-  <app-data-table
-    [columns]="columns"
-    [rows]="rows()"
-    [searchFields]="searchFields"
-    exportFileName="strategy-framework.xlsx"
-    searchPlaceholder="Search"
-    emptyMessage="No elements yet."
-    [selectable]="true"
-    [keyboardSelectable]="true"
-    [selectedKey]="selectedKey()"
-    (rowSelected)="onRowSelected($event)"
-    data-testid="framework-data-table">
-  </app-data-table>
+  @if (noMatches()) {
+    <p class="framework-tables__empty" role="status" data-testid="framework-table-search-empty">No elements match "{{ trimmedQuery() }}"</p>
+  } @else {
+    <app-data-table
+      [columns]="columns"
+      [rows]="filteredRows()"
+      [showToolbar]="false"
+      emptyMessage="No elements yet."
+      [selectable]="true"
+      [keyboardSelectable]="true"
+      [selectedKey]="selectedKey()"
+      (rowSelected)="onRowSelected($event)"
+      data-testid="framework-data-table">
+    </app-data-table>
+  }
 </div>

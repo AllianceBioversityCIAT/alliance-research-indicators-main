@@ -1,27 +1,6 @@
 <div class="element-panel" data-testid="element-panel">
   <app-panel-heading [eyebrow]="eyebrow()" [title]="headerTitle()" [code]="pillCode()" />
 
-  @if (element(); as current) {
-    <div class="element-panel__delete" data-testid="element-delete">
-      <button
-        type="button"
-        pButton
-        severity="danger"
-        [outlined]="true"
-        size="small"
-        class="element-panel__delete-button !rounded-[9px] !text-[13px]"
-        [attr.aria-disabled]="current.deletable ? null : 'true'"
-        [attr.aria-describedby]="current.deletable ? null : 'element-delete-reason'"
-        [disabled]="saving()"
-        (click)="remove()">
-        Delete
-      </button>
-      @if (!current.deletable) {
-        <p id="element-delete-reason" class="element-panel__reason" data-testid="element-delete-reason">{{ blockerText(current) }}</p>
-      }
-    </div>
-  }
-
   <form class="element-panel__form flex flex-col gap-4" [formGroup]="form" data-testid="element-form" (ngSubmit)="save()" [attr.aria-busy]="saving()">
     <div class="element-panel__pair" [class.element-panel__pair--split]="showParent()">
       <div class="field">
@@ -115,25 +94,50 @@
     }
 
     <div class="element-panel__actions" data-testid="element-actions">
-      <p-button
-        type="button"
-        label="Cancel"
-        severity="secondary"
-        size="small"
-        styleClass="!rounded-[9px] !text-[13px]"
-        (onClick)="cancel()"
-        data-testid="element-cancel">
-      </p-button>
-      <p-button
-        type="submit"
-        label="Save"
-        severity="info"
-        size="small"
-        styleClass="!rounded-[9px] !text-[13px]"
-        [disabled]="saving()"
-        [loading]="saving()"
-        data-testid="element-save">
-      </p-button>
+      @if (element(); as current) {
+        <div class="element-panel__delete" data-testid="element-delete">
+          <button
+            type="button"
+            pButton
+            severity="danger"
+            [outlined]="true"
+            size="small"
+            class="element-panel__delete-button !rounded-[9px] !text-[13px]"
+            [attr.aria-disabled]="current.deletable ? null : 'true'"
+            [attr.aria-describedby]="current.deletable ? null : 'element-delete-reason'"
+            [pTooltip]="current.deletable ? undefined : blockerText(current)"
+            tooltipPosition="top"
+            tooltipEvent="both"
+            [disabled]="saving()"
+            (click)="remove()">
+            Delete
+          </button>
+          @if (!current.deletable) {
+            <p id="element-delete-reason" class="sr-only" data-testid="element-delete-reason">{{ blockerText(current) }}</p>
+          }
+        </div>
+      }
+      <div class="element-panel__commit">
+        <p-button
+          type="button"
+          label="Cancel"
+          severity="secondary"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          (onClick)="cancel()"
+          data-testid="element-cancel">
+        </p-button>
+        <p-button
+          type="submit"
+          label="Save"
+          severity="info"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          [disabled]="saving()"
+          [loading]="saving()"
+          data-testid="element-save">
+        </p-button>
+      </div>
     </div>
   </form>
 </div>

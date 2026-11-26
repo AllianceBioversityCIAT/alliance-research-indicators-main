@@ -450,7 +450,7 @@ describe('FrameworkComponent', () => {
     expect(document.querySelector('[data-testid="panel-code"]')?.textContent?.trim()).toBe('1.1.1');
     const remove = document.querySelector('[data-testid="element-delete"] button') as HTMLButtonElement;
     const code = document.querySelector('#elementCode') as HTMLInputElement;
-    expect(remove.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(code.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
 
     (q('view-table') as HTMLButtonElement).click();

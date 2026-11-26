@@ -18,6 +18,7 @@ import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { ObjectivePanelComponent } from './components/objective-panel/objective-panel.component';
 import InstitutionalObjectivesComponent from './institutional-objectives.component';
+import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
 import { linkedIndicatorsText } from './objective-view.util';
 
 // @akili-spec institutional-performance/strategy-framework T-20 — R-STF-009, R-STF-010, R-STF-016, NFR-STF-004.
@@ -892,6 +893,157 @@ describe('InstitutionalObjectivesComponent', () => {
     expect(document.querySelector('[data-testid="objective-form"]')).not.toBeNull();
     expect(statement()).toBe('Unsaved statement');
     expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+  });
+
+  it('puts the five header controls in order and shows the year count line', async () => {
+    create();
+    await settle();
+
+    const header = q('page-header');
+    const actions = q('header-actions');
+    expect(header?.contains(q('page-subtitle'))).toBe(true);
+    expect(q('page-subtitle')?.textContent?.trim()).toBe("Define each year's institutional objectives and link them to framework indicators.");
+    const order = ['portfolio-select', 'year-select', 'carry-forward', 'add-objective', 'export-button'].map(id =>
+      actions?.querySelector(`[data-testid="${id}"]`)
+    );
+    expect(order.every(element => element !== null)).toBe(true);
+    for (let index = 1; index < order.length; index += 1) {
+      expect(order[index - 1]!.compareDocumentPosition(order[index]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(q('summary-line')?.textContent?.trim()).toBe('28 objectives · 1 linked indicators');
+    expect(q('summary-line')?.className).toContain('atc-grey-800');
+  });
+
+  it('filters the list by code and by statement and keeps a hidden selection', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+
+    const codes = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
+    const search = q('objectives-search') as HTMLInputElement;
+    expect(root().querySelector('label[for="objectives-search"]')?.textContent?.trim()).toBe('Find by code or name');
+    search.value = 'IOB-2';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+
+    expect(codes()).toEqual(['IOB-2']);
+    expect(component.selectedId()).toBe(10);
+    expect(q('objectives-table')?.textContent).not.toContain('Raise incomes');
+    expect(row(10)).toBeNull();
+    expect(q('data-table-search')).toBeNull();
+    expect(q('data-table-export')).toBeNull();
+
+    search.value = 'Raise';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    expect(codes()).toEqual(['IOB-1']);
+    expect(q('objectives-table')?.textContent).toContain('Raise incomes');
+    expect(q('objectives-table')?.textContent).not.toContain('Cut loss');
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('says nothing matches instead of the true-empty message, then restores the rows', async () => {
+    create();
+    await settle();
+    await clickRow(10);
+    const search = q('objectives-search') as HTMLInputElement;
+
+    search.value = 'zzz';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+
+    expect(q('objectives-search-empty')?.textContent?.trim()).toBe('No objectives match "zzz"');
+    expect(q('objectives-search-empty')?.getAttribute('role')).toBe('status');
+    expect(q('data-table-empty')).toBeNull();
+    expect(root().textContent).not.toContain('No institutional objectives for this year yet.');
+    expect(component.selectedId()).toBe(10);
+
+    (q('objectives-search-clear') as HTMLButtonElement).click();
+    await settle();
+
+    const codes = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
+    expect(codes()).toEqual(['IOB-1', 'IOB-2']);
+    expect(q('objectives-search-empty')).toBeNull();
+    expect(row(10).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('keeps the find term, the clear button and the no-match line after a clean year change', async () => {
+    api.GET_StrategyFrameworkObjectives.mockImplementation((_portfolioId: number, year: number) =>
+      Promise.resolve(ok(year === 2026 || year === 2028 ? OBJECTIVES : []))
+    );
+    create();
+    await settle();
+
+    const search = q('objectives-search') as HTMLInputElement;
+    search.value = 'zzz';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+
+    let resolveYear: (value: ReturnType<typeof ok<FrameworkObjective[]>>) => void = () => undefined;
+    api.GET_StrategyFrameworkObjectives.mockReturnValue(new Promise(resolve => (resolveYear = resolve)));
+    fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: 2028 });
+    fixture.detectChanges();
+    expect(q('objectives-search')).toBeNull();
+
+    resolveYear(ok(OBJECTIVES));
+    await settle();
+
+    const kept = q('objectives-search') as HTMLInputElement;
+    expect(component.year()).toBe(2028);
+    expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    expect(kept.value).toBe('zzz');
+    expect(q('objectives-search-clear')).not.toBeNull();
+    expect(q('objectives-search-empty')?.textContent?.trim()).toBe('No objectives match "zzz"');
+
+    (q('objectives-search-clear') as HTMLButtonElement).click();
+    await settle();
+
+    const codes = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
+    expect(codes()).toEqual(['IOB-1', 'IOB-2']);
+    expect(q('objectives-search-empty')).toBeNull();
+    expect((q('objectives-search') as HTMLInputElement).value).toBe('');
+  });
+
+  it('exports every objective of the year, code-sorted, while the find field hides rows', async () => {
+    const tenth: FrameworkObjective = {
+      id: 12,
+      portfolioId: 2,
+      year: 2026,
+      code: 'IOB-10',
+      statement: 'Tenth objective',
+      elements: [{ id: 32, code: '1.1.2', name: 'Loss' }],
+      deletable: true,
+      blockers: []
+    };
+    const shuffled = [tenth, OBJECTIVES[1], OBJECTIVES[0]];
+    api.GET_StrategyFrameworkObjectives.mockImplementation((_portfolioId: number, year: number) =>
+      Promise.resolve(ok(year === 2026 ? shuffled : []))
+    );
+    const exportSpy = jest.spyOn(xlsxExportUtil, 'exportRowsToXlsx').mockResolvedValue(undefined);
+    create();
+    await settle();
+
+    const search = q('objectives-search') as HTMLInputElement;
+    search.value = 'Tenth';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    expect(root().textContent).toContain('Tenth objective');
+    expect(root().textContent).not.toContain('Raise incomes');
+
+    button('export-button').click();
+    await settle();
+
+    expect(exportSpy).toHaveBeenCalledTimes(1);
+    const payload = exportSpy.mock.calls[0][0] as {
+      columns: { field: string; header: string }[];
+      rows: { code: string; statement: string }[];
+      fileName: string;
+    };
+    expect(payload.fileName).toBe('institutional-objectives_2026.xlsx');
+    expect(payload.columns.map(column => column.header)).toEqual(['Code', 'Statement', 'Linked indicators']);
+    expect(payload.columns.map(column => column.field)).toEqual(['code', 'statement', 'linkedIndicatorsText']);
+    expect(payload.rows.map(item => item.code)).toEqual(['IOB-1', 'IOB-2', 'IOB-10']);
+    expect(payload.rows.map(item => item.statement)).toEqual(['Raise incomes', 'Cut loss', 'Tenth objective']);
   });
 
   it('puts each linked indicator on its own line', () => {
