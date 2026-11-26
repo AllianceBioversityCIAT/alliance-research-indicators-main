@@ -1049,3 +1049,12 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Pending:** Leader Chrome re-measure of `html` scrollHeight vs innerHeight. The local dev server rendered a blank app, even at `/` (no console errors, scripts 200), so the owner was asked to restart `ng serve`.
 - **Owner (2026-11-26): visual OK on follow-up 5** (from a live screenshot of the restarted app: Delete in the footer, grey blocked Delete, one Export, one find field). Commit authorized; no push. The Leader's Chrome scroll re-measure is carried into follow-up 6 and runs on its result.
 - **Owner re-base (2026-11-26):** review budget 20 → **22 rounds** for follow-up 6.
+
+### T-23 follow-up 6 — banner removed, count line inside the list card (B-8 / D-STF-42)
+- **Owner (2026-11-26, from a live screenshot):** remove the Framework info banner to give the content more room; move the count line inside the list card, above the search. Decisions: banner removed (the blocked-Delete tooltip already gives the "in use" reason); both pages; commit follow-up 5 first (done: `7e19284ca`, `0f46dde5f`); review cap 22.
+- **Spec:** requirements §0b B-8 + amended lines under R-STF-008 / R-STF-009; design §6.4 / §6.6 amended lines, D-STF-42 row, §14 re-base row.
+- **Implementer attempt 1** (Grok `grok-4.7-high`, dispatch `ctx_957a9bbc81a7`): banner removed; the count line is the first child of the list slot on both pages (`mt-0 mb-3`). Specs: the banner text assertion was replaced with absence, plus containment/order before the find field (Tree, then after a real Table toggle click; IOB present, then absent on an empty year). Falsifier: summary line back outside `framework-list` → `framework.component.spec.ts:243` red, reverted.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 697 tests; lint clean; build OK; spec tsc 0 under ods-admin.
+- **Reviewer** (`akili-reviewer`, opus, round **21/22**): **`STATUS: PASS`**. Advisory: the IOB spec's year change uses `triggerEventHandler`. This is pre-existing (it is a context line in the diff), not new.
+- **Pending:** Leader Chrome measurement. Leader's Chrome tab renders a blank app (`app-root` empty), so the owner was asked to check.
+- **Owner (2026-11-26): commit authorized** ("haz commit"); no push. The Leader's Chrome scroll measurement was not run, because the Leader's tab rendered a blank app. The owner's own view stands as the visual check.

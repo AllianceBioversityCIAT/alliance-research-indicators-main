@@ -41,6 +41,7 @@ The owner asked both pages to work like *Organizational Structure*. Proposal: [`
 | B-4 | Q-1 ask before discarding unsaved edits · Q-2 keep the search · Q-3 keep the area colours, **inherited by every descendant row**, with clearly larger indentation than Organizational Structure · Q-4 ~~**Delete at the top** of the panel~~ *(reversed 2026-11-25 by the owner, D-STF-41: Delete sits in the footer, left, with Cancel · Save on the right)* · Q-5 the panel **always fits the viewport** and scrolls internally | R-STF-007, R-STF-016 |
 | B-6 | **T-22 HITL (owner, 2026-11-25):** the Table view is **one table listing every element of every level**, like Organizational Structure's table, with a Level column; the level chips stay as **count summaries that do not filter**; the in-table **+ <Level>** button is removed (the header **New <level-1>** creates Performance Areas; Dimensions and Indicators are added from the tree's **+**). On both pages the **list column is a card** like Organizational Structure's, so the search, Export and table or tree sit on the card, not on the page background | R-STF-008 rewritten; R-STF-016 "level chip" trigger removed; design §6.4, D-STF-37, D-STF-38 |
 | B-7 | **T-23 HITL (owner, 2026-11-25):** the two pages share **one page layout**. Institutional Objectives gets Framework's header (subtitle, count line, and on the right Portfolio · Year · Carry forward · **Add objective** · **Export .xlsx**, same styles as Framework's). **One Export per page, in the header**: the export button inside the shared table is hidden on both pages. **One search style**: Framework's labelled *Find by code or name* field sits on top of the list card on both pages and in both Framework views; the shared table's own search is hidden there | R-STF-008, R-STF-009; design §6.4, §6.6, D-STF-40 |
+| B-8 | **T-23 HITL (owner, 2026-11-26):** the Framework info banner (*"Changes apply to every module…"*) is **removed** to give the content more room; the blocked Delete's tooltip already says why an item cannot be deleted. The count line moves **inside the list card, above the find field**, on both pages (Framework and Institutional Objectives), in both Framework views. D-STF-42. |
 | B-5 | Organizational Structure is **not** changed, including its panel-height defect (Q-5); a separate fix is the owner's call | §12 |
 
 ---
@@ -233,6 +234,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 **Details**
 - Header: eyebrow *ADMIN · ODS*, title `Strategy <start year>–<end year> – Monitoring framework` from the selected portfolio, subtitle, portfolio selector. Toolbar: **Tree | Table** toggle and **Export .xlsx**.
 - Summary line per level (*4 performance areas · 13 dimensions · 31 indicators*) and an info banner: *"Changes apply to every module that uses the framework. Items in use cannot be deleted."*
+- *Amended 2026-11-26 (B-8):* no info banner; the summary line sits inside the list card, above the find field, in both the Tree and the Table view.
 - **Tree table** with the details panel beside it (R-STF-016). Columns:
   - **Name:** a chevron on rows that have children, the name as **read-only text**, and the counts of its descendants per level (*6 dimensions · 18 indicators*, plus registered dependants such as *KPIs* once they exist).
   - **Code:** a pill.
@@ -304,6 +306,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 - Year selector over the portfolio's years (2026–2030 for Portfolio 2), labelled "YYYY · N objectives", defaulting to the current year when in range, else the first year.
 - Table (F-7): Code, Statement, Linked indicators (codes and names); search over code and statement; export. **Clicking a row selects it and opens it in the side details panel (R-STF-016, rev 4)**; there is no row edit action. **+ Add objective** opens the panel in create mode.
 - *Amended 2026-11-25 (B-7):* the header follows Framework's — eyebrow, title, subtitle, a count line *"<n> objectives · <m> linked indicators"* for the selected year, and on the right Portfolio · Year · Carry forward · **Add objective** · **Export .xlsx** (Framework's header Export style; exports the selected year's objectives, all rows, sorted by code). The search is a *Find by code or name* field like Framework's, over code and statement; the table's own search and Export are hidden.
+- *Amended 2026-11-26 (B-8):* the count line sits inside the list card, above the find field, not under the header.
 - Panel form: **Code\*** (unique per portfolio and year), **Year\***, **Statement\***, Linked indicators (optional, multi, indicator-level elements of the same portfolio). **No owner and no responsible** on an objective (A-3).
 
 **Acceptance criteria**
