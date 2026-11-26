@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
+import { TooltipModule } from 'primeng/tooltip';
 import {
   CreateFrameworkElementPayload,
   FrameworkCodeProposalQuery,
@@ -36,7 +37,7 @@ interface OpenedValues {
 @Component({
   selector: 'app-element-panel',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, SelectModule, StaffPickerComponent, PanelHeadingComponent],
+  imports: [ReactiveFormsModule, ButtonModule, SelectModule, TooltipModule, StaffPickerComponent, PanelHeadingComponent],
   templateUrl: './element-panel.component.html',
   styleUrl: './element-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

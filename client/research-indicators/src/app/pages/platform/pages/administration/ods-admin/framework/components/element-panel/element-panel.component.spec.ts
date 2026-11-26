@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Select } from 'primeng/select';
+import { Tooltip } from 'primeng/tooltip';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel } from '@shared/interfaces/strategy-framework.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
@@ -87,6 +88,8 @@ describe('ElementPanelComponent', () => {
     fixture.detectChanges();
   };
   const form = () => fixture.nativeElement.querySelector('[data-testid="element-form"]') as HTMLElement | null;
+  const deleteTip = (button: HTMLElement) =>
+    fixture.debugElement.queryAll(By.directive(Tooltip)).find(node => node.nativeElement === button)?.injector.get(Tooltip);
   const open = async (elementId: number | null, create: { depth: number; parentRequired: boolean; parentId?: number } | null = null) => {
     token += 1;
     fixture.componentRef.setInput('elementId', elementId);
@@ -122,21 +125,28 @@ describe('ElementPanelComponent', () => {
     fixture.destroy();
   });
 
-  it('shows the header, Delete above the fields, and Cancel with Save at the bottom', async () => {
+  it('shows the header and puts Delete, Cancel and Save in the footer', async () => {
     await open(1);
 
     expect(fixture.nativeElement.querySelector('p-' + 'drawer')).toBeNull();
     expect(document.querySelector('[data-testid="panel-level"]')?.textContent?.trim()).toBe('PERFORMANCE AREA · LEVEL 1');
     expect(document.querySelector('[data-testid="panel-code"]')?.textContent?.trim()).toBe('1');
     expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('Area one');
-    const remove = document.querySelector('[data-testid="element-delete"] button') as HTMLButtonElement;
+    const footer = document.querySelector('[data-testid="element-actions"]') as HTMLElement;
+    const order = ['element-delete', 'element-cancel', 'element-save'].map(id => footer.querySelector(`[data-testid="${id}"]`));
+    expect(order.every(element => element !== null)).toBe(true);
+    for (let index = 1; index < order.length; index += 1) {
+      expect(order[index - 1]!.compareDocumentPosition(order[index]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
     const code = document.querySelector('#elementCode') as HTMLInputElement;
-    expect(remove.compareDocumentPosition(code) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector('[data-testid="element-panel"]')?.querySelector('[data-testid="element-delete"]')).toBe(order[0]);
+    expect(code.compareDocumentPosition(order[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const remove = order[0]!.querySelector('button') as HTMLButtonElement;
     expect(remove.classList.contains('p-button-outlined')).toBe(true);
     expect(remove.classList.contains('p-button-danger')).toBe(true);
     expect(remove.getAttribute('aria-disabled')).toBeNull();
-    const labels = Array.from(document.querySelectorAll('[data-testid="element-actions"] button')).map(button => button.textContent?.trim());
-    expect(labels).toEqual(['Cancel', 'Save']);
+    expect(deleteTip(remove)?.content ?? null).toBeNull();
+    expect(document.querySelector('[data-testid="element-delete-reason"]')).toBeNull();
     expect(fixture.componentInstance.isDirty()).toBe(false);
   });
 
@@ -311,7 +321,16 @@ describe('ElementPanelComponent', () => {
     await open(20);
     const button = document.querySelector('[data-testid="element-delete"] button') as HTMLButtonElement;
     expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect(document.querySelector('[data-testid="element-delete-reason"]')?.textContent?.trim()).toBe('Delete or move its 2 indicators first.');
+    expect(button.hasAttribute('disabled')).toBe(false);
+    expect(button.getAttribute('aria-describedby')).toBe('element-delete-reason');
+    const reason = document.querySelector('[data-testid="element-delete-reason"]');
+    expect(reason?.id).toBe('element-delete-reason');
+    expect(reason?.classList.contains('sr-only')).toBe(true);
+    expect(reason?.textContent?.trim()).toBe('Delete or move its 2 indicators first.');
+    const tip = deleteTip(button);
+    expect(tip?.content).toBe('Delete or move its 2 indicators first.');
+    expect(tip?.tooltipPosition).toBe('top');
+    expect(tip?.tooltipEvent).toBe('both');
     button.click();
     expect(requested).toEqual([1]);
   });

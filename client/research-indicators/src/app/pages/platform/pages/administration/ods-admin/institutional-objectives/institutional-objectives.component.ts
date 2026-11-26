@@ -8,7 +8,11 @@ import { FrameworkContext, FrameworkContextPortfolio, FrameworkObjective, Framew
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
+import { naturalCompare } from '@shared/utils/natural-compare.util';
+import { exportRowsToXlsx } from '@shared/utils/xlsx-export.util';
 import { frameworkErrorOf } from '../framework/utils/framework-error.util';
+import { OdsEmptyPanelComponent, OdsEmptyRow } from '../ods-empty-panel/ods-empty-panel.component';
+import { OdsFindFieldComponent } from '../ods-find-field/ods-find-field.component';
 import { SidePanelLayoutComponent } from '../side-panel-layout/side-panel-layout.component';
 import { guardDiscard } from '../unsaved-changes.util';
 import { ObjectivePanelComponent } from './components/objective-panel/objective-panel.component';
@@ -39,6 +43,8 @@ interface ObjectiveTableRow {
     CustomProgressBarComponent,
     DataTableComponent,
     SidePanelLayoutComponent,
+    OdsEmptyPanelComponent,
+    OdsFindFieldComponent,
     ObjectivePanelComponent
   ],
   templateUrl: './institutional-objectives.component.html',
@@ -81,9 +87,10 @@ export default class InstitutionalObjectivesComponent implements OnInit {
     { field: 'linkedIndicatorsText', header: 'Linked indicators', type: 'text', sortable: true }
   ];
 
-  readonly searchFields: (keyof ObjectiveTableRow & string)[] = ['code', 'statement'];
+  readonly query = signal('');
+  readonly exporting = signal(false);
 
-  /** Visible height below the fixed chrome (P-46). The stylesheet releases it below 1024px. */
+  /** Visible height below the fixed chrome (P-46). The stylesheet subtracts the 24px top gap and releases the height below 1024px. */
   readonly columnHeight = computed(() => `calc(100vh - ${this.cache.navbarHeight() + this.cache.headerHeight()}px)`);
 
   readonly portfolioOptions = computed<PortfolioOption[]>(() =>
@@ -105,6 +112,13 @@ export default class InstitutionalObjectivesComponent implements OnInit {
     }))
   );
 
+  readonly trimmedQuery = computed(() => this.query().trim());
+  readonly visibleRows = computed(() => filterObjectives(this.objectiveRows(), this.query()));
+  /** A search over a year that has objectives and hits nothing is not the true-empty state (R-CTL-008). */
+  readonly noMatches = computed(
+    () => this.trimmedQuery() !== '' && this.objectiveRows().length > 0 && this.visibleRows().length === 0
+  );
+
   /** Null during create, so no row stays highlighted. */
   readonly selectedKey = computed(() => {
     if (this.creating()) return null;
@@ -113,6 +127,55 @@ export default class InstitutionalObjectivesComponent implements OnInit {
   });
 
   readonly exportFileName = computed(() => `institutional-objectives_${this.year() ?? 'year'}.xlsx`);
+
+  /**
+   * Counts shared by the empty panel and the summary line. `objectives` is the
+   * selected year's count, the same number the year select shows. `linkedIndicators`
+   * is distinct linked indicator ids.
+   */
+  readonly objectiveCounts = computed(() => {
+    const year = this.year();
+    const linked = new Set<number>();
+    for (const objective of this.objectives()) {
+      for (const element of objective.elements) linked.add(element.id);
+    }
+    return {
+      objectives: this.years().find(row => row.year === year)?.count ?? 0,
+      linkedIndicators: linked.size,
+      year
+    };
+  });
+
+  readonly objectiveSummary = computed(() => {
+    const counts = this.objectiveCounts();
+    return `${counts.objectives} objectives · ${counts.linkedIndicators} linked indicators`;
+  });
+
+  /** Informational rows for the empty panel. The counts are `objectiveCounts`. */
+  readonly emptyRows = computed<OdsEmptyRow[]>(() => {
+    const { objectives, linkedIndicators, year } = this.objectiveCounts();
+    const next = year === null ? '' : String(year + 1);
+    return [
+      {
+        icon: 'pi pi-flag',
+        label: `${objectives} Objectives · ${year ?? ''}`,
+        description: 'Institutional objectives for the selected year.',
+        accent: false
+      },
+      {
+        icon: 'pi pi-chart-bar',
+        label: `${linkedIndicators} Linked indicators`,
+        description: "Framework indicators linked to this year's objectives.",
+        accent: false
+      },
+      {
+        icon: 'pi pi-copy',
+        label: `Carry forward to ${next}`,
+        description: "Copy this year's objectives into the next year.",
+        accent: false
+      }
+    ];
+  });
 
   readonly carryLabel = computed(() => {
     const year = this.year();
@@ -169,8 +232,28 @@ export default class InstitutionalObjectivesComponent implements OnInit {
     this.formDirty.set(value);
   }
 
+  onQuery(value: string): void {
+    this.query.set(value);
+  }
+
   onRowSelected(row: ObjectiveTableRow): void {
     this.selectObjective(row.id);
+  }
+
+  /** Every row of the selected year, code-sorted. A find-field filter does not narrow the workbook. */
+  async exportObjectives(): Promise<void> {
+    if (this.loading() || this.exporting() || this.objectiveRows().length === 0) return;
+    const rows = [...this.objectiveRows()].sort((left, right) => naturalCompare(left.code, right.code));
+    this.exporting.set(true);
+    try {
+      await exportRowsToXlsx({
+        columns: this.columns,
+        rows,
+        fileName: this.exportFileName()
+      });
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   selectObjective(id: number): void {
@@ -549,6 +632,12 @@ export default class InstitutionalObjectivesComponent implements OnInit {
     if (id === null) return undefined;
     return this.objectives().find(objective => objective.id === id);
   }
+}
+
+function filterObjectives(rows: ObjectiveTableRow[], query: string): ObjectiveTableRow[] {
+  const term = query.trim().toLowerCase();
+  if (!term) return rows;
+  return rows.filter(row => row.code.toLowerCase().includes(term) || row.statement.toLowerCase().includes(term));
 }
 
 function portfolioLabel(portfolio: FrameworkContextPortfolio): string {

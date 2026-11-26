@@ -2,27 +2,6 @@
   <div class="objective-panel" data-testid="objective-panel">
     <app-panel-heading [eyebrow]="eyebrow()" [title]="headerTitle()" />
 
-    @if (objective(); as current) {
-      <div class="objective-panel__delete" data-testid="objective-panel-delete">
-        <button
-          type="button"
-          pButton
-          severity="danger"
-          [outlined]="true"
-          size="small"
-          class="objective-panel__delete-button !rounded-[9px] !text-[13px]"
-          [attr.aria-disabled]="current.deletable ? null : 'true'"
-          [attr.aria-describedby]="current.deletable ? null : 'objective-delete-reason'"
-          [disabled]="saving()"
-          (click)="remove()">
-          Delete
-        </button>
-        @if (!current.deletable) {
-          <p id="objective-delete-reason" class="objective-panel__reason" data-testid="objective-delete-reason">{{ blockerText(current) }}</p>
-        }
-      </div>
-    }
-
     <!-- No owner and no responsible (R-STF-009 AC.2). -->
     <form
       class="objective-panel__form flex flex-col gap-4"
@@ -110,25 +89,50 @@
       }
 
       <div class="objective-panel__actions" data-testid="objective-actions">
-        <p-button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          (onClick)="cancel()"
-          data-testid="objective-cancel">
-        </p-button>
-        <p-button
-          type="submit"
-          label="Save"
-          severity="info"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          [disabled]="saving()"
-          [loading]="saving()"
-          data-testid="objective-save">
-        </p-button>
+        @if (objective(); as current) {
+          <div class="objective-panel__delete" data-testid="objective-panel-delete">
+            <button
+              type="button"
+              pButton
+              severity="danger"
+              [outlined]="true"
+              size="small"
+              class="objective-panel__delete-button !rounded-[9px] !text-[13px]"
+              [attr.aria-disabled]="current.deletable ? null : 'true'"
+              [attr.aria-describedby]="current.deletable ? null : 'objective-delete-reason'"
+              [pTooltip]="current.deletable ? undefined : blockerText(current)"
+              tooltipPosition="top"
+              tooltipEvent="both"
+              [disabled]="saving()"
+              (click)="remove()">
+              Delete
+            </button>
+            @if (!current.deletable) {
+              <p id="objective-delete-reason" class="sr-only" data-testid="objective-delete-reason">{{ blockerText(current) }}</p>
+            }
+          </div>
+        }
+        <div class="objective-panel__commit">
+          <p-button
+            type="button"
+            label="Cancel"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="cancel()"
+            data-testid="objective-cancel">
+          </p-button>
+          <p-button
+            type="submit"
+            label="Save"
+            severity="info"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            [disabled]="saving()"
+            [loading]="saving()"
+            data-testid="objective-save">
+          </p-button>
+        </div>
       </div>
     </form>
   </div>

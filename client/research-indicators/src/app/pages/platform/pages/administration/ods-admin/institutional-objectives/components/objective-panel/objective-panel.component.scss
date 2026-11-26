@@ -7,24 +7,32 @@
 }
 
 .objective-panel__delete {
+  // Containing block for p.sr-only#objective-delete-reason (position: absolute).
+  // Without this the reason escapes the panel scroller and stretches <html>.
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 4px;
-  margin-bottom: 16px;
+  min-width: 0;
 }
 
-.objective-panel__delete-button[aria-disabled='true'] {
+button.p-button.objective-panel__delete-button[aria-disabled='true'],
+button.p-button.objective-panel__delete-button[aria-disabled='true']:hover,
+button.p-button.objective-panel__delete-button[aria-disabled='true']:focus,
+button.p-button.objective-panel__delete-button[aria-disabled='true']:focus-visible,
+button.p-button.objective-panel__delete-button[aria-disabled='true']:active {
   color: var(--ac-grey-700);
+  background: transparent;
   border-color: var(--ac-grey-200);
-  cursor: default;
+  box-shadow: none;
+  outline-color: var(--ac-grey-200);
+  cursor: not-allowed;
 }
 
-.objective-panel__reason {
-  margin: 0;
-  color: var(--ac-grey-700);
-  font-size: 12px;
-  line-height: 1.5;
+button.p-button.objective-panel__delete-button[aria-disabled='true']:focus,
+button.p-button.objective-panel__delete-button[aria-disabled='true']:focus-visible {
+  outline-color: var(--ac-grey-700);
 }
 
 .objective-panel__form {
@@ -33,9 +41,17 @@
 
 .objective-panel__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 0.5rem;
+}
+
+.objective-panel__commit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .field {

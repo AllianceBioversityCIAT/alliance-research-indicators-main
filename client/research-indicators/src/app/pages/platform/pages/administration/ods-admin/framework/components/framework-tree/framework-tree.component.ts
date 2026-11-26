@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import type { TreeNode } from 'primeng/api';
 import { TreeTableModule, type TreeTableNodeCollapseEvent } from 'primeng/treetable';
+import { OdsFindFieldComponent } from '../../../ods-find-field/ods-find-field.component';
 import { FrameworkTreeRow } from '../../utils/framework-view.util';
 import { matchesCodeOrName, normalizedTerm } from './tree-filter.util';
 
@@ -47,7 +48,7 @@ export class TreeRowKeysDirective {
 @Component({
   selector: 'app-framework-tree',
   standalone: true,
-  imports: [CommonModule, TreeTableModule, TreeRowKeysDirective],
+  imports: [CommonModule, TreeTableModule, TreeRowKeysDirective, OdsFindFieldComponent],
   templateUrl: './framework-tree.component.html',
   styleUrl: './framework-tree.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -118,13 +119,8 @@ export class FrameworkTreeComponent {
     this.rovingId.set(id);
   }
 
-  onSearchInput(event: Event): void {
-    const value = event.target instanceof HTMLInputElement ? event.target.value : '';
+  onQuery(value: string): void {
     this.setQuery(value);
-  }
-
-  clearSearch(): void {
-    this.setQuery('');
   }
 
   toggle(row: FrameworkTreeRow, event: Event): void {

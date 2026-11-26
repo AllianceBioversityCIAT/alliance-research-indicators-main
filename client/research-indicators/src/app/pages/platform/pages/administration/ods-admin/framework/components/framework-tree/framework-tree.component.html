@@ -1,22 +1,11 @@
-<div class="framework-tree__find">
-  <label class="framework-tree__find-label" for="framework-tree-search">Find by code or name</label>
-  <div class="framework-tree__find-field">
-    <input
-      id="framework-tree-search"
-      type="text"
-      class="framework-tree__find-input"
-      data-testid="framework-tree-search"
-      placeholder="Find by code or name"
-      autocomplete="off"
-      [value]="query()"
-      (input)="onSearchInput($event)" />
-    @if (query()) {
-      <button type="button" class="framework-tree__clear" data-testid="framework-tree-search-clear" aria-label="Clear search" (click)="clearSearch()">
-        <i class="pi pi-times" aria-hidden="true"></i>
-      </button>
-    }
-  </div>
-</div>
+<app-ods-find-field
+  label="Find by code or name"
+  placeholder="Find by code or name"
+  inputId="framework-tree-search"
+  inputTestId="framework-tree-search"
+  clearTestId="framework-tree-search-clear"
+  [value]="query()"
+  (queryChange)="onQuery($event)" />
 
 @if (noMatches()) {
   <p class="framework-tree__empty" role="status" data-testid="framework-tree-search-empty">No elements match "{{ trimmedQuery() }}"</p>

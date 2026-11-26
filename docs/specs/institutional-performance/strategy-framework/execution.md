@@ -898,3 +898,163 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Running totals:** review rounds **13/14** · rev-4 LOC ≈ 4,400 / ≈ 5,000.
 - Waiting for the owner's visual OK before the commit.
 - **Owner visual OK (2026-11-25):** "ok" — committed.
+
+### T-23 follow-up 2 — page top spacing and rich empty panel (owner, 2026-11-25)
+
+- **Owner:**
+  - The page is cramped under the section header.
+  - The empty side panel should explain the structure. The owner's mockup has a circle icon, *"Explore the performance framework"*, and rows for Performance Areas / Dimensions / Indicators, using the app's own icons.
+- **Leader measurement (Chrome, earlier today):** title top ≈ 10 px below the section header bar; Org Structure ≈ 50 px. The gap was lost when the page root cancelled `.app-page-wrapper`'s 25 px margin for the viewport fit (P-46).
+- **Owner decisions:**
+  - Adopt the Leader's adjusted version: PrimeIcons, rows built from `levels` with counts, not clickable, depth 1 tinted with the area accent; IOB gets a short version.
+  - Top spacing: 24 px.
+  - Use the last review round (14/14); a FAIL stops for the owner.
+- **Execute-time spec edits (owner-approved, recorded now):**
+  - `requirements.md` R-STF-016 Empty state;
+  - `design.md` §6.9 Empty state and Top spacing;
+  - `design.md` D-STF-39.
+- **Attempt 1:** fresh Grok `grok-4.7-high`, dispatch `ctx_be2ad7b1a491`, brief `brief-T23c.md`.
+  - **Changes:**
+    - New `ods-page-column.scss` mixin. It is the single source of the 24 px (`$ods-admin-top-gap` / `--ods-admin-top-gap`). Column `height: calc(<column-height> - gap - 16px)` with `content-box`.
+    - New `ods-empty-panel` component, projected into `side-panel-layout`; the `emptyText` fallback is kept.
+    - Framework builds the rows from `levelCounts`. IOB shows `pi-flag` and the short text.
+  - **Falsifier:** three hard-coded rows → `framework.component.spec.ts:266` reports *Expected length 4, Received 3*. Reverted.
+- **Leader re-run (non-author): VERIFIED.** jest administration: 34 suites / 669 tests. Lint clean, build 0, spec tsc 0 under ods-admin.
+- **Leader Chrome check:**
+  - 1280×800: the eyebrow is 25 px below the section header (it was about 9 px). `.content` is 800/800 and the slots are 320–784.
+  - 1280×650 with 1.1.1 selected: `.content` is 650/650, the slots are 318–634 (314 px), and Save ends at 617.
+  - The Framework empty panel shows a circle, title, subtitle and "4 Performance Areas / 13 Dimensions / 31 Indicators", with the first tile accent-tinted.
+  - IOB at 650: `.content` is 650/650, the slots are 295–634, and the short flag empty state shows.
+- **Reviewer** (`akili-reviewer`, opus, round **14/14**): **`STATUS: PASS`**.
+  - The 24 px arithmetic and the box model are correct on both pages.
+  - Rows come from data and are not interactive; tokens only.
+  - The projection fallback is kept.
+- **ADVISORY:**
+  - "1 Indicators" uses the plural at count 1, matching the chips; the summary line uses the singular. This is an owner wording call.
+  - The accent tile is pale in dark theme. The app has no dark theme today.
+  - The empty-panel `<h2>` may skip a heading level; to check at the next a11y pass.
+- **Final:** PASS. Attempts 1, checkpoints none. Spawns: implementer (not reported by host), reviewer PASS. Worker released.
+- **Running totals:** review rounds **14/14** (cap reached, not exceeded) · rev-4 LOC ≈ 4,600 / ≈ 5,000.
+
+### T-23 follow-up 3 — richer IOB empty panel (owner, 2026-11-25)
+
+- **Owner:** the IOB empty panel looks incomplete next to Framework's.
+- **Tripwire:** review rounds were at the 14/14 cap. The Leader stopped and asked; the owner re-based to **16 rounds** (`design.md` §14 row).
+- **Owner chose the Leader's proposal:** flag circle, title, subtitle, and three informational rows: objectives count for the year, distinct linked indicators, and a carry-forward hint.
+- **Execute-time spec edits:** `design.md` §6.9 Empty state (IOB), `requirements.md` R-STF-016 Empty state (IOB), and the §14 re-base row.
+- The spacing and Framework empty-panel change (follow-up 2, PASS) stays uncommitted. It will be committed together with this one after the owner's visual OK.
+- **Dispatch:** Grok `grok-4.7-medium`, `ctx_d76798655125`, brief `brief-T23d.md`. **Owner addition, sent to the same worker mid-task:** on wide screens the empty-panel rows sit flush left under a centred header. Centre the rows block: max-width ≈ 26rem, `margin-inline: auto`, rows left-aligned inside it. This applies to both pages.
+- **Implementer:** the attempt ran as one dispatch (`ctx_d76798655125`) plus a follow-up turn for the centring (`ctx_144e2d816b30`).
+  - `ods-empty-panel` was generalized: inputs for circle, title, subtitle and rows. Framework output is unchanged.
+  - IOB shows 3 neutral rows. `n` comes from the year select's `years[].count`; `m` is the number of distinct indicator ids.
+  - The rows block is centred: `max-width: 26rem; margin: 16px auto 0`.
+  - Falsifier: count links instead of distinct ids → `institutional-objectives.component.spec.ts:364` reports "2" expected, "3" received. Reverted.
+- **Leader re-run (non-author): VERIFIED.** jest administration 34 suites / 670 tests. Lint clean, build 0, spec tsc 0 under ods-admin.
+- **Leader Chrome check at 1728 px:** the rows block is centred in the Framework panel, with a 105 px gap on each side. IOB shows "28 Objectives · 2026", "30 Linked indicators" and "Carry forward to 2027".
+- **Reviewer** (`akili-reviewer`, opus, round **15/16**): **`STATUS: PASS`**.
+  - Texts are exact. Distinct ids are counted through a `Set`.
+  - `n` refreshes together with the list in every traced state.
+  - Framework is unchanged. Tokens only, and every change is under ods-admin.
+- **ADVISORY (recorded, not work):**
+  - A portfolio with no years shows "0 Objectives · " and "Carry forward to " with no year after them.
+  - For one round-trip after a year change, `m` can still be the previous year's count.
+  - `track row.label` could collide.
+- **Final:** PASS. Attempts 1 (+1 owner-addition turn). Worker released.
+- **Running totals:** review rounds **15/16**.
+
+### T-23 follow-up 4 — vertical centring of the empty panel (owner, 2026-11-25)
+- **Owner:** the empty panel sits too close to the top of its card.
+- **Leader decision:** centre the panel content vertically when there is room. Use `margin-block: auto` on a flex column, not `justify-content: center`, so content that overflows starts at the top and scrolls instead of being clipped.
+- **Budget:** this is review round 16/16.
+- **Brief:** `brief-T23e.md`.
+- **Implementer (dispatch `ctx_5afc55664d2f`):** the panel slot becomes a flex column and keeps `min-height: 0; overflow-y: auto`. The `ods-empty-panel` host gets `flex: 1 0 auto` and the block gets `margin-block: auto`. Files: `side-panel-layout.component.scss`, `ods-empty-panel.component.scss`.
+- **Leader re-run (non-author): VERIFIED.** jest administration 34/670 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome:**
+  - Tall IOB panel, empty: the block is centred, 76 px above and 76 px below.
+  - 1280×650 Framework, empty: the block starts at the scroll origin (top 335 = panel top 318 + 16 + 1) and scrolls (382 > 314).
+  - 1280×650 with 1.1.1 selected: the form is unchanged (scrollHeight 801, Save at 617); `.content` 650/650.
+- **Reviewer** (`akili-reviewer`, opus, round **16/16**): **`STATUS: PASS`**. The forms sit inside a plain slot div whose automatic minimum height is its content, so they cannot shrink or clip. Below 1024 px there is no free space, so the block sits at the top. The comments are true. Tokens only.
+- **Final:** PASS. Worker released. Review rounds **16/16** (cap reached).
+- **Owner verdict (2026-11-25):** the Framework page "is coming along great"; follow-ups 2–4 committed as a checkpoint. The owner asked next to align Institutional Objectives with the Framework layout (T-23 follow-up 5, below).
+
+### T-23 follow-up 5 — one page layout for both ODS pages (owner, 2026-11-25, B-7)
+- **Owner:** the IOB page's table and buttons differ from Framework's; they should be almost identical (no Tree/Table toggle on IOB, which has no tree), with the same positions and a header Export.
+- **Owner answers:**
+  - Export: one per page, in the header, with Framework's style (owner offered A or B; Leader chose A, remove the in-table Export).
+  - Search: Framework style.
+  - Commit the approved follow-ups 2–4 first: done, `ddc53c460` + `59b367814`.
+  - **Re-base: ≈ 5,400 LOC / 18 review rounds.**
+- **Spec:** requirements §0b B-7, R-STF-008/009 amended; design §6.6 amended, D-STF-40, §14 re-base row.
+- **Scope note:** one opt-in shared change, `app-data-table` `showToolbar` (default `true`); other consumers unchanged (narrow blast radius).
+- **Brief:** `brief-T23f.md`.
+- **Implementer attempt 1** (dispatch `ctx_bce2b568411f`, cursor grok-4.7-high): `showToolbar` opt-in on `app-data-table`; new `ods-admin/ods-find-field/`, used by the tree, the Framework table and IOB; IOB header mirrors Framework's with the header Export (`exportRowsToXlsx`, all rows of the year, natural code sort); count line. Falsifiers (a) default `showToolbar=false` and (b) export the filtered rows, both observed red and reverted.
+- **Leader re-run (non-author): VERIFIED.**
+  - jest administration + data-table: 36 suites / 692 tests.
+  - Lint clean.
+  - Build exit 0; the only warnings were in components outside this diff.
+  - spec tsc: 0 errors under ods-admin.
+- **Leader Chrome:**
+  - IOB header order is right. There is one Export per page and no in-table search or Export.
+  - The find field filters by code and by statement (IOB) and by code and by name (Framework Table).
+  - `.content` is 850/850 on both pages.
+- **Reviewer** (`akili-reviewer`, opus, round **17/18**): **`STATUS: FAIL`**.
+  1. A search miss now shows the true-empty message. Filtering moved to the parents, so `app-data-table` receives `[]` and shows `emptyMessage`.
+  - **Confirmed by the Leader in Chrome:** IOB 2026 with `zzz` shows "No institutional objectives for this year yet."
+  - **Violates:** R-STF-008 B-7 ("the same field as the Tree view"; the tree shows *No elements match "<term>"*) and R-CTL-008's rule against showing true-empty during a search.
+  - **Advisory:**
+    - `framework-tables.component.spec.ts:246` asserts an input the test set itself.
+    - "1 linked indicators" plural (owner call).
+    - `exportObjectives()` has no catch; this matches Framework's export.
+- **Rework → attempt 2** (same worker, effort high).
+- **Owner addition (2026-11-25, during rework):** move Delete to the panel footer, left-aligned, in the Cancel · Save row, on both panels. This reverses Q-4 / D-STF-33. **Spec:** D-STF-41, with B-4, R-STF-016 and §6.5/§6.6 amended. It is folded into rework attempt 2, so it uses the same review round (18/18).
+- **Implementer attempt 2** (dispatches `ctx_fdf933a0e596` + `ctx_3be74385e09e`): no-match `role="status"` line on both pages (table hidden on a miss, `emptyMessage` kept for true-empty); Delete moved to the panel footer (D-STF-41). Falsifier: guard removed → both `zzz` specs red, reverted.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 694 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome:**
+  - IOB `zzz` shows `No objectives match "zzz"`, with no `data-table-empty`.
+  - IOB footer: Delete 1077 / Cancel 1552 / Save 1620, all at top 723.
+  - **Framework footer defect (Leader):** when Delete is blocked, its reason line under it makes the row centre vertically, so Delete sits 11 px above Cancel/Save (979 vs 990). Fix: align the footer row to the top.
+- **Reviewer** (`akili-reviewer`, opus, round **18/18**): **`STATUS: FAIL`**.
+  1. **IOB search state survives a reload of the list while its field does not.** The page `query` signal is never reset. The find field is destroyed by `loading()` on a year, portfolio or Retry change and re-created empty. Result: an empty box (no clear button) with `No objectives match "zzz"`, or a silent subset.
+  - **Advisory:**
+    - `framework-tables.spec:273` role assertion is circular.
+    - No spec for true-empty + query.
+    - `@if` re-creation resets sort/paginator.
+- **Budget tripwire:** review rounds 18/18. Attempt 3 needs a 19th round, so this is an owner stop.
+- **Owner (2026-11-25):**
+  - **Re-base: 20 review rounds.**
+  - The IOB search **is kept** across a year or portfolio change, in line with Q-2. This is the Reviewer's option (a): a controlled find field.
+- **Rework → attempt 3** (same worker, effort xhigh).
+- **Owner addition during attempt 3:** a blocked Delete must look inactive, with no red hover, and show its reason as a tooltip instead of a line under the button. This also fixes the footer misalignment. D-STF-41 is amended. It is folded into attempt 3 and replaces the earlier footer `align-items` item.
+- **Implementer attempt 3** (dispatches `ctx_58af6eab261a` + `ctx_2c940d9bd65e`):
+  - `OdsFindFieldComponent` is now controlled (`value` input; all three parents bind `query()`).
+  - A blocked Delete looks neutral and shows its reason as a `pTooltip` (hover and focus), with an sr-only reason kept on `aria-describedby`.
+  - Falsifier: binding removed → year-change spec red (input ''), reverted.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 697 tests; lint pass; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome:**
+  - Footer row aligned: Delete, Cancel and Save all at 784–817.
+  - Blocked Delete: grey, `cursor: not-allowed`.
+  - The tooltip shows the reason on keyboard focus.
+  - **Defect:** `<html>` scrollHeight is 979 against innerHeight 850. The only absolute element past the viewport is `p.sr-only#element-delete-reason` (top 978), so the page scrolls (D-STF-31 / Q-5).
+- **Reviewer** (`akili-reviewer`, opus, round **19/20**): **`STATUS: FAIL`**.
+  1. The sr-only reason has no positioned ancestor and escapes the panel scroller. This matches the Leader's Chrome measurement and repeats a known repo bug (`innovation-use-details` sr-only). Fix: add `position: relative` on `.element-panel__delete` / `.objective-panel__delete`.
+  2. The blocked Delete's `:focus-visible` outline uses `--ac-grey-200` (about 1.2:1), so the focus ring is barely visible (WCAG 2.4.7). Fix: `--ac-grey-700`.
+  - The controlled field is verified correct.
+  - **Advisory:** the tooltip specs read the directive instance rather than the rendered overlay; there are two `.sr-only` sources.
+- **HALT: 3 attempts exhausted.** Both fixes are one CSS line each. Owner decision needed for attempt 4.
+- **Owner (2026-11-25): attempt 4 authorized** (round 20/20). Same worker.
+- **Runtime event (attempt 4):** the follow-up dispatch `ctx_64b7bf1d0bc7` timed out at agent readiness (never started; old worker lost). Rung 1: fresh worker `ctx_1828bfbdf297` with the same task. The attempt counter is unchanged.
+- **Implementer attempt 4** (dispatch `ctx_1828bfbdf297`): `position: relative` on `.element-panel__delete` / `.objective-panel__delete` (the sr-only reason is a direct child); blocked Delete `:focus`/`:focus-visible` outline uses `--ac-grey-700`.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 697 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Reviewer** (`akili-reviewer`, opus, round **20/20**): **`STATUS: PASS`**. Both defects fixed in both panels; no regression from round 19's verified state.
+- **Pending:** Leader Chrome re-measure of `html` scrollHeight vs innerHeight. The local dev server rendered a blank app, even at `/` (no console errors, scripts 200), so the owner was asked to restart `ng serve`.
+- **Owner (2026-11-26): visual OK on follow-up 5** (from a live screenshot of the restarted app: Delete in the footer, grey blocked Delete, one Export, one find field). Commit authorized; no push. The Leader's Chrome scroll re-measure is carried into follow-up 6 and runs on its result.
+- **Owner re-base (2026-11-26):** review budget 20 → **22 rounds** for follow-up 6.
+
+### T-23 follow-up 6 — banner removed, count line inside the list card (B-8 / D-STF-42)
+- **Owner (2026-11-26, from a live screenshot):** remove the Framework info banner to give the content more room; move the count line inside the list card, above the search. Decisions: banner removed (the blocked-Delete tooltip already gives the "in use" reason); both pages; commit follow-up 5 first (done: `7e19284ca`, `0f46dde5f`); review cap 22.
+- **Spec:** requirements §0b B-8 + amended lines under R-STF-008 / R-STF-009; design §6.4 / §6.6 amended lines, D-STF-42 row, §14 re-base row.
+- **Implementer attempt 1** (Grok `grok-4.7-high`, dispatch `ctx_957a9bbc81a7`): banner removed; the count line is the first child of the list slot on both pages (`mt-0 mb-3`). Specs: the banner text assertion was replaced with absence, plus containment/order before the find field (Tree, then after a real Table toggle click; IOB present, then absent on an empty year). Falsifier: summary line back outside `framework-list` → `framework.component.spec.ts:243` red, reverted.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 697 tests; lint clean; build OK; spec tsc 0 under ods-admin.
+- **Reviewer** (`akili-reviewer`, opus, round **21/22**): **`STATUS: PASS`**. Advisory: the IOB spec's year change uses `triggerEventHandler`. This is pre-existing (it is a context line in the diff), not new.
+- **Pending:** Leader Chrome measurement. Leader's Chrome tab renders a blank app (`app-root` empty), so the owner was asked to check.
+- **Owner (2026-11-26): commit authorized** ("haz commit"); no push. The Leader's Chrome scroll measurement was not run, because the Leader's tab rendered a blank app. The owner's own view stands as the visual check.

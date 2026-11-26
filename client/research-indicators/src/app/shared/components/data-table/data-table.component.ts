@@ -59,6 +59,11 @@ export class DataTableComponent<T extends object> implements OnInit {
   @Input() exportFileName = 'export.xlsx';
   @Input() searchPlaceholder = 'Search';
   @Input() emptyMessage = 'No records found.';
+  /**
+   * The search and Export row (strategy-framework D-STF-40). Default true, so
+   * control-lists and organizational-structure keep the toolbar they have today.
+   */
+  @Input() showToolbar = true;
   /** Fields the local search box filters over (design §6.3 "search fields"). */
   @Input() searchFields: (keyof T & string)[] = [];
   /**

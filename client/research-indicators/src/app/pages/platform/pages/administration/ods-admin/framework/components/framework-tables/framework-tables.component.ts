@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { DataTableColumn, DataTableComponent } from '@shared/components/data-table/data-table.component';
 import { FrameworkEditorView } from '@shared/interfaces/strategy-framework.interface';
 import { naturalCompare } from '@shared/utils/natural-compare.util';
+import { OdsFindFieldComponent } from '../../../ods-find-field/ods-find-field.component';
 import { FrameworkTableRow, levelCounts, tableRowsForLevel } from '../../utils/framework-view.util';
 
 /** Create request for the details panel. `parentId` is set when the tree's + already knows the parent. */
@@ -20,14 +21,13 @@ const COLUMNS: DataTableColumn<FrameworkTableRow>[] = [
   { field: 'responsiblesText', header: 'Responsibles', type: 'text', sortable: true }
 ];
 
-const SEARCH_FIELDS: (keyof FrameworkTableRow & string)[] = ['code', 'levelName', 'name', 'parentLabel', 'responsiblesText'];
-
-// @akili-spec institutional-performance/strategy-framework T-23 — design §6.4, D-STF-37.
+// @akili-spec institutional-performance/strategy-framework T-23 — design §6.4, D-STF-37, D-STF-40.
 // One shared DataTable lists every element. Chips show counts. Selection lives on the page.
+// The find field filters code and name. The table toolbar stays hidden; the page header exports.
 @Component({
   selector: 'app-framework-tables',
   standalone: true,
-  imports: [DataTableComponent],
+  imports: [DataTableComponent, OdsFindFieldComponent],
   templateUrl: './framework-tables.component.html',
   styleUrls: ['./framework-tables.component.scss', '../../../ods-table-wrap.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -40,13 +40,27 @@ export class FrameworkTablesComponent {
   readonly rowSelected = output<number>();
 
   readonly columns = COLUMNS;
-  readonly searchFields = SEARCH_FIELDS;
   readonly counts = computed(() => levelCounts(this.view()));
   readonly rows = computed(() => rowsOf(this.view()));
+  readonly query = signal('');
+  readonly trimmedQuery = computed(() => this.query().trim());
+  readonly filteredRows = computed(() => filterRows(this.rows(), this.query()));
+  /** A search over a non-empty list that hits nothing is not the true-empty state (R-CTL-008). */
+  readonly noMatches = computed(() => this.trimmedQuery() !== '' && this.rows().length > 0 && this.filteredRows().length === 0);
+
+  onQuery(value: string): void {
+    this.query.set(value);
+  }
 
   onRowSelected(row: FrameworkTableRow): void {
     this.rowSelected.emit(row.id);
   }
+}
+
+function filterRows(rows: FrameworkTableRow[], query: string): FrameworkTableRow[] {
+  const term = query.trim().toLowerCase();
+  if (!term) return rows;
+  return rows.filter(row => row.code.toLowerCase().includes(term) || row.name.toLowerCase().includes(term));
 }
 
 function rowsOf(view: FrameworkEditorView): FrameworkTableRow[] {

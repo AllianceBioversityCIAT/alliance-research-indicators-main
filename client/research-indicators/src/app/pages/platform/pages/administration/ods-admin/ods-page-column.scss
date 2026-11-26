@@ -1,0 +1,19 @@
+// D-STF-39. The only 24px: both page roots include this mixin.
+// content-box keeps the gap from being subtracted twice. The border box stays
+// the visible height (P-46); the content column is shorter by the top gap.
+// The 16px is the bottom gap that already lived inside the column.
+
+$ods-admin-top-gap: 24px;
+
+@mixin ods-admin-fixed-column($height-var) {
+  --ods-admin-top-gap: #{$ods-admin-top-gap};
+  flex: none;
+  margin-top: 0;
+  margin-bottom: 0;
+  box-sizing: content-box;
+  padding-top: var(--ods-admin-top-gap);
+  padding-bottom: 16px;
+  min-height: 0;
+  height: calc(var(#{$height-var}) - var(--ods-admin-top-gap) - 16px);
+  overflow: hidden;
+}
