@@ -1094,6 +1094,32 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Open owner calls:** Responsibles column width in the tree (names cut); Linked indicators 47 px with chips vs 39 px; dark-mode code pill text ≈ 1.7:1 (pre-existing); Table view Responsibles wraps (needs shared `app-data-table`).
 
 
+- **Resumed (2026-11-26, afternoon):** Implementer attempt 1 re-dispatched to a fresh Grok `grok-4.7-high` worker, dispatch `ctx_1732bdab6b2d`, same brief (B-10 / D-STF-44 on top of the uncommitted follow-up 7 tree).
+
+- **Implementer attempt 1 report** (`ctx_1732bdab6b2d`): claimed jest 150/150, lint clean, build with no ods-admin warning, spec tsc 0. New partials `ods-action-button.scss`, `ods-list-band.scss` (+ spec). Toggle size copied from My Projects (32 px) because Results Center does not render it.
+- **Leader re-run: FAIL.** jest 18/18 suites, 150 tests; lint clean; spec tsc 0 ods-admin — but **`npm run build` exits 1**: TS-993004 "Unable to import symbol OdsPressedDirective … not exported from framework.component.ts". The worker's build claim was false (K-004: a gate cited without being seen). Diff now 38 client files, +926 / −338. Sent back as attempt 2 (own exported file + spec; paste build tail and exit code verbatim). No review round spent.
+
+- **Implementer attempt 2** (same worker): `OdsPressedDirective` moved to its own exported file + spec. **Leader re-run:** `npm run build` exit 0.
+- **Owner HITL (live, 2026-11-26):** (1) scrolled rows show above the sticky band; (2) the icon toggle is smaller than the 39 px inputs, misaligned; (3) the active toggle must look like My Projects' (darker background, blue icon). Leader Chrome on `/projects`: 32 × 32 px, active bg #d9e1eb, border rgb(226,232,240), radius 4, icon #035ba9 16 px, inactive icon rgb(100,116,139); source `my-projects.component.scss:93-115` (no token for #d9e1eb / #b8d4e8). Attempt 3 sent: band covers from the scroll container top, toggle 39 × 39 bottom-aligned, My Projects active look.
+
+- **Owner (2026-11-26):** buttons must use `navigation-buttons`' styles (AskUserQuestion answer: "usa son los estilos"; the component itself is a fixed result-page bar with Back/Next/Save only). Added to attempt 3: Save = its Save, Cancel = its Back/Next outline, Delete = same geometry in danger.
+
+- **Implementer attempts 3–4** (same worker): sticky band = first child of a paddingless `.list-scroll` (opaque, z-index 5); toggle My Projects colours; panel buttons with `navigation-buttons` styles (Save green + spinner, Cancel blue outline, Delete red outline); `ods-action-button.scss` removed.
+- **Leader re-run: VERIFIED gates** — build exit 0 (no ods-admin warning), jest 19/19 suites, 155 tests, lint clean, spec tsc 0. Diff incl. follow-up 7: 40 files, +1,287 / −496.
+- **Leader Chrome (1728×850):** sticky band OK on Framework Tree and IOB (scrolled 400/500 px: 0 row pixels above the band; band top = card top); one Portfolio, none in the header; IOB Portfolio + Year in the band; toggle active bg rgb(217,225,235) + icon #035ba9, aria-pressed/labels correct; no page scroll. **Defects:** (a) toggle is **39 × 27 px**, not 39 × 39 (`!max-h-[27px]` still wins; the spec only checked width); (b) Save 39 px next to Cancel/Delete 43 px (2 px border on the outlines; same as STAR's own bar, but side by side here they misalign).
+
+- **Reviewer** (`akili-reviewer`, opus, round **26/34**): **`STATUS: FAIL`**. (1) major: Portfolio/Year/toggle render only in the loaded branch → destroyed on change (focus lost) and absent on a failed load (user stranded on Retry); (2) moderate: toggle duplicated per view branch, pressed button destroyed on switch; (3) moderate: `aria-pressed`/`aria-label` also on the `p-button` host (generic role), specs assert the host; (4) minor: inactive icon colour literal; (5) minor: below 1024 px the sticky band resolves to the platform scroller. Reviewer read 39×39 from CSS; Leader Chrome measured 39×27 painted (`!max-h-[27px]`).
+- **Attempt 5 sent** (same worker): all five + Leader (6) toggle 39×39 painted, (7) Save `border-2 border-transparent` so Save/Cancel/Delete are all 43 px. Band rendered once, always; progress/error inside the list body.
+
+- **Transport:** the reopen of the attempt-4 worker failed (`agent_readiness: timeout`, dispatch `ctx_569faab9cdd7`, released). Attempt 5 retried on a fresh Grok worker, dispatch `ctx_db097aeada40`, with a context message (B-10 / D-STF-44, brief path, base tree).
+
+- **Attempt 5 stopped by the Leader at the owner's request** (owner leaving; dispatch `ctx_db097aeada40`, stopped mid-work). It had already edited ~20 files (framework.*, institutional-objectives.*, element/objective panels, framework-tree/-tables, side-panel-layout.*, ods-list-band.*, ods-pressed.directive.ts). **The working tree is PARTIAL**: no gate was run on it, no report was made. Snapshot of the whole uncommitted client diff (follow-ups 7 + 8 + partial attempt 5): `<git-dir>/strategy-framework-fu7-fu8-partial-2026-11-26.patch` (43 files, +1,552 / −551).
+
+### Session pause 2 (2026-11-26, afternoon)
+- **State:** follow-up 7 complete (Reviewer PASS ×4). Follow-up 8: attempts 1–4 done, Reviewer FAIL round 26/34 (5 issues) + 2 Leader Chrome defects; attempt 5 (all seven fixes) **interrupted halfway**.
+- **Resume:** (1) run the gates on the tree as is (build, jest ods-admin, lint, spec tsc) to see where attempt 5 stopped; (2) dispatch a fresh Grok worker with the attempt-5 body (the seven items logged above under "Attempt 5 sent") + the context message, telling it the tree holds a partial attempt 5 to finish, not to restart; (3) Leader re-run + Chrome (toggle 39 × 39 painted, Save/Cancel/Delete 43 px, selectors survive a failed load, focus kept on view switch, no row above the band, no page scroll) → Reviewer round 27/34 → owner visual OK → commit 7 + 8 (no push).
+- **Open owner calls:** unchanged from "Session pause (midday)".
+
 ### Session handoff (2026-11-26)
 The owner is closing this session and will continue in a new one with more UI changes. State at close:
 - **Branch** `institutional-kpis`, HEAD `8e7daaae7`. The working tree is clean, except that this handoff entry is committed on its own. **Nothing is pushed**; the owner pushes.
