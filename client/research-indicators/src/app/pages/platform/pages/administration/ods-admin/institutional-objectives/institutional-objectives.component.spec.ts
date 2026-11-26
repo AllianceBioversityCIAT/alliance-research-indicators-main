@@ -259,9 +259,12 @@ describe('InstitutionalObjectivesComponent', () => {
   it('disables carry forward on an empty year', async () => {
     create();
     await settle();
+    expect(q('objectives-list')?.contains(q('summary-line'))).toBe(true);
     fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: 2027 });
     await settle();
 
+    expect(q('summary-line')).toBeNull();
+    expect(q('objectives-search')).not.toBeNull();
     const carry = button('carry-forward');
     expect(carry.textContent).toContain('Carry forward to 2028');
     expect(carry.disabled).toBe(true);
@@ -351,9 +354,7 @@ describe('InstitutionalObjectivesComponent', () => {
         defaultYear: 2026
       })
     );
-    api.GET_StrategyFrameworkObjectives.mockImplementation((_portfolioId: number, year: number) =>
-      Promise.resolve(ok(year === 2026 ? shared : []))
-    );
+    api.GET_StrategyFrameworkObjectives.mockImplementation((_portfolioId: number, year: number) => Promise.resolve(ok(year === 2026 ? shared : [])));
     create();
     await settle();
 
@@ -379,7 +380,9 @@ describe('InstitutionalObjectivesComponent', () => {
       expect(item.hasAttribute('tabindex')).toBe(false);
       expect(item.querySelector('button, [tabindex]')).toBeNull();
     }
-    q('panel-empty')?.querySelectorAll('i').forEach(icon => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+    q('panel-empty')
+      ?.querySelectorAll('i')
+      .forEach(icon => expect(icon.getAttribute('aria-hidden')).toBe('true'));
 
     await clickRow(10);
     expect(q('panel-empty')).toBeNull();
@@ -912,6 +915,8 @@ describe('InstitutionalObjectivesComponent', () => {
     }
     expect(q('summary-line')?.textContent?.trim()).toBe('28 objectives · 1 linked indicators');
     expect(q('summary-line')?.className).toContain('atc-grey-800');
+    expect(q('objectives-list')?.contains(q('summary-line'))).toBe(true);
+    expect(q('summary-line')!.compareDocumentPosition(q('objectives-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('filters the list by code and by statement and keeps a hidden selection', async () => {

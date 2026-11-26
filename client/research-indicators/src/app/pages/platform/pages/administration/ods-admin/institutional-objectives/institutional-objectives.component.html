@@ -105,19 +105,16 @@
           </p-button>
         </div>
       } @else {
-        @if (objectiveCounts().objectives > 0) {
-          <p class="m-0 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ objectiveSummary() }}</p>
-        }
-        <app-side-panel-layout
-          [hasSelection]="selectedId() !== null"
-          [creating]="creating()"
-          panelLabel="Objective details">
+        <app-side-panel-layout [hasSelection]="selectedId() !== null" [creating]="creating()" panelLabel="Objective details">
           <app-ods-empty-panel
             circleIcon="pi pi-flag"
             title="Explore the institutional objectives"
             subtitle="Select an objective to see its statement, year and linked indicators."
             [rows]="emptyRows()" />
           <div list data-testid="objectives-list">
+            @if (objectiveCounts().objectives > 0) {
+              <p class="mt-0 mb-3 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ objectiveSummary() }}</p>
+            }
             <app-ods-find-field
               label="Find by code or name"
               placeholder="Find by code or name"

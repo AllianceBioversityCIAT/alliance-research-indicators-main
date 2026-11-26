@@ -89,28 +89,16 @@
           </p-button>
         </div>
       } @else if (editor()) {
-        @if (!empty()) {
-          <p class="m-0 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ summary() }}</p>
-        }
-
-        <div
-          class="flex items-start gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2"
-          role="note"
-          data-testid="framework-banner">
-          <i class="pi pi-check mt-0.5 atc-primary-blue-600" aria-hidden="true"></i>
-          <p class="m-0 text-sm leading-[1.5] atc-grey-800">Changes apply to every module that uses the framework. Items in use cannot be deleted.</p>
-        </div>
-
-        <app-side-panel-layout
-          [hasSelection]="selectedId() !== null"
-          [creating]="createRequest() !== null"
-          panelLabel="Element details">
+        <app-side-panel-layout [hasSelection]="selectedId() !== null" [creating]="createRequest() !== null" panelLabel="Element details">
           <app-ods-empty-panel
             circleIcon="pi pi-sitemap"
             title="Explore the performance framework"
             subtitle="Select an item from the hierarchy to see its details and actions."
             [rows]="emptyRows()" />
           <div list data-testid="framework-list">
+            @if (!empty()) {
+              <p class="mt-0 mb-3 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ summary() }}</p>
+            }
             @if (empty()) {
               <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
                 <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>

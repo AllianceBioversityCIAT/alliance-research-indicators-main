@@ -238,7 +238,18 @@ describe('FrameworkComponent', () => {
     expect(q('view-tree')?.textContent?.trim()).toBe('Tree');
     expect(root().querySelector('p-treetable input, p-treetable textarea')).toBeNull();
     expect(treeRow('1').querySelector('[data-testid="framework-tree-name"]')?.textContent?.trim()).toBe('Area');
-    expect(q('framework-banner')?.textContent).toContain('Changes apply to every module that uses the framework. Items in use cannot be deleted.');
+    // B-8 / D-STF-42: the info banner is gone. The count line is the first row inside the list card.
+    expect(q('framework-banner')).toBeNull();
+    expect(q('framework-list')?.contains(q('summary-line'))).toBe(true);
+    expect(q('summary-line')!.compareDocumentPosition(q('framework-tree-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    (q('view-table') as HTMLButtonElement).click();
+    await settle();
+
+    expect(q('framework-banner')).toBeNull();
+    expect(q('framework-list')?.contains(q('summary-line'))).toBe(true);
+    expect(q('summary-line')!.compareDocumentPosition(q('framework-table-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('framework-tree-search')).toBeNull();
     expect(root().querySelector('app-custom-progress-bar')).toBeNull();
     expect(root().querySelector('p-' + 'drawer')).toBeNull();
   });
@@ -280,7 +291,9 @@ describe('FrameworkComponent', () => {
       expect(row.hasAttribute('tabindex')).toBe(false);
       expect(row.querySelector('button, [tabindex]')).toBeNull();
     }
-    q('panel-empty')?.querySelectorAll('i').forEach(icon => expect(icon.getAttribute('aria-hidden')).toBe('true'));
+    q('panel-empty')
+      ?.querySelectorAll('i')
+      .forEach(icon => expect(icon.getAttribute('aria-hidden')).toBe('true'));
 
     await clickTree('1');
     expect(q('panel-empty')).toBeNull();
