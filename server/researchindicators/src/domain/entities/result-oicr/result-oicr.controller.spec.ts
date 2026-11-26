@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { ResultOicrController } from './result-oicr.controller';
 import { ResultOicrService } from './result-oicr.service';
+import { OicrCatalogsService } from './oicr-catalogs.service';
 import { OicrWordTemplateService } from './word-template/oicr-word-template.service';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
@@ -17,6 +18,11 @@ describe('ResultOicrController', () => {
   let mockResultOicrService: jest.Mocked<ResultOicrService>;
   let mockResultUtil: jest.Mocked<ResultsUtil>;
   let mockWordTemplateService: { download: jest.Mock };
+  let mockCatalogsService: {
+    findAudiences: jest.Mock;
+    findThematicKeywords: jest.Mock;
+    findQuantificationUnitCategories: jest.Mock;
+  };
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -36,6 +42,12 @@ describe('ResultOicrController', () => {
       download: jest.fn(),
     };
 
+    mockCatalogsService = {
+      findAudiences: jest.fn(),
+      findThematicKeywords: jest.fn(),
+      findQuantificationUnitCategories: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultOicrController],
       providers: [
@@ -45,6 +57,7 @@ describe('ResultOicrController', () => {
           provide: OicrWordTemplateService,
           useValue: mockWordTemplateService,
         },
+        { provide: OicrCatalogsService, useValue: mockCatalogsService },
         mockPortfolioUtilProvider,
       ],
     }).compile();
@@ -461,6 +474,52 @@ describe('ResultOicrController', () => {
         message: 'Result not found',
       });
       expect(mockWordTemplateService.download).not.toHaveBeenCalled();
+    });
+  });
+  describe('OICR catalogs', () => {
+    it('getAudiencesCatalog returns the audiences', async () => {
+      const rows = [{ id: 1, name: 'Research' }];
+      mockCatalogsService.findAudiences.mockResolvedValue(rows);
+      const result = await controller.getAudiencesCatalog();
+      expect(result.data).toEqual(rows);
+      expect(result.status).toBe(HttpStatus.OK);
+    });
+
+    it('getThematicKeywordsCatalog returns the thematic keywords', async () => {
+      const rows = [{ id: 1, name: 'Food Security' }];
+      mockCatalogsService.findThematicKeywords.mockResolvedValue(rows);
+      const result = await controller.getThematicKeywordsCatalog();
+      expect(result.data).toEqual(rows);
+      expect(result.status).toBe(HttpStatus.OK);
+    });
+
+    it('getQuantificationUnitCategoriesCatalog returns the unit categories', async () => {
+      const rows = [
+        {
+          id: 1,
+          macro_category: 'Performance Metrics & Indicators',
+          name: 'Adoption Rate',
+          is_percentage: true,
+        },
+      ];
+      mockCatalogsService.findQuantificationUnitCategories.mockResolvedValue(
+        rows,
+      );
+      const result = await controller.getQuantificationUnitCategoriesCatalog();
+      expect(result.data).toEqual(rows);
+      expect(result.status).toBe(HttpStatus.OK);
+    });
+
+    it('declares the catalog routes at the contract paths', () => {
+      const path = (handler: unknown) =>
+        Reflect.getMetadata('path', handler as object);
+      expect(path(controller.getAudiencesCatalog)).toBe('catalogs/audiences');
+      expect(path(controller.getThematicKeywordsCatalog)).toBe(
+        'catalogs/thematic-keywords',
+      );
+      expect(path(controller.getQuantificationUnitCategoriesCatalog)).toBe(
+        'catalogs/quantification-unit-categories',
+      );
     });
   });
 });
