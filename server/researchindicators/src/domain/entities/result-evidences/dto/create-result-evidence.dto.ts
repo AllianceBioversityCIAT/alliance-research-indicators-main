@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ResultEvidence } from '../entities/result-evidence.entity';
+import { ResultOicrAnnex } from '../../result-oicr-annexes/entities/result-oicr-annex.entity';
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 
 export class CreateResultEvidenceDto {
@@ -20,4 +21,12 @@ export class CreateResultEvidenceDto {
 
   @ApiProperty({ type: [ResultNotableReference] })
   notable_references?: ResultNotableReference[];
+
+  @ApiProperty({
+    type: [ResultOicrAnnex],
+    required: false,
+    description:
+      'OICR annexes (2026). Absent = stored annexes untouched; present = replaces the stored set',
+  })
+  annexes?: ResultOicrAnnex[];
 }

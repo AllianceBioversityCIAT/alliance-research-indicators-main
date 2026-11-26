@@ -18,6 +18,9 @@ import { ResultQuantificationsModule } from '../result-quantifications/result-qu
 import { ResultImpactAreasModule } from '../result-impact-areas/result-impact-areas.module';
 import { ResultImpactAreaGlobalTargetsModule } from '../result-impact-area-global-targets/result-impact-area-global-targets.module';
 import { AllianceUserStaffGroupsModule } from '../alliance-user-staff-groups/alliance-user-staff-groups.module';
+import { ResultOicrAudiencesService } from './result-oicr-audiences.service';
+import { ResultOicrThematicKeywordsService } from './result-oicr-thematic-keywords.service';
+import { OicrCatalogsService } from './oicr-catalogs.service';
 import { ResultStatusWorkflowModule } from '../result-status-workflow/result-status-workflow.module';
 
 @Module({
@@ -27,6 +30,9 @@ import { ResultStatusWorkflowModule } from '../result-status-workflow/result-sta
     MessageMicroservice,
     ResultOicrRepository,
     OicrWordTemplateService,
+    ResultOicrAudiencesService,
+    ResultOicrThematicKeywordsService,
+    OicrCatalogsService,
   ],
   imports: [
     HttpModule,

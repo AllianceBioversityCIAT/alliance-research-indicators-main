@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultUsersService } from './result-users.service';
 import { UserService } from '../../complementary-entities/secondary/user/user.service';
@@ -141,6 +142,73 @@ describe('ResultUsersService', () => {
 
       expect(mockRepo.save).toHaveBeenCalled();
       expect(result).toEqual(newRole);
+    });
+
+    describe('orcid', () => {
+      const setup = () => {
+        const newRole = {
+          result_user_id: 7,
+          informative_role_id: InformativeRolesEnum.CONTACT_PERSON,
+        };
+        const mockRepo = {
+          find: jest.fn().mockResolvedValue([]),
+          findOne: jest.fn().mockResolvedValue(null),
+          update: jest.fn(),
+          create: jest.fn().mockReturnValue(newRole),
+          save: jest.fn().mockResolvedValue(newRole),
+        };
+        mockTransaction.mockImplementation(async (cb) => {
+          return cb({ getRepository: jest.fn().mockReturnValue(mockRepo) });
+        });
+        return mockRepo;
+      };
+
+      it.each(['0000-0002-1825-0097', '0000-0001-5109-370X'])(
+        'saves a valid orcid (%s) on the saved row',
+        async (orcid) => {
+          const mockRepo = setup();
+          const result: any = await service.saveAuthorContactUserByResultId(1, {
+            user_id: 'U1',
+            informative_role_id: InformativeRolesEnum.CONTACT_PERSON,
+            orcid,
+          });
+          expect(mockRepo.update).toHaveBeenCalledWith(7, { orcid });
+          expect(result.orcid).toBe(orcid);
+        },
+      );
+
+      it.each([
+        '1234',
+        '0000-0002-1825-009',
+        '0000000218250097',
+        'abcd-0002-1825-0097',
+        '0000-0002-1825-0097-1',
+      ])(
+        'rejects an invalid orcid (%s) with 400 and does not open a transaction',
+        async (orcid) => {
+          const mockRepo = setup();
+          mockTransaction.mockClear();
+          await expect(
+            service.saveAuthorContactUserByResultId(1, {
+              user_id: 'U1',
+              informative_role_id: InformativeRolesEnum.CONTACT_PERSON,
+              orcid,
+            }),
+          ).rejects.toBeInstanceOf(BadRequestException);
+          expect(mockTransaction).not.toHaveBeenCalled();
+          expect(mockRepo.save).not.toHaveBeenCalled();
+        },
+      );
+
+      it('does not touch orcid when it is absent or blank', async () => {
+        const mockRepo = setup();
+        await service.saveAuthorContactUserByResultId(1, {
+          user_id: 'U1',
+          informative_role_id: InformativeRolesEnum.CONTACT_PERSON,
+          orcid: '  ',
+        });
+        expect(mockRepo.update).not.toHaveBeenCalled();
+      });
     });
   });
 

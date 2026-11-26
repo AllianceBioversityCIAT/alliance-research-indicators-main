@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultUser } from './entities/result-user.entity';
 import { UserRolesEnum } from '../user-roles/enum/user-roles.enum';
@@ -21,6 +21,8 @@ import {
   ResultOwnerType,
 } from '../../shared/decorators/result-owner.decorator';
 import { normalizeSimilarityScore } from '../../shared/utils/ai-similarity.util';
+export const ORCID_PATTERN = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
+
 @Injectable()
 export class ResultUsersService extends BaseServiceSimple<
   ResultUser,
@@ -69,44 +71,67 @@ export class ResultUsersService extends BaseServiceSimple<
     resultId: number,
     body: SaveAuthorContcatDto,
   ) {
+    const orcid = typeof body.orcid === 'string' ? body.orcid.trim() : '';
+    if (orcid && !ORCID_PATTERN.test(orcid)) {
+      throw new BadRequestException(
+        'orcid must match the format 0000-0000-0000-000X',
+      );
+    }
+
     return await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(ResultUser);
-
-      const existingRoles = await repository.find({
-        where: {
-          result_id: resultId,
-          user_id: body.user_id,
-          user_role_id: UserRolesEnum.AUTHORS_CONTACT,
-          is_active: true,
-        },
-      });
-
-      const newInformativeRole = body.informative_role_id;
-
-      if (newInformativeRole === InformativeRolesEnum.BOTH) {
-        return await this.handleBothRole(
-          repository,
-          resultId,
-          body.user_id,
-          existingRoles,
-        );
+      const saved = await this.saveAuthorContactRoles(
+        repository,
+        resultId,
+        body,
+      );
+      if (orcid && saved) {
+        await repository.update(saved.result_user_id, { orcid });
+        saved.orcid = orcid;
       }
-
-      if (
-        newInformativeRole === InformativeRolesEnum.AUTHOR ||
-        newInformativeRole === InformativeRolesEnum.CONTACT_PERSON
-      ) {
-        return await this.handleIndividualRole(
-          repository,
-          resultId,
-          body.user_id,
-          newInformativeRole,
-          existingRoles,
-        );
-      }
-
-      throw new Error('Invalid informative_role_id provided');
+      return saved;
     });
+  }
+
+  private async saveAuthorContactRoles(
+    repository: Repository<ResultUser>,
+    resultId: number,
+    body: SaveAuthorContcatDto,
+  ): Promise<ResultUser> {
+    const existingRoles = await repository.find({
+      where: {
+        result_id: resultId,
+        user_id: body.user_id,
+        user_role_id: UserRolesEnum.AUTHORS_CONTACT,
+        is_active: true,
+      },
+    });
+
+    const newInformativeRole = body.informative_role_id;
+
+    if (newInformativeRole === InformativeRolesEnum.BOTH) {
+      return await this.handleBothRole(
+        repository,
+        resultId,
+        body.user_id,
+        existingRoles,
+      );
+    }
+
+    if (
+      newInformativeRole === InformativeRolesEnum.AUTHOR ||
+      newInformativeRole === InformativeRolesEnum.CONTACT_PERSON
+    ) {
+      return await this.handleIndividualRole(
+        repository,
+        resultId,
+        body.user_id,
+        newInformativeRole,
+        existingRoles,
+      );
+    }
+
+    throw new Error('Invalid informative_role_id provided');
   }
 
   private async handleBothRole(

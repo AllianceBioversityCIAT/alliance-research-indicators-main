@@ -479,6 +479,12 @@ describe('ServiceLocatorService', () => {
       expect(result).toBe(serviceMock);
     });
 
+    it.each(['oicrAudiences', 'oicrThematicKeywords'])('returns %s service (OICR Details 2026 catalogs)', name => {
+      const result = (service as any).getOtherServices(name);
+      expect(injectorMock.get).toHaveBeenCalled();
+      expect(result).toBe(serviceMock);
+    });
+
     it('returns applicationOptions service', () => {
       const result = (service as any).getOtherServices('applicationOptions');
       expect(injectorMock.get).toHaveBeenCalled();

@@ -177,6 +177,7 @@ import { GetOICRDetails } from '@shared/interfaces/gets/get-oicr-details.interfa
 import { ExistingOicrSource, LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { LeverSdgTargetApi, PatchLeverSdgTargetsRequest } from '@shared/interfaces/lever-sdg-target.interface';
 import { MaturityLevel } from '@shared/interfaces/maturity-level.interface';
+import { OicrCatalogItem, QuantificationUnitCategory } from '@shared/interfaces/oicr-catalogs.interface';
 import { InteractionFeedbackPayload } from '@shared/interfaces/feedback-interaction.interface';
 import { ImpactArea } from '@shared/interfaces/impact-area.interface';
 import { LinkResultsResponse } from '@shared/interfaces/link-results.interface';
@@ -628,6 +629,22 @@ export class ApiService {
   GET_Oicr = (id: number): Promise<MainResponse<PatchOicr>> => {
     const url = () => `results/oicr/${id}`;
     return this.TP.get(url(), { loadingTrigger: true, useResultInterceptor: true });
+  };
+
+  // OICR Details 2026 catalogs (read-only)
+  GET_OicrAudiences = (): Promise<MainResponse<OicrCatalogItem[]>> => {
+    const url = () => `results/oicr/catalogs/audiences`;
+    return this.TP.get(url(), {});
+  };
+
+  GET_OicrThematicKeywords = (): Promise<MainResponse<OicrCatalogItem[]>> => {
+    const url = () => `results/oicr/catalogs/thematic-keywords`;
+    return this.TP.get(url(), {});
+  };
+
+  GET_QuantificationUnitCategories = (): Promise<MainResponse<QuantificationUnitCategory[]>> => {
+    const url = () => `results/oicr/catalogs/quantification-unit-categories`;
+    return this.TP.get(url(), {});
   };
 
   // create result
@@ -1666,7 +1683,7 @@ export class ApiService {
     return this.TP.get(url(), { useResultInterceptor: true });
   };
 
-  POST_AutorContact = (body: { user_id: number; informative_role_id: number }, resultCode: number): Promise<MainResponse<ContactPersonResponse>> => {
+  POST_AutorContact = (body: { user_id: number; informative_role_id: number; orcid?: string }, resultCode: number): Promise<MainResponse<ContactPersonResponse>> => {
     const url = () => `result-user/author-contact/save-by-result/${resultCode}`;
     return this.TP.post(url(), body, {});
   };

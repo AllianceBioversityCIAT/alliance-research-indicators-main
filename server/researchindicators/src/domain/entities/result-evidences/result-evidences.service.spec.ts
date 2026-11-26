@@ -10,6 +10,7 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { EvidenceRoleEnum } from '../evidence-roles/enums/evidence-role.enum';
 import { CreateResultEvidenceDto } from './dto/create-result-evidence.dto';
 import { ResultOicr } from '../result-oicr/entities/result-oicr.entity';
+import { ResultOicrAnnexesService } from '../result-oicr-annexes/result-oicr-annexes.service';
 
 describe('ResultEvidencesService', () => {
   let service: ResultEvidencesService;
@@ -51,10 +52,17 @@ describe('ResultEvidencesService', () => {
     find: jest.fn().mockResolvedValue([{ id: 1 }]),
   };
 
+  const mockAnnexes = {
+    validateAndNormalize: jest.fn((a) => a),
+    replace: jest.fn().mockResolvedValue([]),
+    findByResult: jest.fn().mockResolvedValue([]),
+  };
+
   const resultsUtilStub = { indicatorId: IndicatorsEnum.KNOWLEDGE_PRODUCT };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockAnnexes.validateAndNormalize.mockImplementation((a) => a);
     resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
 
     const module: TestingModule = await Test.createTestingModule({
@@ -67,6 +75,7 @@ describe('ResultEvidencesService', () => {
           provide: ResultNotableReferencesService,
           useValue: mockNotableRefs,
         },
+        { provide: ResultOicrAnnexesService, useValue: mockAnnexes },
         {
           provide: ResultsUtil,
           useValue: resultsUtilStub as unknown as ResultsUtil,
@@ -179,7 +188,9 @@ describe('ResultEvidencesService', () => {
         evidence: ev,
         notable_references: null,
         cgspace_link: null,
+        annexes: [],
       });
+      expect(mockAnnexes.findByResult).not.toHaveBeenCalled();
     });
 
     it('should include notable references and cgspace_link for OICR', async () => {
@@ -200,8 +211,72 @@ describe('ResultEvidencesService', () => {
         evidence: [],
         notable_references: [{ ref: 1 }],
         cgspace_link: cgspaceLink,
+        annexes: [],
       });
       resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+    });
+
+    it('should return the stored annexes for OICR', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      find.mockResolvedValue([]);
+      oicrFindOne.mockResolvedValue({ cgspace_link: 'x' });
+      mockAnnexes.findByResult.mockResolvedValue([{ id: 1 }]);
+
+      const out = await service.findPrincipalEvidence(6);
+
+      expect(mockAnnexes.findByResult).toHaveBeenCalledWith(6);
+      expect(out.annexes).toEqual([{ id: 1 }]);
+    });
+  });
+
+  describe('updateResultEvidences annexes', () => {
+    const manager = { tag: 'm' };
+    beforeEach(() => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.OICR;
+      jest.spyOn(service, 'create').mockResolvedValue([] as any);
+      transaction.mockImplementation(
+        async (cb: (m: unknown) => Promise<unknown>) => cb(manager),
+      );
+    });
+
+    it('leaves annexes untouched when the key is absent', async () => {
+      await service.updateResultEvidences(2, { evidence: [] });
+      expect(mockAnnexes.validateAndNormalize).not.toHaveBeenCalled();
+      expect(mockAnnexes.replace).not.toHaveBeenCalled();
+    });
+
+    it('replaces the stored set when annexes is present', async () => {
+      const annexes = [{ annex_type_id: 1 } as any];
+      await service.updateResultEvidences(2, { evidence: [], annexes });
+      expect(mockAnnexes.replace).toHaveBeenCalledWith(2, annexes, manager);
+    });
+
+    it('clears all annexes when annexes is an empty array', async () => {
+      await service.updateResultEvidences(2, { evidence: [], annexes: [] });
+      expect(mockAnnexes.replace).toHaveBeenCalledWith(2, [], manager);
+    });
+
+    it('propagates a validation error before any write', async () => {
+      mockAnnexes.validateAndNormalize.mockImplementation(() => {
+        throw new Error('400');
+      });
+      await expect(
+        service.updateResultEvidences(2, {
+          evidence: [],
+          annexes: [{ annex_type_id: 9 } as any],
+        }),
+      ).rejects.toThrow('400');
+      expect(mockNotableRefs.upsertByCompositeKeys).not.toHaveBeenCalled();
+      expect(mockAnnexes.replace).not.toHaveBeenCalled();
+    });
+
+    it('ignores annexes for non-OICR indicators', async () => {
+      resultsUtilStub.indicatorId = IndicatorsEnum.KNOWLEDGE_PRODUCT;
+      await service.updateResultEvidences(2, {
+        evidence: [],
+        annexes: [{ annex_type_id: 1 } as any],
+      });
+      expect(mockAnnexes.replace).not.toHaveBeenCalled();
     });
   });
 });

@@ -2,6 +2,7 @@ export class PatchResultEvidences {
   evidence: Evidence[] = [];
   notable_references: NotableReference[] = [];
   cgspace_link: string | null = null;
+  annexes?: ResultOicrAnnex[];
 }
 
 export class Evidence {
@@ -16,5 +17,15 @@ export class Evidence {
 
 export class NotableReference {
   notable_reference_type_id: number | null = null;
+  link = '';
+}
+
+export class ResultOicrAnnex {
+  id?: number;
+  annex_type_id: number | null = null;
+  description = '';
+  photo_credits: string | null = null;
+  file_type: string | null = null;
+  partner_consent: string | null = null;
   link = '';
 }

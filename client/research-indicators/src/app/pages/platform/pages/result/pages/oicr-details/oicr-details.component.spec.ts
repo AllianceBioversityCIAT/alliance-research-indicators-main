@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Component, Input, NO_ERRORS_SCHEMA, Output, EventEmitter } from '@angular/core';
+import { Component, Input, NO_ERRORS_SCHEMA, Output, EventEmitter, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { CheckboxModule } from 'primeng/checkbox';
@@ -17,6 +17,8 @@ import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
 import { ContactPersonResponse } from '@shared/interfaces/contact-person.interface';
+import { QuantificationUnitCategory } from '@shared/interfaces/oicr-catalogs.interface';
+import { GetQuantificationUnitCategoriesService } from '@shared/services/control-list/get-quantification-unit-categories.service';
 
 describe('OicrDetailsComponent', () => {
   let component: OicrDetailsComponent;
@@ -34,7 +36,8 @@ describe('OicrDetailsComponent', () => {
     const mockCacheService: jest.Mocked<CacheService> = {
       getCurrentNumericResultId: jest.fn().mockReturnValue(1),
       currentResultId: jest.fn().mockReturnValue('1'),
-      isExternalResult: jest.fn().mockReturnValue(false)
+      isExternalResult: jest.fn().mockReturnValue(false),
+      currentMetadata: signal({ report_year: 2025 })
       // @ts-expect-error partial mock
     } as jest.Mocked<CacheService>;
 
@@ -756,6 +759,175 @@ describe('OicrDetailsComponent', () => {
     });
   });
 
+  describe('OICR Details 2026 data and payload', () => {
+    const setYear = (year: number | undefined) => (cacheService.currentMetadata as unknown as { set: (v: unknown) => void }).set({ report_year: year });
+    const patchPayload = () => (apiService.PATCH_Oicr as jest.Mock).mock.calls[0][1];
+    const KEYS_2026 = [
+      'problem_statement',
+      'alliance_solution',
+      'beneficiaries',
+      'outcome_achieved',
+      'outcome_achieved_edited',
+      'acknowledgments',
+      'audiences',
+      'thematic_keywords'
+    ];
+
+    beforeEach(() => {
+      submissionService.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_Oicr.mockResolvedValue({ successfulRequest: true } as any);
+      jest.spyOn(component, 'getData').mockResolvedValue();
+    });
+
+    it('2025: is2026 is false and the payload carries none of the 2026 fields, even when the GET echoed them', async () => {
+      expect(component.is2026()).toBe(false);
+      component.body.set({
+        problem_statement: null,
+        outcome_achieved_edited: false,
+        audiences: [],
+        thematic_keywords: []
+      } as any);
+      component.quantifications.set([{ number: 1, unit: 'kg', comments: 'c', unit_macro_category: 'Individuals' }]);
+
+      await component.saveData();
+
+      const payload = patchPayload();
+      KEYS_2026.forEach(k => expect(JSON.parse(JSON.stringify(payload))[k]).toBeUndefined());
+      expect(payload.actual_count[0]).toEqual({ quantification_number: 1, unit: 'kg', description: 'c' });
+      expect('unit_macro_category' in payload.actual_count[0]).toBe(false);
+    });
+
+    it('2026: the payload carries the four answers, edited flag, acknowledgments, audiences and keywords as id lists', async () => {
+      setYear(2026);
+      component.body.set({
+        problem_statement: 'p',
+        alliance_solution: 's',
+        beneficiaries: 'b',
+        outcome_achieved: 'o',
+        outcome_achieved_edited: true,
+        acknowledgments: 'thanks',
+        audiences: [{ oicr_audience_id: 1, name: 'Research', id: 1 }],
+        thematic_keywords: [{ oicr_thematic_keyword_id: 4, name: 'Food Security', id: 4 }]
+      } as any);
+      component.quantifications.set([{ number: 5, unit: 'Farmers', comments: 'c1', unit_macro_category: 'Individuals' }]);
+      component.extrapolatedEstimates.set([{ number: 6, unit: 'my unit', comments: 'c2', unit_macro_category: 'Other' }]);
+
+      await component.saveData();
+
+      const payload = patchPayload();
+      expect(payload).toEqual(
+        expect.objectContaining({
+          problem_statement: 'p',
+          alliance_solution: 's',
+          beneficiaries: 'b',
+          outcome_achieved: 'o',
+          outcome_achieved_edited: true,
+          acknowledgments: 'thanks',
+          audiences: [{ oicr_audience_id: 1 }],
+          thematic_keywords: [{ oicr_thematic_keyword_id: 4 }]
+        })
+      );
+      expect(payload.actual_count).toEqual([{ quantification_number: 5, unit: 'Farmers', description: 'c1', unit_macro_category: 'Individuals' }]);
+      expect(payload.extrapolate_estimates).toEqual([{ quantification_number: 6, unit: 'my unit', description: 'c2', unit_macro_category: 'Other' }]);
+    });
+
+    it('2026: empty answers default to empty strings / lists and a missing macro is sent as null', async () => {
+      setYear(2026);
+      component.body.set({} as any);
+      component.quantifications.set([{ number: null, unit: '', comments: '' }]);
+
+      await component.saveData();
+
+      const payload = patchPayload();
+      expect(payload).toEqual(
+        expect.objectContaining({
+          problem_statement: '',
+          outcome_achieved: '',
+          outcome_achieved_edited: false,
+          acknowledgments: '',
+          audiences: [],
+          thematic_keywords: []
+        })
+      );
+      expect(payload.actual_count[0].unit_macro_category).toBeNull();
+    });
+
+    it('2026 getData maps unit_macro_category per quantification row; 2025 does not add it', async () => {
+      const response = {
+        data: {
+          actual_count: [{ quantification_number: '10', unit: 'Farmers', description: 'd', unit_macro_category: 'Individuals' }],
+          extrapolate_estimates: [{ quantification_number: 3, unit: 'x', description: 'e' }]
+        }
+      } as any;
+      (component.getData as jest.Mock).mockRestore();
+      jest.spyOn(component, 'loadContactPersons').mockResolvedValue();
+      apiService.GET_Oicr.mockResolvedValue(response);
+
+      setYear(2026);
+      await component.getData();
+      expect(component.quantifications()[0]).toEqual({ number: 10, unit: 'Farmers', comments: 'd', unit_macro_category: 'Individuals' });
+      expect(component.extrapolatedEstimates()[0]).toEqual({ number: 3, unit: 'x', comments: 'e', unit_macro_category: '' });
+
+      setYear(2025);
+      await component.getData();
+      expect(component.quantifications()[0]).toEqual({ number: 10, unit: 'Farmers', comments: 'd' });
+    });
+
+    it('2026 maps the ORCID of each contact person row (dash when absent)', async () => {
+      apiService.GET_AutorContact.mockResolvedValue({
+        data: [
+          { result_user_id: 1, user_id: 1, informative_role_id: 1, orcid: '0000-0002-1825-0097', user: { first_name: 'A', last_name: 'B' }, informativeRole: { name: 'Author' } },
+          { result_user_id: 2, user_id: 2, informative_role_id: 1, user: { first_name: 'C', last_name: 'D' }, informativeRole: { name: 'Author' } }
+        ]
+      } as any);
+
+      await component.loadContactPersons();
+
+      expect(component.contactPersons().map(r => r.orcid)).toEqual(['0000-0002-1825-0097', '-']);
+    });
+
+    it('2026: confirming the modal posts the trimmed ORCID', async () => {
+      setYear(2026);
+      apiService.POST_AutorContact.mockResolvedValue({} as any);
+      jest.spyOn(component, 'loadContactPersons').mockResolvedValue();
+
+      await component.onConfirmAddContactPerson({ contact_person_id: 9, role_id: 2, orcid: ' 0000-0002-1825-009X ' });
+
+      expect(apiService.POST_AutorContact).toHaveBeenCalledWith(
+        { user_id: 9, informative_role_id: 2, orcid: '0000-0002-1825-009X' },
+        cacheService.getCurrentNumericResultId()
+      );
+    });
+
+    it('2026: an empty ORCID is not sent', async () => {
+      setYear(2026);
+      apiService.POST_AutorContact.mockResolvedValue({} as any);
+      jest.spyOn(component, 'loadContactPersons').mockResolvedValue();
+
+      await component.onConfirmAddContactPerson({ contact_person_id: 9, role_id: 2, orcid: '  ' });
+
+      expect(apiService.POST_AutorContact).toHaveBeenCalledWith({ user_id: 9, informative_role_id: 2 }, cacheService.getCurrentNumericResultId());
+    });
+
+    it('2026: a malformed ORCID is refused with a toast and nothing is posted', async () => {
+      setYear(2026);
+
+      await component.onConfirmAddContactPerson({ contact_person_id: 9, role_id: 2, orcid: '1234' });
+
+      expect(apiService.POST_AutorContact).not.toHaveBeenCalled();
+      expect(actionsService.showToast).toHaveBeenCalledWith({ severity: 'error', summary: 'Error', detail: 'ORCID must look like 0000-0002-1825-0097' });
+    });
+
+    it('2025: the ORCID is never posted, even if the modal data carried one', async () => {
+      apiService.POST_AutorContact.mockResolvedValue({} as any);
+      jest.spyOn(component, 'loadContactPersons').mockResolvedValue();
+
+      await component.onConfirmAddContactPerson({ contact_person_id: 9, role_id: 2, orcid: '0000-0002-1825-0097' });
+
+      expect(apiService.POST_AutorContact).toHaveBeenCalledWith({ user_id: 9, informative_role_id: 2 }, cacheService.getCurrentNumericResultId());
+    });
+  });
+
   describe('clearOicrSelection', () => {
     it('should reset external_oicr_id to 0', () => {
       component.body.set({
@@ -875,6 +1047,10 @@ class FakeQuantificationItemComponent {
   @Input() quantNumber = 1;
   @Input() headerLabel = '';
   @Input() disabled = false;
+  @Input() useUnitCategories = false;
+  @Input() unitCategories: unknown;
+  @Input() showNarrativeNote = false;
+  @Output() openUnitCategories = new EventEmitter<void>();
   @Output() update = new EventEmitter<unknown>();
   @Output() delete = new EventEmitter<void>();
 }
@@ -883,6 +1059,7 @@ class FakeQuantificationItemComponent {
 class FakeAuthorsContactPersonsTableComponent {
   @Input() rows: unknown;
   @Input() disabled = false;
+  @Input() showOrcid = false;
   @Output() addClicked = new EventEmitter<void>();
   @Output() deleteClicked = new EventEmitter<unknown>();
 }
@@ -904,11 +1081,17 @@ describe('OicrDetailsComponent — real template disabled bindings (T-07)', () =
   let fixture: ComponentFixture<OicrDetailsComponent>;
   let component: OicrDetailsComponent;
 
-  function render(opts: { isAdmin: boolean; isExternalResult: boolean; isEditableStatus: boolean }) {
+  let metadata = signal<{ report_year?: number }>({ report_year: 2025 });
+  let unitList = signal<QuantificationUnitCategory[]>([]);
+
+  function render(opts: { isAdmin: boolean; isExternalResult: boolean; isEditableStatus: boolean; reportYear?: number }) {
+    metadata = signal<{ report_year?: number }>({ report_year: opts.reportYear ?? 2025 });
+    unitList = signal<QuantificationUnitCategory[]>([]);
     const mockCacheService = {
       getCurrentNumericResultId: jest.fn().mockReturnValue(1),
       currentResultId: jest.fn().mockReturnValue('1'),
-      isExternalResult: jest.fn().mockReturnValue(opts.isExternalResult)
+      isExternalResult: jest.fn().mockReturnValue(opts.isExternalResult),
+      currentMetadata: metadata
     } as unknown as jest.Mocked<CacheService>;
 
     const mockApiService = {
@@ -972,7 +1155,8 @@ describe('OicrDetailsComponent — real template disabled bindings (T-07)', () =
         { provide: RolesService, useValue: mockRolesService },
         { provide: Router, useValue: mockRouter },
         { provide: ActivatedRoute, useValue: mockActivatedRoute },
-        { provide: ServiceLocatorService, useValue: mockServiceLocator }
+        { provide: ServiceLocatorService, useValue: mockServiceLocator },
+        { provide: GetQuantificationUnitCategoriesService, useValue: { list: unitList, main: jest.fn() } }
       ]
     });
 
@@ -1080,6 +1264,91 @@ describe('OicrDetailsComponent — real template disabled bindings (T-07)', () =
     expect(items.length).toBe(2);
     items.forEach(item => expect(item.disabled).toBe(false));
   });
+  describe('OICR Details 2026 year gate', () => {
+    const names = (f: ComponentFixture<OicrDetailsComponent>, sel: string) => f.nativeElement.querySelectorAll(sel).length;
+
+    it('2025 renders today\'s screen: legacy short outcome on, no 2026 blocks, no ORCID column', () => {
+      const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true, reportYear: 2025 });
+
+      expect(component.is2026()).toBe(false);
+      expect(oicrFormFields(f).showShortOutcome).toBe(true);
+      expect(names(f, 'app-short-outcome-2026')).toBe(0);
+      expect(names(f, 'app-multiselect')).toBe(0);
+      expect((authorsContactTable(f) as unknown as { showOrcid: boolean }).showOrcid).toBe(false);
+      expect(f.nativeElement.textContent).not.toContain('Audience focus');
+      expect(f.nativeElement.textContent).not.toContain('Acknowledgments');
+    });
+
+    it('a missing report year is treated as the old screen', () => {
+      metadata = signal<{ report_year?: number }>({});
+      const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true });
+      metadata.set({});
+      f.detectChanges();
+      expect(component.is2026()).toBe(false);
+    });
+
+    it('2026 renders the four-question block, audience/keywords/acknowledgments and the ORCID column', () => {
+      const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true, reportYear: 2026 });
+
+      expect(component.is2026()).toBe(true);
+      expect(oicrFormFields(f).showShortOutcome).toBe(false);
+      expect(names(f, 'app-short-outcome-2026')).toBe(1);
+      expect(names(f, 'app-multiselect')).toBe(2);
+      const multiselects = Array.from(f.nativeElement.querySelectorAll('app-multiselect')) as HTMLElement[];
+      expect(multiselects.map(m => m.getAttribute('label'))).toEqual(['Audience focus', 'Thematic Keywords']);
+      expect(f.nativeElement.querySelectorAll('app-textarea').length).toBe(1);
+      expect((authorsContactTable(f) as unknown as { showOrcid: boolean }).showOrcid).toBe(true);
+    });
+
+    it('transition: opens as 2025, then the year resolves to 2026 and the new layout appears', () => {
+      const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true, reportYear: 2025 });
+      expect(names(f, 'app-short-outcome-2026')).toBe(0);
+
+      metadata.set({ report_year: 2026 });
+      f.detectChanges();
+
+      expect(names(f, 'app-short-outcome-2026')).toBe(1);
+      expect(oicrFormFields(f).showShortOutcome).toBe(false);
+    });
+
+    it('2026 turns on the unit categories + narrative note on Actual count only, and the catalog loads on demand', () => {
+      const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true, reportYear: 2026 });
+      component.quantifications.set([{ number: 1, unit: 'Farmers', comments: 'c' }]);
+      component.extrapolatedEstimates.set([{ number: 2, unit: 'Farmers', comments: 'c' }]);
+      f.detectChanges();
+
+      const [actual, extrapolated] = quantificationItems(f) as unknown as { useUnitCategories: boolean; showNarrativeNote: boolean }[];
+      expect(actual.useUnitCategories).toBe(true);
+      expect(actual.showNarrativeNote).toBe(true);
+      expect(extrapolated.useUnitCategories).toBe(true);
+      expect(extrapolated.showNarrativeNote).toBe(false);
+      expect(component.unitCategoriesService.main).toHaveBeenCalled();
+    });
+
+    it('2025 leaves the quantification items on the free-text unit', () => {
+      const f = render({ isAdmin: true, isExternalResult: false, isEditableStatus: true, reportYear: 2025 });
+      component.quantifications.set([{ number: 1, unit: 'kg', comments: 'c' }]);
+      f.detectChanges();
+
+      const [actual] = quantificationItems(f) as unknown as { useUnitCategories: boolean; showNarrativeNote: boolean }[];
+      expect(actual.useUnitCategories).toBe(false);
+      expect(actual.showNarrativeNote).toBe(false);
+      expect(component.unitCategoriesService.main).not.toHaveBeenCalled();
+    });
+
+    it('groups the suggested categories table by macro-category', () => {
+      render({ isAdmin: true, isExternalResult: false, isEditableStatus: true, reportYear: 2026 });
+      expect(component.unitCategoryGroups()).toEqual([]);
+
+      unitList.set([
+        { id: 1, macro_category: 'Individuals', name: 'Farmers', is_percentage: false },
+        { id: 2, macro_category: 'Individuals', name: 'Researchers', is_percentage: false },
+        { id: 3, macro_category: 'Households/Families', name: 'Households', is_percentage: false }
+      ]);
+      expect(component.unitCategoryGroups()).toEqual([
+        { macro: 'Individuals', categories: ['Farmers', 'Researchers'] },
+        { macro: 'Households/Families', categories: ['Households'] }
+      ]);
+    });
+  });
 });
-
-

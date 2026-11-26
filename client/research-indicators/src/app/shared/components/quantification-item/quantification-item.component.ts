@@ -2,18 +2,26 @@ import { Component, EventEmitter, Input, OnInit, OnChanges, Output, SimpleChange
 import { NgTemplateOutlet } from '@angular/common';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
+import { FormsModule } from '@angular/forms';
+import { SelectModule } from 'primeng/select';
 import { SubmissionService } from '@shared/services/submission.service';
+import { QuantificationUnitCategory } from '@shared/interfaces/oicr-catalogs.interface';
 
 export interface QuantificationItemData {
   number: number | null;
   unit: string;
   comments: string;
+  /** OICR 2026 only: macro-category of the unit; `unit` holds the category, or the free text when this is `Other`. */
+  unit_macro_category?: string;
 }
+
+export const OTHER_UNIT_MACRO = 'Other';
+const PERCENT_TEXT_PATTERN = /%|percent|\brate\b|\bshare\b|proportion/i;
 
 @Component({
   selector: 'app-quantification-item',
   standalone: true,
-  imports: [NgTemplateOutlet, InputComponent, TextareaComponent],
+  imports: [NgTemplateOutlet, FormsModule, SelectModule, InputComponent, TextareaComponent],
   templateUrl: './quantification-item.component.html'
 })
 export class QuantificationItemComponent implements OnInit, OnChanges {
@@ -81,6 +89,14 @@ export class QuantificationItemComponent implements OnInit, OnChanges {
   get maxFractionDigits(): number {
     return this._maxFractionDigits;
   }
+  // OICR Details 2026 — opt-in so Innovation Use keeps its free-text Unit untouched.
+  /** Turns the Unit field into macro-category + category selects (macro `Other` swaps the category for free text). Defaults to `false`. */
+  @Input() useUnitCategories = false;
+  /** Catalog rows behind the macro-category / category selects. Only read when `useUnitCategories` is on. */
+  @Input() unitCategories: QuantificationUnitCategory[] = [];
+  /** Shows the note that this narrative is copied into "What outcome or impact was achieved?" (Actual count rows). Defaults to `false`. */
+  @Input() showNarrativeNote = false;
+  @Output() openUnitCategories = new EventEmitter<void>();
   @Output() update = new EventEmitter<QuantificationItemData>();
   @Output() delete = new EventEmitter<void>();
 
@@ -107,6 +123,46 @@ export class QuantificationItemComponent implements OnInit, OnChanges {
         this.body.set(next);
       }
     }
+  }
+
+  macroOptions(): string[] {
+    const macros: string[] = [];
+    for (const row of this.unitCategories) {
+      if (!macros.includes(row.macro_category)) macros.push(row.macro_category);
+    }
+    return [...macros, OTHER_UNIT_MACRO];
+  }
+
+  categoryOptions(): QuantificationUnitCategory[] {
+    return this.unitCategories.filter(row => row.macro_category === this.body().unit_macro_category);
+  }
+
+  isOtherUnit(): boolean {
+    return this.body().unit_macro_category === OTHER_UNIT_MACRO;
+  }
+
+  /** `%` prefix: the chosen category is a percentage one, or the free-text unit reads like one. */
+  isPercentageUnit(): boolean {
+    if (!this.useUnitCategories) return false;
+    const { unit, unit_macro_category } = this.body();
+    if (!unit) return false;
+    if (unit_macro_category === OTHER_UNIT_MACRO) return PERCENT_TEXT_PATTERN.test(unit);
+    return this.unitCategories.some(row => row.macro_category === unit_macro_category && row.name === unit && row.is_percentage);
+  }
+
+  unitMissingMessage(): string {
+    const { unit, unit_macro_category } = this.body();
+    if (unit) return '';
+    if (!unit_macro_category) return 'This field is required';
+    return this.isOtherUnit() ? 'Please specify the unit' : 'Please select a category';
+  }
+
+  onMacroChange(macro: string | null) {
+    this.body.update(current => ({ ...current, unit_macro_category: macro ?? '', unit: '' }));
+  }
+
+  onCategoryChange(category: string | null) {
+    this.body.update(current => ({ ...current, unit: category ?? '' }));
   }
 
   onValueChange() {

@@ -1798,6 +1798,30 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/results/current-user&direction=asc', {});
     });
 
+    it('should call the three OICR 2026 catalog GETs', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      service.GET_OicrAudiences();
+      service.GET_OicrThematicKeywords();
+      service.GET_QuantificationUnitCategories();
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('results/oicr/catalogs/audiences', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('results/oicr/catalogs/thematic-keywords', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('results/oicr/catalogs/quantification-unit-categories', {});
+    });
+
+    it('should post the optional orcid with the author/contact body', () => {
+      (mockToPromiseService.post as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.POST_AutorContact({ user_id: 5, informative_role_id: 2, orcid: '0000-0002-1825-0097' }, 77);
+
+      expect(mockToPromiseService.post).toHaveBeenCalledWith(
+        'result-user/author-contact/save-by-result/77',
+        { user_id: 5, informative_role_id: 2, orcid: '0000-0002-1825-0097' },
+        {}
+      );
+    });
+
     it('should call GET_OICRDetails', () => {
       const resultCode = 123;
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });

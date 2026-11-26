@@ -44,5 +44,10 @@
     <app-select label="Role" [isRequired]="true" [signal]="body" [optionValue]="{ body: 'role_id', option: 'id' }"
       optionLabel="name" [scrollHeight]="'135px'" serviceName="informativeRoles" placeholder="Select a role">
     </app-select>
+
+    @if (showOrcid()) {
+    <app-input label="ORCID" [signal]="body" optionValue="orcid" placeholder="0000-0002-1825-0097"
+      helperText="Optional. Add the author's ORCID iD; it is shown in the table of people involved."></app-input>
+    }
   </div>
 </div>

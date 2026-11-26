@@ -1,0 +1,60 @@
+<div class="flex flex-col gap-2">
+  <h2 class="label">Short Outcome/Impact Statement<span class="text-red-500">*</span></h2>
+  <p class="text-[14px] leading-5 text-[var(--ac-grey-700)]" data-testid="short-outcome-helper">
+    This summary appears on the first page of the OICR published on CGSpace and may be reused in communications products, presentations,
+    fundraising materials and other external-facing content. Write for a broad audience, avoid technical jargon, and answer each question below.
+  </p>
+
+  <div class="flex flex-col gap-4 rounded-[4px] border border-l-4 border-[var(--ac-grey-200)] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] p-4">
+    <app-textarea label="What was the problem?" [isRequired]="true" [rows]="3" [maxLength]="wordLimit" [signal]="body()"
+      optionValue="problem_statement" [disabled]="disabled()" helperText="Focus on the most important issue. 25 words max."
+      placeholder="Briefly describe the challenge, need, or opportunity addressed"></app-textarea>
+
+    <app-textarea label="What was the Alliance's solution?" [isRequired]="true" [rows]="3" [maxLength]="wordLimit" [signal]="body()"
+      optionValue="alliance_solution" [disabled]="disabled()" helperText="The contribution that helped address the problem. 25 words max."
+      placeholder="Describe the key research, innovation, partnership, or intervention"></app-textarea>
+
+    <app-textarea label="Who benefited from the reported change?" [isRequired]="true" [rows]="3" [maxLength]="wordLimit" [signal]="body()"
+      optionValue="beneficiaries" [disabled]="disabled()" helperText="The main beneficiaries affected by the reported change. 25 words max."
+      placeholder="Identify the main beneficiaries"></app-textarea>
+
+    <div class="flex flex-col gap-1">
+      <div class="flex w-full items-center justify-between">
+        <label class="label flex items-center" for="outcome-achieved">
+          What outcome or impact was achieved?<span class="text-red-500">*</span>
+        </label>
+        <app-word-counter [value]="q4Value()" [showMax]="false"></app-word-counter>
+      </div>
+      <textarea id="outcome-achieved" pTextarea rows="5" class="w-full" style="resize: none"
+        [style.border]="q4Invalid() ? '2px solid var(--ac-orange-1)' : null" [value]="q4Value()" [disabled]="disabled()"
+        placeholder="The narrative from the Quantification section [Actual count], for each unit of measure reported"
+        (input)="onQ4Input($event)"></textarea>
+
+      @if (!edited() && sourceChips().length) {
+      <div class="flex flex-wrap items-center gap-2" data-testid="q4-sources">
+        <span class="text-[12px] text-[var(--ac-grey-700)]">Taken from:</span>
+        @for (chip of sourceChips(); track $index) {
+        <span class="rounded-full border border-[var(--ac-grey-300)] bg-white px-2 py-0.5 text-[11px] text-[var(--ac-primary-blue-300)]">{{ chip.label }}</span>
+        }
+      </div>
+      }
+
+      <div class="flex items-start justify-between gap-3">
+        <span class="text-[14px] leading-5 text-[var(--ac-grey-700)]" data-testid="q4-note">{{ q4Note() }}</span>
+        @if (edited() && !disabled()) {
+        <button type="button" data-testid="q4-restore" (click)="restore()"
+          class="shrink-0 cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-[13px] text-[var(--ac-light-blue-300)] hover:underline">
+          Restore from Quantification
+        </button>
+        }
+      </div>
+
+      @if (q4Invalid()) {
+      <div class="flex items-center gap-1 text-sm text-[var(--ac-orange-1)]" data-testid="q4-required">
+        <i class="material-symbols-rounded !text-base">warning</i>
+        <span>This field is required</span>
+      </div>
+      }
+    </div>
+  </div>
+</div>

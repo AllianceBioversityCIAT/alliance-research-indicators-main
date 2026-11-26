@@ -82,6 +82,21 @@ describe('ResultUsersController', () => {
     });
   });
 
+  it('saveAuthorContactUserByResultId forwards the optional orcid untouched', async () => {
+    const body = {
+      user_id: 'U1',
+      informative_role_id: 2,
+      orcid: '0000-0002-1825-0097',
+    } as any;
+    mockService.saveAuthorContactUserByResultId.mockResolvedValue({});
+    mockFormat.mockReturnValue({});
+    await controller.saveAuthorContactUserByResultId(body);
+    expect(mockService.saveAuthorContactUserByResultId).toHaveBeenCalledWith(
+      5,
+      body,
+    );
+  });
+
   it('deleteAuthorContactUserByResultId', async () => {
     const deleted = {};
     mockService.deleteAuthorContactByResultIdAndKey.mockResolvedValue(deleted);

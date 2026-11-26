@@ -11,6 +11,8 @@ import { ResultNotableReferencesService } from '../result-notable-references/res
 import { ResultsUtil } from '../../shared/utils/results.util';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultOicr } from '../result-oicr/entities/result-oicr.entity';
+import { ResultOicrAnnex } from '../result-oicr-annexes/entities/result-oicr-annex.entity';
+import { ResultOicrAnnexesService } from '../result-oicr-annexes/result-oicr-annexes.service';
 @Injectable()
 export class ResultEvidencesService extends BaseServiceSimple<
   ResultEvidence,
@@ -22,6 +24,7 @@ export class ResultEvidencesService extends BaseServiceSimple<
     private readonly _updateDataUtil: UpdateDataUtil,
     private readonly resultNotableReferencesService: ResultNotableReferencesService,
     private readonly _resultsUtil: ResultsUtil,
+    private readonly resultOicrAnnexesService: ResultOicrAnnexesService,
   ) {
     super(
       ResultEvidence,
@@ -43,6 +46,15 @@ export class ResultEvidencesService extends BaseServiceSimple<
       );
 
       if (this._resultsUtil.indicatorId == IndicatorsEnum.OICR) {
+        // Absent key leaves stored annexes untouched; present replaces them.
+        // Validated before any write so a 400 leaves nothing half saved.
+        const annexes =
+          resultEvidences?.annexes === undefined
+            ? undefined
+            : this.resultOicrAnnexesService.validateAndNormalize(
+                resultEvidences.annexes,
+              );
+
         const filterNotableReferences =
           resultEvidences?.notable_references?.filter(
             (el) =>
@@ -58,6 +70,14 @@ export class ResultEvidencesService extends BaseServiceSimple<
         await this.dataSource
           .getRepository(ResultOicr)
           .update(resultId, { cgspace_link: resultEvidences?.cgspace_link });
+
+        if (annexes !== undefined) {
+          await this.resultOicrAnnexesService.replace(
+            resultId,
+            annexes,
+            manager,
+          );
+        }
       }
 
       return await this.create(
@@ -89,6 +109,7 @@ export class ResultEvidencesService extends BaseServiceSimple<
       evidence: resultEvidences,
       notable_references: null,
       cgspace_link: null,
+      annexes: [] as ResultOicrAnnex[],
     };
 
     if (this._resultsUtil.indicatorId == IndicatorsEnum.OICR) {
@@ -106,6 +127,8 @@ export class ResultEvidencesService extends BaseServiceSimple<
       const notableReferences =
         await this.resultNotableReferencesService.find(resultId);
       returnEvidences.notable_references = notableReferences;
+      returnEvidences.annexes =
+        await this.resultOicrAnnexesService.findByResult(resultId);
     }
 
     return returnEvidences;

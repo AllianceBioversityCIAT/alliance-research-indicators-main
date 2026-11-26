@@ -42,6 +42,14 @@
             <p-sortIcon field="email"></p-sortIcon>
           </div>
         </th>
+        @if (showOrcid) {
+        <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'orcid'" scope="col">
+          <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
+            ORCID
+            <p-sortIcon field="orcid"></p-sortIcon>
+          </div>
+        </th>
+        }
         <th class="!text-[#112F5C] !bg-[#FCFCFC]" [pSortableColumn]="'role'" scope="col">
           <div class="flex items-center font-[500] leading-4.5 gap-2 text-[13px]">
             Role
@@ -62,6 +70,9 @@
         <td>{{ row.position || '-' }}</td>
         <td>{{ row.affiliation || '-' }}</td>
         <td>{{ row.email || '-' }}</td>
+        @if (showOrcid) {
+        <td>{{ row.orcid || '-' }}</td>
+        }
         <td>{{ row.role || '-' }}</td>
         <td>
           <button type="button" class="p-button p-button-text p-1 !bg-[#FFD5D5]" pTooltip="Remove author"
@@ -74,7 +85,7 @@
     </ng-template>
     <ng-template pTemplate="emptymessage">
       <tr>
-        <td colspan="7" class="text-center p-6">
+        <td [attr.colspan]="showOrcid ? 8 : 7" class="text-center p-6">
           <div class="flex flex-col items-center gap-4 bg-surface-ground p-3 pb-4 rounded-xl">
             <p class="text-[#4C5158] leading-4 text-center text-[14px] max-w-[800px]">
               No people have been added yet. Start by clicking “Add contact person” to include those involved in this

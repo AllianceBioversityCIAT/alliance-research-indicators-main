@@ -75,6 +75,8 @@ import {
   PiDelegatePeoplePickerStubService,
   PiDelegateProjectsPickerStubService
 } from '@platform/pages/my-pi-delegates/services/pi-delegate-picker-stub.service';
+import { GetOicrAudiencesService } from './control-list/get-oicr-audiences.service';
+import { GetOicrThematicKeywordsService } from './control-list/get-oicr-thematic-keywords.service';
 import { Portfolio2026SdgTargetsService } from './control-list/portfolio-2026-sdg-targets.service';
 
 @Injectable({
@@ -257,6 +259,10 @@ export class ServiceLocatorService {
         return this.getFromInjector(GetSdgsService);
       case 'scaling':
         return this.getFromInjector(ScalingService);
+      case 'oicrAudiences':
+        return this.getFromInjector(GetOicrAudiencesService);
+      case 'oicrThematicKeywords':
+        return this.getFromInjector(GetOicrThematicKeywordsService);
       case 'applicationOptions':
         return this.getFromInjector(ApplicationOptionsService);
       case 'levers':

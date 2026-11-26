@@ -1,0 +1,64 @@
+<div class="relative flex flex-col gap-4 bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] p-5 mb-4">
+  <div class="flex justify-between gap-1">
+    <span class="text-[13px] text-[var(--ac-grey-500)] font-['Space_Grotesk'] tracking-widest">ANNEX # {{ itemNumber }}</span>
+    @if (submission.isEditableStatus()) {
+    <div class="cursor-pointer text-[var(--ac-red-1)]" (click)="onDelete()" (keydown.enter)="onDelete()" data-testid="annex-delete">
+      <i class="pi pi-times-circle !text-[16px] pr-1"></i>
+    </div>
+    }
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <h2 class="label">Annex type<span class="text-[15px] text-[var(--ac-red-1)]">*</span></h2>
+    <div class="flex flex-wrap gap-x-5 gap-y-2">
+      @for (k of kinds; track k.id) {
+      <div class="flex items-center gap-2">
+        <p-radioButton [name]="'annex-type-' + itemNumber" [value]="k.id" [ngModel]="body().annex_type_id"
+          (ngModelChange)="onTypeChange($event)" [disabled]="!submission.isEditableStatus()"
+          [inputId]="'annex-type-' + itemNumber + '-' + k.id" [class]="body().annex_type_id === null ? 'warning-radio' : ''" />
+        <label class="option-label cursor-pointer" [for]="'annex-type-' + itemNumber + '-' + k.id">{{ k.label }}</label>
+      </div>
+      }
+    </div>
+    @if (body().annex_type_id === null) {
+    <div class="flex items-center gap-1 text-[var(--ac-warning-1)] text-sm" data-testid="annex-type-required">
+      <i class="material-symbols-rounded !text-base">warning</i>
+      <span>This field is required</span>
+    </div>
+    }
+  </div>
+
+  @if (kind; as k) {
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+    <div class="flex flex-col">
+      <h2 class="label pb-1">{{ k.field1.label }}<span class="text-[15px] text-[var(--ac-red-1)]">*</span></h2>
+      <app-input [signal]="body" [disabled]="!submission.isEditableStatus()" optionValue="description" [isRequired]="true"
+        [validateEmpty]="true" [placeholder]="k.field1.placeholder"></app-input>
+    </div>
+
+    <div class="flex flex-col">
+      <h2 class="label pb-1">{{ k.field2.label }}<span class="text-[15px] text-[var(--ac-red-1)]">*</span></h2>
+      @if (k.field2.options) {
+      <p-select [options]="k.field2.options" [ngModel]="selectValue" (ngModelChange)="onSelectChange($event)"
+        [placeholder]="k.field2.placeholder" [disabled]="!submission.isEditableStatus()" appendTo="body"
+        [style]="!selectValue ? { width: '100%', border: '2px solid var(--ac-warning-1)' } : { width: '100%' }" />
+      @if (!selectValue) {
+      <div class="flex items-center gap-1 mt-1 text-[var(--ac-warning-1)] text-sm" data-testid="annex-field2-required">
+        <i class="material-symbols-rounded !text-base">warning</i>
+        <span>This field is required</span>
+      </div>
+      }
+      } @else {
+      <app-input [signal]="body" [disabled]="!submission.isEditableStatus()" [optionValue]="k.field2.key" [isRequired]="true"
+        [validateEmpty]="true" [placeholder]="k.field2.placeholder"></app-input>
+      }
+    </div>
+
+    <div class="flex flex-col">
+      <h2 class="label pb-1">{{ k.field3Label }}<span class="text-[15px] text-[var(--ac-red-1)]">*</span></h2>
+      <app-input [signal]="body" [disabled]="!submission.isEditableStatus()" optionValue="link" [isRequired]="true"
+        [validateEmpty]="true" pattern="url" placeholder="Paste the link to the folder"></app-input>
+    </div>
+  </div>
+  }
+</div>

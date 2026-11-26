@@ -54,6 +54,31 @@
       }
     </div>
     }
+
+    @if (hasAnnexes()) {
+    <div class="flex flex-col bg-white rounded-[10px] px-[10px] pt-8" data-testid="annexes-block">
+      <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-2">Annexes</span>
+      <p class="text-[13px] text-[var(--ac-grey-600)] leading-[1.45] pb-4"><b>Do not upload any items here;</b> enter only the
+        description and the link to the folder where the item is stored (SharePoint, Google Drive, etc.). Please ensure you
+        grant the MEL focal point supporting the OICR development access to the listed materials. Only png or jpeg formats.</p>
+
+      @for (item of annexes(); track $index) {
+      <app-oicr-annex-item [item]="item" [itemNumber]="$index + 1" (update)="updateAnnex($index, $event)"
+        (delete)="removeAnnex($index)">
+      </app-oicr-annex-item>
+      }
+
+      @if (submission.isEditableStatus()) {
+      <div class="flex w-full">
+        <button type="button" (click)="addAnnex()"
+          class="flex cursor-pointer w-full items-center gap-2 border-2 justify-center font-medium border-[#1689CA] text-[#1689CA] px-4 py-3 rounded-[7px] text-[15px]">
+          Add annex
+          <i class="pi pi-plus !text-[12px]"></i>
+        </button>
+      </div>
+      }
+    </div>
+    }
   </div>
 
   <app-navigation-buttons

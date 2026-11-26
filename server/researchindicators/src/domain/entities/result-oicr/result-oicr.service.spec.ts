@@ -32,6 +32,8 @@ import { ResultImpactAreasService } from '../result-impact-areas/result-impact-a
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
 import { Result } from '../results/entities/result.entity';
+import { ResultOicrAudiencesService } from './result-oicr-audiences.service';
+import { ResultOicrThematicKeywordsService } from './result-oicr-thematic-keywords.service';
 import { StatusWorkflowFunctionHandlerService } from '../result-status-workflow/function-handler.service';
 
 describe('ResultOicrService', () => {
@@ -57,6 +59,8 @@ describe('ResultOicrService', () => {
   let mockResultImpactAreasService: jest.Mocked<any>;
   let mockResultImpactAreaGlobalTargetsService: jest.Mocked<any>;
   let mockStatusWorkflowFunctionHandlerService: jest.Mocked<StatusWorkflowFunctionHandlerService>;
+  let mockAudiencesService: { create: jest.Mock; find: jest.Mock };
+  let mockKeywordsService: { create: jest.Mock; find: jest.Mock };
 
   beforeEach(async () => {
     // Create mocks for all dependencies
@@ -217,9 +221,23 @@ describe('ResultOicrService', () => {
       oicrRequestConfigEmail: jest.fn(),
     } as any;
 
+    mockAudiencesService = {
+      create: jest.fn().mockResolvedValue([]),
+      find: jest.fn().mockResolvedValue([]),
+    };
+    mockKeywordsService = {
+      create: jest.fn().mockResolvedValue([]),
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ResultOicrService,
+        { provide: ResultOicrAudiencesService, useValue: mockAudiencesService },
+        {
+          provide: ResultOicrThematicKeywordsService,
+          useValue: mockKeywordsService,
+        },
         { provide: DataSource, useValue: mockDataSource },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
         { provide: ResultTagsService, useValue: mockResultTagsService },
@@ -1467,6 +1485,8 @@ describe('ResultOicrService', () => {
         for_external_use_description:
           mockOicrEntity.for_external_use_description,
         result_impact_areas: [],
+        audiences: [],
+        thematic_keywords: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1515,6 +1535,8 @@ describe('ResultOicrService', () => {
         for_external_use: undefined,
         for_external_use_description: undefined,
         result_impact_areas: [],
+        audiences: [],
+        thematic_keywords: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(null);
@@ -1562,6 +1584,8 @@ describe('ResultOicrService', () => {
         for_external_use_description:
           mockOicrEntity.for_external_use_description,
         result_impact_areas: [],
+        audiences: [],
+        thematic_keywords: [],
       };
 
       mockResultOicrRepository.findOne.mockResolvedValue(mockOicrEntity as any);
@@ -1927,6 +1951,8 @@ describe('ResultOicrService', () => {
         updateData.actual_count,
         ['quantification_number', 'unit', 'description'],
         QuantificationRolesEnum.ACTUAL_COUNT,
+        undefined,
+        ['unit_macro_category'],
       );
 
       expect(
@@ -1936,6 +1962,8 @@ describe('ResultOicrService', () => {
         updateData.extrapolate_estimates,
         ['quantification_number', 'unit', 'description'],
         QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+        undefined,
+        ['unit_macro_category'],
       );
 
       expect(mockUpdateDataUtil.updateLastUpdatedDate).toHaveBeenCalledWith(
@@ -2124,6 +2152,8 @@ describe('ResultOicrService', () => {
         [], // Should convert null to empty array
         ['quantification_number', 'unit', 'description'],
         QuantificationRolesEnum.ACTUAL_COUNT,
+        undefined,
+        ['unit_macro_category'],
       );
 
       expect(
@@ -2133,6 +2163,8 @@ describe('ResultOicrService', () => {
         [], // Should convert undefined to empty array
         ['quantification_number', 'unit', 'description'],
         QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+        undefined,
+        ['unit_macro_category'],
       );
 
       expect(mockResultImpactAreasService.create).toHaveBeenCalledWith(
@@ -2371,6 +2403,171 @@ describe('ResultOicrService', () => {
         10,
         expect.objectContaining({ sharepoint_link: null }),
       );
+    });
+  });
+  describe('OICR Details 2026 fields', () => {
+    const baseDto = (extra: Partial<UpdateOicrDto> = {}): UpdateOicrDto =>
+      ({
+        oicr_internal_code: 'X-1',
+        actual_count: [],
+        extrapolate_estimates: [],
+        result_impact_areas: [],
+        ...extra,
+      }) as any;
+
+    beforeEach(() => {
+      mockResultOicrRepository.findOne.mockResolvedValue(null);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({});
+    });
+
+    it('saves the 2026 scalar fields', async () => {
+      await service.updateOicr(
+        1,
+        baseDto({
+          problem_statement: 'p',
+          alliance_solution: 's',
+          beneficiaries: 'b',
+          outcome_achieved: 'o',
+          outcome_achieved_edited: true,
+          acknowledgments: 'a',
+        }),
+      );
+      expect(mockResultOicrRepository.update).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          problem_statement: 'p',
+          alliance_solution: 's',
+          beneficiaries: 'b',
+          outcome_achieved: 'o',
+          outcome_achieved_edited: true,
+          acknowledgments: 'a',
+        }),
+      );
+    });
+
+    it('saves audiences and thematic keywords through the link services', async () => {
+      await service.updateOicr(
+        1,
+        baseDto({
+          audiences: [{ oicr_audience_id: 2 }, { oicr_audience_id: 5 }],
+          thematic_keywords: [{ oicr_thematic_keyword_id: 3 }],
+        }),
+      );
+      expect(mockAudiencesService.create).toHaveBeenCalledWith(
+        1,
+        [{ oicr_audience_id: 2 }, { oicr_audience_id: 5 }],
+        'oicr_audience_id',
+      );
+      expect(mockKeywordsService.create).toHaveBeenCalledWith(
+        1,
+        [{ oicr_thematic_keyword_id: 3 }],
+        'oicr_thematic_keyword_id',
+      );
+    });
+
+    it('leaves the link tables untouched when the payload omits them (2025 payload)', async () => {
+      await service.updateOicr(1, baseDto());
+      expect(mockAudiencesService.create).not.toHaveBeenCalled();
+      expect(mockKeywordsService.create).not.toHaveBeenCalled();
+    });
+
+    it('clears the link tables when empty arrays are sent', async () => {
+      await service.updateOicr(
+        1,
+        baseDto({ audiences: [], thematic_keywords: [] }),
+      );
+      expect(mockAudiencesService.create).toHaveBeenCalledWith(
+        1,
+        [],
+        'oicr_audience_id',
+      );
+      expect(mockKeywordsService.create).toHaveBeenCalledWith(
+        1,
+        [],
+        'oicr_thematic_keyword_id',
+      );
+    });
+
+    it('treats unit_macro_category as an updatable field, not a composite key', async () => {
+      await service.updateOicr(
+        1,
+        baseDto({
+          actual_count: [
+            {
+              quantification_number: 1,
+              unit: 'Farmers',
+              unit_macro_category: 'Individuals',
+              description: 'd',
+            } as any,
+          ],
+          extrapolate_estimates: [{ unit: 'Other' } as any],
+        }),
+      );
+      const calls = mockResultQuantificationsService.upsertByCompositeKeys.mock
+        .calls as unknown[][];
+      expect(calls).toHaveLength(2);
+      for (const call of calls) {
+        expect(call[2]).toEqual([
+          'quantification_number',
+          'unit',
+          'description',
+        ]);
+        expect(call[5]).toEqual(['unit_macro_category']);
+      }
+    });
+
+    it('returns the 2026 fields, audiences and keywords from findOicrs', async () => {
+      mockResultTagsService.find.mockResolvedValue([] as any);
+      mockTempExternalOicrsService.find.mockResolvedValue([] as any);
+      mockResultOicrRepository.findOne.mockResolvedValue({
+        problem_statement: 'p',
+        alliance_solution: 's',
+        beneficiaries: 'b',
+        outcome_achieved: 'o',
+        outcome_achieved_edited: true,
+        acknowledgments: 'a',
+      } as any);
+      mockAudiencesService.find.mockResolvedValue([
+        { id: 9, result_id: 1, oicr_audience_id: 4 },
+      ]);
+      mockKeywordsService.find.mockResolvedValue([
+        { id: 8, result_id: 1, oicr_thematic_keyword_id: 6 },
+      ]);
+      mockResultQuantificationsService.findByResultIdAndRoles.mockResolvedValue(
+        [
+          {
+            quantification_role_id: QuantificationRolesEnum.ACTUAL_COUNT,
+            unit: 'Farmers',
+            unit_macro_category: 'Individuals',
+          },
+        ],
+      );
+
+      const result = await service.findOicrs(1);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          problem_statement: 'p',
+          alliance_solution: 's',
+          beneficiaries: 'b',
+          outcome_achieved: 'o',
+          outcome_achieved_edited: true,
+          acknowledgments: 'a',
+          audiences: [{ oicr_audience_id: 4 }],
+          thematic_keywords: [{ oicr_thematic_keyword_id: 6 }],
+        }),
+      );
+      expect(result.actual_count[0].unit_macro_category).toBe('Individuals');
+    });
+
+    it('returns empty arrays for a result without audiences or keywords', async () => {
+      mockResultTagsService.find.mockResolvedValue([] as any);
+      mockTempExternalOicrsService.find.mockResolvedValue([] as any);
+      mockResultOicrRepository.findOne.mockResolvedValue({} as any);
+      const result = await service.findOicrs(1);
+      expect(result.audiences).toEqual([]);
+      expect(result.thematic_keywords).toEqual([]);
     });
   });
 });

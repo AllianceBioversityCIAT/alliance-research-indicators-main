@@ -125,6 +125,64 @@
           </ng-template>
         </app-multiselect>
 
+        @if (isOicrIndicator()) {
+        <!-- OICRs split Research Areas like Create OICR step 2; an area picked in one field is disabled in the other. -->
+        <app-multiselect label="Primary Research Area" [signal]="primaryAreas" optionLabel="full_name" optionValue="lever_id"
+          signalOptionValue="research_areas" [disabled]="!submission.isEditableStatus()"
+          [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
+          [serviceParams]="serviceParams"
+          [isRequired]="true" [optionsDisabled]="primaryAreasDisabled" placeholder="Select the primary research area">
+          <!-- Same look as Contribution to SDG, without an image. No description in the DB, so the name is not bold. -->
+          <ng-template #item let-area>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+            </p>
+          </ng-template>
+          <ng-template #rows let-area>
+            <div class="flex w-full min-w-0 flex-1 flex-col gap-3">
+              <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+                <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+              </p>
+              @if (isOtherResearchArea(area)) {
+              <!-- Same field as Create OICR step 2, nested under the selected "Other" area. -->
+              <div class="ml-1 border-l-2 border-[var(--ac-grey-200)] pl-4">
+                <app-input label="Name of the team or area creating the result" [signal]="getCustomNameSignal(area)"
+                  optionValue="custom_lever_name" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+                  placeholder="Write the team or area name"></app-input>
+              </div>
+              }
+            </div>
+          </ng-template>
+        </app-multiselect>
+
+        <app-multiselect label="Other Contributing Research Areas" [signal]="contributingAreas" optionLabel="full_name" optionValue="lever_id"
+          signalOptionValue="research_areas" [disabled]="!submission.isEditableStatus()"
+          [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
+          [serviceParams]="serviceParams"
+          [optionsDisabled]="contributingAreasDisabled" placeholder="Select the contributing research areas">
+          <!-- Same look as Contribution to SDG, without an image. No description in the DB, so the name is not bold. -->
+          <ng-template #item let-area>
+            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+              <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+            </p>
+          </ng-template>
+          <ng-template #rows let-area>
+            <div class="flex w-full min-w-0 flex-1 flex-col gap-3">
+              <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[var(--ac-grey-800)]">
+                <span class="font-['Barlow'] font-normal">{{ area?.full_name }}</span>
+              </p>
+              @if (isOtherResearchArea(area)) {
+              <!-- Same field as Create OICR step 2, nested under the selected "Other" area. -->
+              <div class="ml-1 border-l-2 border-[var(--ac-grey-200)] pl-4">
+                <app-input label="Name of the team or area creating the result" [signal]="getCustomNameSignal(area)"
+                  optionValue="custom_lever_name" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
+                  placeholder="Write the team or area name"></app-input>
+              </div>
+              }
+            </div>
+          </ng-template>
+        </app-multiselect>
+        } @else {
         <app-multiselect label="Research Areas" [signal]="body" optionLabel="full_name" optionValue="lever_id"
           signalOptionValue="research_areas" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
           [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
@@ -151,6 +209,8 @@
             </div>
           </ng-template>
         </app-multiselect>
+
+        }
 
         <app-multiselect label="Strategic Objectives" [signal]="body" optionLabel="name" optionValue="id"
           signalOptionValue="strategic_objectives" [isRequired]="true" [disabled]="!submission.isEditableStatus()"

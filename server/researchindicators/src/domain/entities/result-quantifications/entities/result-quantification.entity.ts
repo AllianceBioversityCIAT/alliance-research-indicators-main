@@ -72,6 +72,15 @@ export class ResultQuantification extends AuditableEntity {
   description: string;
 
   @Column({
+    type: 'varchar',
+    length: 150,
+    name: 'unit_macro_category',
+    nullable: true,
+  })
+  @ApiProperty({ required: false })
+  unit_macro_category?: string;
+
+  @Column({
     type: 'bigint',
     name: 'result_id',
   })

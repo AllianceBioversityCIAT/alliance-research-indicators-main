@@ -71,6 +71,8 @@ export type ControlListServices =
   | 'impactAreas'
   | 'allianceStaffByGroup'
   | 'sourceFilterOptions'
+  | 'oicrAudiences'
+  | 'oicrThematicKeywords'
   // T-UI-08: PI Delegates picker stubs — swap point in PiDelegatePeoplePickerStubService /
   // PiDelegateProjectsPickerStubService. Replace the service registrations in
   // ServiceLocatorService when the real endpoints are available.

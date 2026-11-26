@@ -1,5 +1,7 @@
-import { Component, Pipe, PipeTransform, effect, inject, signal, WritableSignal } from '@angular/core';
+import { Component, Pipe, PipeTransform, computed, effect, inject, signal, WritableSignal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { InputComponent } from '@shared/components/custom-fields/input/input.component';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { ContactPersonFormData } from '@shared/interfaces/contact-person.interface';
@@ -22,15 +24,20 @@ export class ProperCasePipe implements PipeTransform {
 @Component({
   selector: 'app-add-contact-person-modal',
   standalone: true,
-  imports: [FormsModule, SelectComponent, ProperCasePipe],
+  imports: [FormsModule, SelectComponent, InputComponent, ProperCasePipe],
   templateUrl: './add-contact-person-modal.component.html'
 })
 export class AddContactPersonModalComponent {
   allModalsService = inject(AllModalsService);
+  cache = inject(CacheService);
+
+  /** OICR Details 2026: the optional ORCID input only exists for report years >= 2026. */
+  showOrcid = computed(() => Number(this.cache.currentMetadata().report_year) >= 2026);
 
   body: WritableSignal<ContactPersonFormData> = signal({
     contact_person_id: null,
-    role_id: null
+    role_id: null,
+    orcid: ''
   });
 
   private wasOpen = false;
@@ -52,7 +59,8 @@ export class AddContactPersonModalComponent {
   private clearData(): void {
     this.body.set({
       contact_person_id: null,
-      role_id: null
+      role_id: null,
+      orcid: ''
     });
   }
 

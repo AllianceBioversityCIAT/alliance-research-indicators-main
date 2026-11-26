@@ -59,6 +59,8 @@ import { ResultImpactAreasService } from '../result-impact-areas/result-impact-a
 import { ResultImpactAreaGlobalTargetsService } from '../result-impact-area-global-targets/result-impact-area-global-targets.service';
 import { StatusWorkflowFunctionHandlerService } from '../result-status-workflow/function-handler.service';
 import { GeneralDataDto } from '../result-status-workflow/config/config-workflow';
+import { ResultOicrAudiencesService } from './result-oicr-audiences.service';
+import { ResultOicrThematicKeywordsService } from './result-oicr-thematic-keywords.service';
 import { ResultImpactAreaGlobalTarget } from '../result-impact-area-global-targets/entities/result-impact-area-global-target.entity';
 
 @Injectable()
@@ -82,6 +84,8 @@ export class ResultOicrService {
     private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
     private readonly resultStatusWorkflowHandler: StatusWorkflowFunctionHandlerService,
     private readonly moduleRef: ModuleRef,
+    private readonly resultOicrAudiencesService: ResultOicrAudiencesService,
+    private readonly resultOicrThematicKeywordsService: ResultOicrThematicKeywordsService,
     @Inject(REQUEST) private readonly request: Request,
   ) {}
 
@@ -226,6 +230,12 @@ export class ResultOicrService {
         : data.oicr_internal_code,
       outcome_impact_statement: data?.outcome_impact_statement,
       short_outcome_impact_statement: data?.short_outcome_impact_statement,
+      problem_statement: data?.problem_statement,
+      alliance_solution: data?.alliance_solution,
+      beneficiaries: data?.beneficiaries,
+      outcome_achieved: data?.outcome_achieved,
+      outcome_achieved_edited: data?.outcome_achieved_edited,
+      acknowledgments: data?.acknowledgments,
       general_comment: data?.general_comment,
       maturity_level_id: data?.maturity_level_id,
       for_external_use: data?.for_external_use,
@@ -268,6 +278,8 @@ export class ResultOicrService {
       data?.actual_count ?? [],
       ['quantification_number', 'unit', 'description'],
       QuantificationRolesEnum.ACTUAL_COUNT,
+      undefined,
+      ['unit_macro_category'],
     );
 
     await this.resultQuantificationsService.upsertByCompositeKeys(
@@ -275,7 +287,29 @@ export class ResultOicrService {
       data?.extrapolate_estimates ?? [],
       ['quantification_number', 'unit', 'description'],
       QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+      undefined,
+      ['unit_macro_category'],
     );
+
+    if (data?.audiences !== undefined) {
+      await this.resultOicrAudiencesService.create(
+        resultId,
+        (data.audiences ?? []).map((a) => ({
+          oicr_audience_id: a?.oicr_audience_id,
+        })),
+        'oicr_audience_id',
+      );
+    }
+
+    if (data?.thematic_keywords !== undefined) {
+      await this.resultOicrThematicKeywordsService.create(
+        resultId,
+        (data.thematic_keywords ?? []).map((k) => ({
+          oicr_thematic_keyword_id: k?.oicr_thematic_keyword_id,
+        })),
+        'oicr_thematic_keyword_id',
+      );
+    }
 
     const impactToSave = removeDuplicatesByKeys(
       data?.result_impact_areas ?? [],
@@ -340,6 +374,20 @@ export class ResultOicrService {
         QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
       ]);
 
+    const audiences = await this.resultOicrAudiencesService
+      .find(resultId)
+      .then((rows) =>
+        (rows ?? []).map((r) => ({ oicr_audience_id: r.oicr_audience_id })),
+      );
+
+    const thematic_keywords = await this.resultOicrThematicKeywordsService
+      .find(resultId)
+      .then((rows) =>
+        (rows ?? []).map((r) => ({
+          oicr_thematic_keyword_id: r.oicr_thematic_keyword_id,
+        })),
+      );
+
     const result_impact_areas =
       await this.resultImpactAreasService.find(resultId);
 
@@ -361,6 +409,14 @@ export class ResultOicrService {
       oicr_internal_code: oicr?.oicr_internal_code,
       outcome_impact_statement: oicr?.outcome_impact_statement,
       short_outcome_impact_statement: oicr?.short_outcome_impact_statement,
+      problem_statement: oicr?.problem_statement,
+      alliance_solution: oicr?.alliance_solution,
+      beneficiaries: oicr?.beneficiaries,
+      outcome_achieved: oicr?.outcome_achieved,
+      outcome_achieved_edited: oicr?.outcome_achieved_edited,
+      acknowledgments: oicr?.acknowledgments,
+      audiences,
+      thematic_keywords,
       tagging,
       link_result,
       sharepoint_link: oicr?.sharepoint_link,
