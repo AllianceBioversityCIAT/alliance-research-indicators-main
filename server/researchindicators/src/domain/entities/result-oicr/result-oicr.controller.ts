@@ -32,6 +32,7 @@ import { CreateResultOicrDto } from './dto/create-result-oicr.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { isEmpty } from '../../shared/utils/object.utils';
+import { OicrCatalogsService } from './oicr-catalogs.service';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 
 const DOCX_MIME =
@@ -46,7 +47,50 @@ export class ResultOicrController {
     private readonly resultOicrService: ResultOicrService,
     private readonly resultUtil: ResultsUtil,
     private readonly oicrWordTemplateService: OicrWordTemplateService,
+    private readonly oicrCatalogsService: OicrCatalogsService,
   ) {}
+
+  @Get('catalogs/audiences')
+  @ApiOperation({ summary: 'List the OICR audience catalog' })
+  async getAudiencesCatalog() {
+    return this.oicrCatalogsService.findAudiences().then((result) =>
+      ResponseUtils.format({
+        data: result,
+        description: 'OICR audiences retrieved successfully',
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  @Get('catalogs/thematic-keywords')
+  @ApiOperation({ summary: 'List the OICR thematic keywords catalog' })
+  async getThematicKeywordsCatalog() {
+    return this.oicrCatalogsService.findThematicKeywords().then((result) =>
+      ResponseUtils.format({
+        data: result,
+        description: 'OICR thematic keywords retrieved successfully',
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  @Get('catalogs/quantification-unit-categories')
+  @ApiOperation({
+    summary: 'List the quantification unit categories catalog',
+    description:
+      'Macro-categories with their sub-categories; is_percentage marks units shown as a percentage.',
+  })
+  async getQuantificationUnitCategoriesCatalog() {
+    return this.oicrCatalogsService
+      .findQuantificationUnitCategories()
+      .then((result) =>
+        ResponseUtils.format({
+          data: result,
+          description: 'Quantification unit categories retrieved successfully',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
 
   @Patch(`${RESULT_CODE}`)
   @GetResultVersion()
