@@ -976,3 +976,76 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Reviewer** (`akili-reviewer`, opus, round **16/16**): **`STATUS: PASS`**. The forms sit inside a plain slot div whose automatic minimum height is its content, so they cannot shrink or clip. Below 1024 px there is no free space, so the block sits at the top. The comments are true. Tokens only.
 - **Final:** PASS. Worker released. Review rounds **16/16** (cap reached).
 - **Owner verdict (2026-11-25):** the Framework page "is coming along great"; follow-ups 2–4 committed as a checkpoint. The owner asked next to align Institutional Objectives with the Framework layout (T-23 follow-up 5, below).
+
+### T-23 follow-up 5 — one page layout for both ODS pages (owner, 2026-11-25, B-7)
+- **Owner:** the IOB page's table and buttons differ from Framework's; they should be almost identical (no Tree/Table toggle on IOB, which has no tree), with the same positions and a header Export.
+- **Owner answers:**
+  - Export: one per page, in the header, with Framework's style (owner offered A or B; Leader chose A, remove the in-table Export).
+  - Search: Framework style.
+  - Commit the approved follow-ups 2–4 first: done, `ddc53c460` + `59b367814`.
+  - **Re-base: ≈ 5,400 LOC / 18 review rounds.**
+- **Spec:** requirements §0b B-7, R-STF-008/009 amended; design §6.6 amended, D-STF-40, §14 re-base row.
+- **Scope note:** one opt-in shared change, `app-data-table` `showToolbar` (default `true`); other consumers unchanged (narrow blast radius).
+- **Brief:** `brief-T23f.md`.
+- **Implementer attempt 1** (dispatch `ctx_bce2b568411f`, cursor grok-4.7-high): `showToolbar` opt-in on `app-data-table`; new `ods-admin/ods-find-field/`, used by the tree, the Framework table and IOB; IOB header mirrors Framework's with the header Export (`exportRowsToXlsx`, all rows of the year, natural code sort); count line. Falsifiers (a) default `showToolbar=false` and (b) export the filtered rows, both observed red and reverted.
+- **Leader re-run (non-author): VERIFIED.**
+  - jest administration + data-table: 36 suites / 692 tests.
+  - Lint clean.
+  - Build exit 0; the only warnings were in components outside this diff.
+  - spec tsc: 0 errors under ods-admin.
+- **Leader Chrome:**
+  - IOB header order is right. There is one Export per page and no in-table search or Export.
+  - The find field filters by code and by statement (IOB) and by code and by name (Framework Table).
+  - `.content` is 850/850 on both pages.
+- **Reviewer** (`akili-reviewer`, opus, round **17/18**): **`STATUS: FAIL`**.
+  1. A search miss now shows the true-empty message. Filtering moved to the parents, so `app-data-table` receives `[]` and shows `emptyMessage`.
+  - **Confirmed by the Leader in Chrome:** IOB 2026 with `zzz` shows "No institutional objectives for this year yet."
+  - **Violates:** R-STF-008 B-7 ("the same field as the Tree view"; the tree shows *No elements match "<term>"*) and R-CTL-008's rule against showing true-empty during a search.
+  - **Advisory:**
+    - `framework-tables.component.spec.ts:246` asserts an input the test set itself.
+    - "1 linked indicators" plural (owner call).
+    - `exportObjectives()` has no catch; this matches Framework's export.
+- **Rework → attempt 2** (same worker, effort high).
+- **Owner addition (2026-11-25, during rework):** move Delete to the panel footer, left-aligned, in the Cancel · Save row, on both panels. This reverses Q-4 / D-STF-33. **Spec:** D-STF-41, with B-4, R-STF-016 and §6.5/§6.6 amended. It is folded into rework attempt 2, so it uses the same review round (18/18).
+- **Implementer attempt 2** (dispatches `ctx_fdf933a0e596` + `ctx_3be74385e09e`): no-match `role="status"` line on both pages (table hidden on a miss, `emptyMessage` kept for true-empty); Delete moved to the panel footer (D-STF-41). Falsifier: guard removed → both `zzz` specs red, reverted.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 694 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome:**
+  - IOB `zzz` shows `No objectives match "zzz"`, with no `data-table-empty`.
+  - IOB footer: Delete 1077 / Cancel 1552 / Save 1620, all at top 723.
+  - **Framework footer defect (Leader):** when Delete is blocked, its reason line under it makes the row centre vertically, so Delete sits 11 px above Cancel/Save (979 vs 990). Fix: align the footer row to the top.
+- **Reviewer** (`akili-reviewer`, opus, round **18/18**): **`STATUS: FAIL`**.
+  1. **IOB search state survives a reload of the list while its field does not.** The page `query` signal is never reset. The find field is destroyed by `loading()` on a year, portfolio or Retry change and re-created empty. Result: an empty box (no clear button) with `No objectives match "zzz"`, or a silent subset.
+  - **Advisory:**
+    - `framework-tables.spec:273` role assertion is circular.
+    - No spec for true-empty + query.
+    - `@if` re-creation resets sort/paginator.
+- **Budget tripwire:** review rounds 18/18. Attempt 3 needs a 19th round, so this is an owner stop.
+- **Owner (2026-11-25):**
+  - **Re-base: 20 review rounds.**
+  - The IOB search **is kept** across a year or portfolio change, in line with Q-2. This is the Reviewer's option (a): a controlled find field.
+- **Rework → attempt 3** (same worker, effort xhigh).
+- **Owner addition during attempt 3:** a blocked Delete must look inactive, with no red hover, and show its reason as a tooltip instead of a line under the button. This also fixes the footer misalignment. D-STF-41 is amended. It is folded into attempt 3 and replaces the earlier footer `align-items` item.
+- **Implementer attempt 3** (dispatches `ctx_58af6eab261a` + `ctx_2c940d9bd65e`):
+  - `OdsFindFieldComponent` is now controlled (`value` input; all three parents bind `query()`).
+  - A blocked Delete looks neutral and shows its reason as a `pTooltip` (hover and focus), with an sr-only reason kept on `aria-describedby`.
+  - Falsifier: binding removed → year-change spec red (input ''), reverted.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 697 tests; lint pass; build 0; spec tsc 0 under ods-admin.
+- **Leader Chrome:**
+  - Footer row aligned: Delete, Cancel and Save all at 784–817.
+  - Blocked Delete: grey, `cursor: not-allowed`.
+  - The tooltip shows the reason on keyboard focus.
+  - **Defect:** `<html>` scrollHeight is 979 against innerHeight 850. The only absolute element past the viewport is `p.sr-only#element-delete-reason` (top 978), so the page scrolls (D-STF-31 / Q-5).
+- **Reviewer** (`akili-reviewer`, opus, round **19/20**): **`STATUS: FAIL`**.
+  1. The sr-only reason has no positioned ancestor and escapes the panel scroller. This matches the Leader's Chrome measurement and repeats a known repo bug (`innovation-use-details` sr-only). Fix: add `position: relative` on `.element-panel__delete` / `.objective-panel__delete`.
+  2. The blocked Delete's `:focus-visible` outline uses `--ac-grey-200` (about 1.2:1), so the focus ring is barely visible (WCAG 2.4.7). Fix: `--ac-grey-700`.
+  - The controlled field is verified correct.
+  - **Advisory:** the tooltip specs read the directive instance rather than the rendered overlay; there are two `.sr-only` sources.
+- **HALT: 3 attempts exhausted.** Both fixes are one CSS line each. Owner decision needed for attempt 4.
+- **Owner (2026-11-25): attempt 4 authorized** (round 20/20). Same worker.
+- **Runtime event (attempt 4):** the follow-up dispatch `ctx_64b7bf1d0bc7` timed out at agent readiness (never started; old worker lost). Rung 1: fresh worker `ctx_1828bfbdf297` with the same task. The attempt counter is unchanged.
+- **Implementer attempt 4** (dispatch `ctx_1828bfbdf297`): `position: relative` on `.element-panel__delete` / `.objective-panel__delete` (the sr-only reason is a direct child); blocked Delete `:focus`/`:focus-visible` outline uses `--ac-grey-700`.
+- **Leader re-run (non-author): VERIFIED.** jest 36 suites / 697 tests; lint clean; build 0; spec tsc 0 under ods-admin.
+- **Reviewer** (`akili-reviewer`, opus, round **20/20**): **`STATUS: PASS`**. Both defects fixed in both panels; no regression from round 19's verified state.
+- **Pending:** Leader Chrome re-measure of `html` scrollHeight vs innerHeight. The local dev server rendered a blank app, even at `/` (no console errors, scripts 200), so the owner was asked to restart `ng serve`.
+- **Owner (2026-11-26): visual OK on follow-up 5** (from a live screenshot of the restarted app: Delete in the footer, grey blocked Delete, one Export, one find field). Commit authorized; no push. The Leader's Chrome scroll re-measure is carried into follow-up 6 and runs on its result.
+- **Owner re-base (2026-11-26):** review budget 20 → **22 rounds** for follow-up 6.

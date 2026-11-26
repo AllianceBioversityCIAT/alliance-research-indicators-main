@@ -38,8 +38,9 @@ The owner asked both pages to work like *Organizational Structure*. Proposal: [`
 | B-1 | The Framework tree becomes an **expandable tree table** like Organizational Structure, replacing the card outline (supersedes A-6's layout; the A-6 structure and counts stand) | R-STF-007 rewritten |
 | B-2 | Editing moves from the modal drawer to a **details panel beside the list**, filled by clicking a row, on **both** pages (supersedes A-9's "panel opened from the row" as a drawer) | New R-STF-016; R-STF-008, R-STF-009, NFR-STF-004 amended |
 | B-3 | The element **name is read-only text** outside the panel; the inline name editor and inline draft rows are removed | R-STF-007; `family.md` F-4 child-3 exception withdrawn |
-| B-4 | Q-1 ask before discarding unsaved edits · Q-2 keep the search · Q-3 keep the area colours, **inherited by every descendant row**, with clearly larger indentation than Organizational Structure · Q-4 **Delete at the top** of the panel · Q-5 the panel **always fits the viewport** and scrolls internally | R-STF-007, R-STF-016 |
+| B-4 | Q-1 ask before discarding unsaved edits · Q-2 keep the search · Q-3 keep the area colours, **inherited by every descendant row**, with clearly larger indentation than Organizational Structure · Q-4 ~~**Delete at the top** of the panel~~ *(reversed 2026-11-25 by the owner, D-STF-41: Delete sits in the footer, left, with Cancel · Save on the right)* · Q-5 the panel **always fits the viewport** and scrolls internally | R-STF-007, R-STF-016 |
 | B-6 | **T-22 HITL (owner, 2026-11-25):** the Table view is **one table listing every element of every level**, like Organizational Structure's table, with a Level column; the level chips stay as **count summaries that do not filter**; the in-table **+ <Level>** button is removed (the header **New <level-1>** creates Performance Areas; Dimensions and Indicators are added from the tree's **+**). On both pages the **list column is a card** like Organizational Structure's, so the search, Export and table or tree sit on the card, not on the page background | R-STF-008 rewritten; R-STF-016 "level chip" trigger removed; design §6.4, D-STF-37, D-STF-38 |
+| B-7 | **T-23 HITL (owner, 2026-11-25):** the two pages share **one page layout**. Institutional Objectives gets Framework's header (subtitle, count line, and on the right Portfolio · Year · Carry forward · **Add objective** · **Export .xlsx**, same styles as Framework's). **One Export per page, in the header**: the export button inside the shared table is hidden on both pages. **One search style**: Framework's labelled *Find by code or name* field sits on top of the list card on both pages and in both Framework views; the shared table's own search is hidden there | R-STF-008, R-STF-009; design §6.4, §6.6, D-STF-40 |
 | B-5 | Organizational Structure is **not** changed, including its panel-height defect (Q-5); a separate fix is the owner's call | §12 |
 
 ---
@@ -287,6 +288,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 - Level chips (*Performance Areas · 4*, *Dimensions · 13*, *Indicators · 31*) are **count summaries only**; they do not filter.
 - **Clicking a row selects it and opens it in the side details panel (R-STF-016)**; delete is in the panel. The Table view has **no add button**: the page header's **New <level-1>** creates a level-1 element, and children are added from the tree's **+** (R-STF-007).
 - **Export .xlsx** (toolbar) writes one workbook with one sheet per level, all elements of the selected portfolio, sorted by code.
+- *Amended 2026-11-25 (B-7):* the header Export is the only Export (the table's own is hidden), and the search is the page's *Find by code or name* field over code and name, the same field as the Tree view.
 
 **Acceptance criteria**
 - [ ] AC.1 — The single table lists all 48 seeded elements (4 + 13 + 31) and passes the F-7 checks with the shared `DataTable`.
@@ -301,6 +303,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 - Its own page under ODS Admin, with the same portfolio selector.
 - Year selector over the portfolio's years (2026–2030 for Portfolio 2), labelled "YYYY · N objectives", defaulting to the current year when in range, else the first year.
 - Table (F-7): Code, Statement, Linked indicators (codes and names); search over code and statement; export. **Clicking a row selects it and opens it in the side details panel (R-STF-016, rev 4)**; there is no row edit action. **+ Add objective** opens the panel in create mode.
+- *Amended 2026-11-25 (B-7):* the header follows Framework's — eyebrow, title, subtitle, a count line *"<n> objectives · <m> linked indicators"* for the selected year, and on the right Portfolio · Year · Carry forward · **Add objective** · **Export .xlsx** (Framework's header Export style; exports the selected year's objectives, all rows, sorted by code). The search is a *Find by code or name* field like Framework's, over code and statement; the table's own search and Export are hidden.
 - Panel form: **Code\*** (unique per portfolio and year), **Year\***, **Statement\***, Linked indicators (optional, multi, indicator-level elements of the same portfolio). **No owner and no responsible** on an objective (A-3).
 
 **Acceptance criteria**
@@ -438,7 +441,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 #### Scenario: Select and edit
 - GIVEN the Framework tree with nothing selected
 - WHEN the user clicks Indicator `1.1.1`
-- THEN the panel shows `INDICATOR · LEVEL 3`, the pill `1.1.1`, its fields and Delete at the top
+- THEN the panel shows `INDICATOR · LEVEL 3`, the pill `1.1.1`, its fields, and Delete in the footer (left) *(amended 2026-11-25, D-STF-41)*
 - AND WHEN the user changes the name and clicks Save
 - THEN the row shows the new name and stays selected
 
@@ -457,7 +460,7 @@ A new sidebar group, **ODS Admin**, gives ODS Admins and System Admins two pages
 
 **Acceptance criteria**
 - [ ] AC.1 — Both pages: row click fills the panel; empty state when nothing is selected; no `p-drawer` remains.
-- [ ] AC.2 — Delete at the top, edit mode only, follows `deletable` and the existing flow.
+- [ ] AC.2 — Delete in the panel footer, left of Cancel · Save *(amended 2026-11-25, D-STF-41)*, edit mode only, follows `deletable` and the existing flow.
 - [ ] AC.3 — The unsaved-changes prompt guards row change, create, portfolio/year/view change and Carry forward; both answers behave as stated.
 - [ ] AC.4 — At ≥ 1024 px wide, the panel bottom is within the viewport at rest and scrolled, at two window heights (measured in a real browser). Below 1024 px the panel stacks under the list and the page scrolls.
 
