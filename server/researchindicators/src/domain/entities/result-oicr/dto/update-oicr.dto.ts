@@ -3,6 +3,8 @@ import { ResultTag } from '../../result-tags/entities/result-tag.entity';
 import { TempResultExternalOicr } from '../../temp_external_oicrs/entities/temp_result_external_oicr.entity';
 import { ResultQuantification } from '../../result-quantifications/entities/result-quantification.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
+import { ResultOicrAudience } from '../entities/result-oicr-audience.entity';
+import { ResultOicrThematicKeyword } from '../entities/result-oicr-thematic-keyword.entity';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 
 export class UpdateOicrDto {
@@ -65,4 +67,28 @@ export class UpdateOicrDto {
 
   @ApiProperty({ type: [ResultImpactArea] })
   result_impact_areas: ResultImpactArea[];
+
+  @ApiProperty({ type: String, required: false })
+  problem_statement?: string;
+
+  @ApiProperty({ type: String, required: false })
+  alliance_solution?: string;
+
+  @ApiProperty({ type: String, required: false })
+  beneficiaries?: string;
+
+  @ApiProperty({ type: String, required: false })
+  outcome_achieved?: string;
+
+  @ApiProperty({ type: Boolean, required: false })
+  outcome_achieved_edited?: boolean;
+
+  @ApiProperty({ type: String, required: false })
+  acknowledgments?: string;
+
+  @ApiProperty({ type: [ResultOicrAudience], required: false })
+  audiences?: Partial<ResultOicrAudience>[];
+
+  @ApiProperty({ type: [ResultOicrThematicKeyword], required: false })
+  thematic_keywords?: Partial<ResultOicrThematicKeyword>[];
 }
