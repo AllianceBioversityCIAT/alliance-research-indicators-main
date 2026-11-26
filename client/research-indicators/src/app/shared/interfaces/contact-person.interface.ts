@@ -7,11 +7,13 @@ export interface ContactPersonRow {
   role?: string;
   user_id?: string;
   informative_role_id?: number;
+  orcid?: string;
 }
 
 export interface ContactPersonFormData {
   contact_person_id: number | null;
   role_id: number | null;
+  orcid?: string;
 }
 
 export interface UserData {
@@ -46,6 +48,7 @@ export interface ContactPersonResponse {
   user_role_id: number;
   informative_role_id: number;
   informativeRole: InformativeRole;
+  orcid?: string | null;
   user: UserData;
 }
 

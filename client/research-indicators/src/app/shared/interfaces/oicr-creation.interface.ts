@@ -122,12 +122,34 @@ export interface PatchOicr {
   result_impact_areas?: ResultImpactArea[];
   for_external_use: boolean;
   for_external_use_description: string;
+  // OICR Details 2026 (report_year >= 2026) — all optional so 2025 payloads stay as they are.
+  problem_statement?: string;
+  alliance_solution?: string;
+  beneficiaries?: string;
+  outcome_achieved?: string;
+  /** true once the user typed their own "outcome achieved"; false = it follows the Actual count narratives. */
+  outcome_achieved_edited?: boolean;
+  acknowledgments?: string;
+  audiences?: OicrAudienceSelection[];
+  thematic_keywords?: OicrThematicKeywordSelection[];
+}
+
+export interface OicrAudienceSelection {
+  oicr_audience_id: number;
+  name?: string;
+}
+
+export interface OicrThematicKeywordSelection {
+  oicr_thematic_keyword_id: number;
+  name?: string;
 }
 
 export interface QuantificationPayload {
   quantification_number: number | string;
   unit: string;
   description: string;
+  /** Macro-category of the unit (2026 only); `unit` keeps the category, or the free text when this is `Other`. */
+  unit_macro_category?: string | null;
 }
 
 export interface NotableReferencePayload {
