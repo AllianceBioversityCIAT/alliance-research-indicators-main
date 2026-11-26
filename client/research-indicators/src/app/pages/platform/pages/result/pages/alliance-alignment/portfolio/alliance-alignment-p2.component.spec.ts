@@ -140,4 +140,72 @@ describe('AllianceAlignmentP2Component', () => {
     expect(component.canRemove({ id: 1 })).toBe(true);
     expect(() => component.markAsPrimary({ is_primary: false, contract_id: '1' }, 'contract')).not.toThrow();
   });
+
+  describe('OICR primary and contributing Research Areas', () => {
+    const area = (lever_id: number, is_primary?: boolean | number) => ({ lever_id, full_name: `Area ${lever_id}`, is_primary }) as never;
+    // The parent passes `body` once and then updates it, so the load updates the same signal.
+    const body = () => component.body() as unknown as Record<string, unknown>;
+    const load = (research_areas: unknown[]) => {
+      component.body.update(current => ({ ...current, research_areas: research_areas as never }));
+      fixture.detectChanges();
+    };
+    const ids = (list: { lever_id?: number | string }[]) => list.map(item => Number(item.lever_id));
+
+    it('splits the saved areas by their flag, a missing flag counting as primary', () => {
+      load([area(1, true), area(2, 0), area(3), area(4, false)]);
+
+      expect(ids(component.primaryAreas().research_areas)).toEqual([1, 3]);
+      expect(ids(component.contributingAreas().research_areas)).toEqual([2, 4]);
+    });
+
+    it('disables in each field what the other one holds', () => {
+      load([area(1, true), area(2, false)]);
+
+      expect(ids(component.contributingAreasDisabled())).toEqual([1]);
+      expect(ids(component.primaryAreasDisabled())).toEqual([2]);
+    });
+
+    it('writes a contributing pick back to the saved list as not primary, keeping the primary one', () => {
+      load([area(1, true)]);
+
+      component.contributingAreas.set({ research_areas: [area(5)] });
+      fixture.detectChanges();
+
+      const saved = body()['research_areas'] as { lever_id: number; is_primary: boolean }[];
+      expect(saved.map(row => [row.lever_id, row.is_primary])).toEqual([
+        [1, true],
+        [5, false]
+      ]);
+      expect(ids(component.primaryAreasDisabled())).toEqual([5]);
+    });
+
+    it('removing an area from a field removes it from the saved list', () => {
+      load([area(1, true), area(2, false)]);
+
+      component.primaryAreas.set({ research_areas: [] });
+      fixture.detectChanges();
+
+      expect(ids(body()['research_areas'] as never[])).toEqual([2]);
+    });
+
+    it('keeps the "Other" team name when the area moves through a field', () => {
+      load([{ lever_id: 18, full_name: 'Other', is_primary: true, custom_lever_name: 'My team' } as never]);
+
+      component.contributingAreas.set({ research_areas: [area(2)] });
+      fixture.detectChanges();
+
+      const other = (body()['research_areas'] as { lever_id: number; custom_lever_name?: string }[]).find(row => row.lever_id === 18);
+      expect(other?.custom_lever_name).toBe('My team');
+    });
+
+    it('leaves the single Research Areas list alone outside OICRs', () => {
+      metadata.set({ indicator_id: 4 });
+      load([area(1, false), area(2, true)]);
+
+      component.contributingAreas.set({ research_areas: [] });
+      fixture.detectChanges();
+
+      expect(ids(body()['research_areas'] as never[])).toEqual([1, 2]);
+    });
+  });
 });
