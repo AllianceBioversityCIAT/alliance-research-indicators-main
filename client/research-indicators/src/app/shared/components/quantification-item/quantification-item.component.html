@@ -23,18 +23,63 @@
       <!-- @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — DD-4: min/max/placeholder promoted to inputs) -->
       <!-- @akili-spec docs/specs/changes/innovation-use-required-fields (T-03 — DD-4: fieldsRequired split; requiredMode forwarded) -->
       <h2 class="label">Number@if (numberRequired) {<span class="text-[15px] text-[#CF0808]">*</span>}</h2>
+      @if (isPercentageUnit()) {
+      <div class="flex items-start">
+        <span title="Unit is a percentage" data-testid="percent-prefix"
+          class="flex h-[42px] min-w-[34px] items-center justify-center rounded-l-[6px] border border-r-0 border-[var(--ac-grey-300)] bg-[var(--ac-grey-200)] text-[var(--ac-grey-800)]">%</span>
+        <div class="flex-1">
+          <app-input [signal]="body" [optionValue]="'number'" [isRequired]="numberRequired" [requiredMode]="numberRequiredMode"
+            [type]="'number'" [min]="min" [max]="max" [maxFractionDigits]="maxFractionDigits" [disabled]="disabled"
+            [placeholder]="placeholder" (ngModelChange)="onValueChange()"></app-input>
+        </div>
+      </div>
+      } @else {
       <app-input [signal]="body" [optionValue]="'number'" [isRequired]="numberRequired" [requiredMode]="numberRequiredMode"
         [type]="'number'" [min]="min" [max]="max" [maxFractionDigits]="maxFractionDigits" [disabled]="disabled"
         [placeholder]="placeholder" (ngModelChange)="onValueChange()"></app-input>
+      }
     </div>
   </ng-template>
 
   <ng-template #unitField>
+    @if (useUnitCategories) {
+    <div>
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="label">Unit<span class="text-[15px] text-[#CF0808]">*</span></h2>
+        <button type="button" data-testid="open-unit-categories" (click)="openUnitCategories.emit()"
+          class="flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[13px] text-[var(--ac-light-blue-300)] hover:underline">
+          <i class="pi pi-info-circle !text-[12px]"></i>Suggested quantification categories
+        </button>
+      </div>
+      <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+        <p-select data-testid="unit-macro" styleClass="w-full" [options]="macroOptions()" [ngModel]="body().unit_macro_category || null"
+          (ngModelChange)="onMacroChange($event)" [disabled]="disabled" [filter]="true" appendTo="body"
+          placeholder="Macro-category" ariaLabel="Unit macro-category"></p-select>
+        @if (isOtherUnit()) {
+        <app-input [signal]="body" [optionValue]="'unit'" [disabled]="disabled" placeholder="Specify the unit"
+          (ngModelChange)="onValueChange()"></app-input>
+        } @else {
+        <p-select data-testid="unit-category" styleClass="w-full" [options]="categoryOptions()" optionLabel="name" optionValue="name"
+          [ngModel]="body().unit || null" (ngModelChange)="onCategoryChange($event)"
+          [disabled]="disabled || !body().unit_macro_category" [filter]="true" appendTo="body"
+          [placeholder]="body().unit_macro_category ? 'Select category' : 'Select a macro-category first'"
+          ariaLabel="Unit category"></p-select>
+        }
+      </div>
+      @if (unitMissingMessage()) {
+      <div class="mt-1 flex items-center gap-1 text-sm text-[#E69F00]" data-testid="unit-missing">
+        <i class="material-symbols-rounded !text-base">warning</i>
+        <span>{{ unitMissingMessage() }}</span>
+      </div>
+      }
+    </div>
+    } @else {
     <div>
       <h2 class="label">Unit@if (unitRequired) {<span class="text-[15px] text-[#CF0808]">*</span>}</h2>
       <app-input [signal]="body" [optionValue]="'unit'" [isRequired]="unitRequired" [requiredMode]="unitRequiredMode"
         [disabled]="disabled" placeholder="Write the unit" (ngModelChange)="onValueChange()"></app-input>
     </div>
+    }
   </ng-template>
 
   <!-- @akili-spec quick/innovation-measures-remove-comments -->
@@ -44,6 +89,12 @@
     <h2 class="label">Comments@if (commentsRequired) {<span class="text-[15px] text-[#CF0808]">*</span>}</h2>
     <app-textarea [signal]="body" [optionValue]="'comments'" [isRequired]="commentsRequired" [rows]="5" [disabled]="disabled"
       placeholder="Write the comments"></app-textarea>
+    @if (showNarrativeNote) {
+    <div class="mt-1 flex items-center gap-2 text-[13px] text-[var(--ac-light-blue-300)]" data-testid="narrative-note">
+      <i class="pi pi-arrow-down !text-[12px]"></i>
+      <span>As you write it, this narrative is copied into "What outcome or impact was achieved?" in the Short Outcome/Impact Statement above.</span>
+    </div>
+    }
   </div>
   }
 </div>
