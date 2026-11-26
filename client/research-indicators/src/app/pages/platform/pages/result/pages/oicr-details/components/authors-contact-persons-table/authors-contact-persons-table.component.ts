@@ -13,6 +13,8 @@ import { ContactPersonRow } from '@shared/interfaces/contact-person.interface';
 export class AuthorsContactPersonsTableComponent{
   @Input() rows: ContactPersonRow[] = [];
   @Input() disabled = false;
+  /** OICR Details 2026: adds the ORCID column. */
+  @Input() showOrcid = false;
   @Output() addClicked = new EventEmitter<void>();
   @Output() deleteClicked = new EventEmitter<ContactPersonRow>();
 }
