@@ -5,12 +5,13 @@
 :host {
   display: block;
   min-width: 0;
+  margin-bottom: 24px;
 }
 
 .panel-heading {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 

@@ -1,11 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { Tooltip } from 'primeng/tooltip';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, FrameworkResponsible } from '@shared/interfaces/strategy-framework.interface';
 import { frameworkTreeNodes } from '../../utils/framework-view.util';
 import { FrameworkTreeComponent } from './framework-tree.component';
 
 // @akili-spec institutional-performance/strategy-framework T-18 — R-STF-007 AC.1–AC.4,
-// NFR-STF-004 (tree keyboard), D-STF-30. KZ-015: collapse, search and **+** are driven from the DOM.
+// NFR-STF-004 (tree keyboard), D-STF-30. KZ-015: collapse and **+** are driven from the DOM.
+// Search is the page binding: queryOverride changes after the first render.
 // KZ-017: the accent assertion reads the rendered custom property; the indent assertion reads the
 // style value. jsdom cannot judge the painted bar, the 28px step, outline geometry or Tab order (T-22).
 
@@ -77,9 +82,7 @@ describe('FrameworkTreeComponent', () => {
   const indentOf = (code: string) => (rowByCode(code)?.querySelector('[data-testid="framework-tree-indent"]') as HTMLElement).style.paddingLeft;
   const addOf = (code: string) => rowByCode(code)?.querySelector('[data-testid="framework-tree-add"]') as HTMLButtonElement | null;
   const search = async (term: string) => {
-    const input = root().querySelector('[data-testid="framework-tree-search"]') as HTMLInputElement;
-    input.value = term;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.componentRef.setInput('queryOverride', term);
     await settle();
   };
 
@@ -240,8 +243,6 @@ describe('FrameworkTreeComponent', () => {
   });
 
   it('filters by code prefix and by name, keeps ancestors, and says when nothing matches', async () => {
-    expect(root().querySelector('label[for="framework-tree-search"]')?.textContent?.trim()).toBe('Find by code or name');
-
     await search('1.2');
     expect(codes()).toEqual(['1', '1.2', '1.2.3']);
     expect(toggleOf('1').getAttribute('aria-expanded')).toBe('true');
@@ -253,11 +254,7 @@ describe('FrameworkTreeComponent', () => {
     expect(root().querySelector('[data-testid="framework-tree-search-empty"]')?.textContent?.trim()).toBe('No elements match "nomatch"');
     expect(codes()).toEqual([]);
 
-    const clear = root().querySelector('[data-testid="framework-tree-search-clear"]') as HTMLButtonElement;
-    expect(clear.getAttribute('aria-label')).toBe('Clear search');
-    expect(clear.textContent?.trim()).toBe('');
-    clear.click();
-    await settle();
+    await search('');
     expect(codes()).toContain('2');
     expect(codes()).toContain('1.10');
     expect(root().querySelector('[data-testid="framework-tree-search-empty"]')).toBeNull();
@@ -285,8 +282,7 @@ describe('FrameworkTreeComponent', () => {
     (rowByCode('1') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowLeft', bubbles: true }));
     await settle();
     await search('1.2');
-    (root().querySelector('[data-testid="framework-tree-search-clear"]') as HTMLButtonElement).click();
-    await settle();
+    await search('');
     expect(rowByCode('1.2')).toBeNull();
 
     (rowByCode('1') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
@@ -302,10 +298,49 @@ describe('FrameworkTreeComponent', () => {
     expect(toggleOf('1').getAttribute('aria-expanded')).toBe('true');
     expect(rowByCode('1.2.3')).not.toBeNull();
 
-    (root().querySelector('[data-testid="framework-tree-search-clear"]') as HTMLButtonElement).click();
-    await settle();
+    await search('');
     expect(toggleOf('1').getAttribute('aria-expanded')).toBe('false');
     expect(rowByCode('1.2')).toBeNull();
     expect(rowByCode('2')).not.toBeNull();
+  });
+
+  it('keeps Responsibles on one line and puts the full text in a tooltip', () => {
+    const withTwo = view();
+    withTwo.elements = [
+      ...withTwo.elements,
+      element({
+        id: 11,
+        depth: 3,
+        code: '2.1.1',
+        name: 'Second indicator',
+        parentId: 6,
+        responsibles: [{ carnet: 'AA', name: 'Ada Ann', email: null, isActiveStaff: true }]
+      })
+    ];
+    fixture.componentRef.setInput('nodes', frameworkTreeNodes(withTwo));
+    fixture.componentRef.setInput('selectedId', 4);
+    fixture.detectChanges();
+
+    const active = rowByCode('1.2.3')?.querySelector('.framework-tree__responsibles-text') as HTMLElement;
+    const other = rowByCode('2.1.1')?.querySelector('.framework-tree__responsibles-text') as HTMLElement;
+    expect(active.textContent?.trim()).toBe('Idris Jones; Philippe Attey (inactive)');
+    expect(active.getAttribute('tabindex')).toBe('0');
+    expect(other.getAttribute('tabindex')).toBe('-1');
+    const tip = fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .find(node => node.nativeElement === active)
+      ?.injector.get(Tooltip);
+    expect(tip?.content).toBe('Idris Jones; Philippe Attey (inactive)');
+    expect(tip?.tooltipPosition).toBe('top');
+    expect(tip?.tooltipEvent).toBe('both');
+    expect(rowByCode('1.2')?.querySelector('.framework-tree__responsibles-text')).toBeNull();
+
+    const scss = readFileSync(join(__dirname, 'framework-tree.component.scss'), 'utf8');
+    const start = scss.indexOf('.framework-tree__responsibles-text {');
+    const rule = scss.slice(start, scss.indexOf('}', start) + 1);
+    expect(rule).toContain('text-overflow: ellipsis');
+    expect(rule).toContain('white-space: nowrap');
+    expect(rule).toContain('overflow: hidden');
+    expect(rule).not.toContain('framework-tree__add');
   });
 });

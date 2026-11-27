@@ -1,9 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal, untracked } from '@angular/core';
 import { DataTableColumn, DataTableComponent } from '@shared/components/data-table/data-table.component';
 import { FrameworkEditorView } from '@shared/interfaces/strategy-framework.interface';
 import { naturalCompare } from '@shared/utils/natural-compare.util';
-import { OdsFindFieldComponent } from '../../../ods-find-field/ods-find-field.component';
-import { FrameworkTableRow, levelCounts, tableRowsForLevel } from '../../utils/framework-view.util';
+import { FrameworkTableRow, tableRowsForLevel } from '../../utils/framework-view.util';
 
 /** Create request for the details panel. `parentId` is set when the tree's + already knows the parent. */
 export interface FrameworkTableCreate {
@@ -13,7 +12,7 @@ export interface FrameworkTableCreate {
   parentId?: number;
 }
 
-const COLUMNS: DataTableColumn<FrameworkTableRow>[] = [
+export const FRAMEWORK_TABLE_COLUMNS: DataTableColumn<FrameworkTableRow>[] = [
   { field: 'code', header: 'Code', type: 'code', sortable: true, width: '7rem' },
   { field: 'levelName', header: 'Level', type: 'text', sortable: true },
   { field: 'name', header: 'Name', type: 'text', sortable: true },
@@ -22,12 +21,13 @@ const COLUMNS: DataTableColumn<FrameworkTableRow>[] = [
 ];
 
 // @akili-spec institutional-performance/strategy-framework T-23 — design §6.4, D-STF-37, D-STF-40.
-// One shared DataTable lists every element. Chips show counts. Selection lives on the page.
+// One shared DataTable lists every element. Selection lives on the page.
 // The find field filters code and name. The table toolbar stays hidden; the page header exports.
+// Count chips live in the page band (D-STF-45).
 @Component({
   selector: 'app-framework-tables',
   standalone: true,
-  imports: [DataTableComponent, OdsFindFieldComponent],
+  imports: [DataTableComponent],
   templateUrl: './framework-tables.component.html',
   styleUrls: ['./framework-tables.component.scss', '../../../ods-table-wrap.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -36,21 +36,28 @@ export class FrameworkTablesComponent {
   readonly view = input.required<FrameworkEditorView>();
   /** `String(row.id)`. Null while a create is open, so no row is highlighted. */
   readonly selectedKey = input<string | null>(null);
+  /** The page's find field. Null leaves the list unfiltered. */
+  readonly queryOverride = input<string | null>(null);
 
   readonly rowSelected = output<number>();
 
-  readonly columns = COLUMNS;
-  readonly counts = computed(() => levelCounts(this.view()));
+  readonly columns = FRAMEWORK_TABLE_COLUMNS;
   readonly rows = computed(() => rowsOf(this.view()));
   readonly query = signal('');
+
+  constructor() {
+    effect(() => {
+      const override = this.queryOverride();
+      if (override === null) return;
+      untracked(() => {
+        if (override !== this.query()) this.query.set(override);
+      });
+    });
+  }
   readonly trimmedQuery = computed(() => this.query().trim());
   readonly filteredRows = computed(() => filterRows(this.rows(), this.query()));
   /** A search over a non-empty list that hits nothing is not the true-empty state (R-CTL-008). */
   readonly noMatches = computed(() => this.trimmedQuery() !== '' && this.rows().length > 0 && this.filteredRows().length === 0);
-
-  onQuery(value: string): void {
-    this.query.set(value);
-  }
 
   onRowSelected(row: FrameworkTableRow): void {
     this.rowSelected.emit(row.id);
@@ -63,7 +70,8 @@ function filterRows(rows: FrameworkTableRow[], query: string): FrameworkTableRow
   return rows.filter(row => row.code.toLowerCase().includes(term) || row.name.toLowerCase().includes(term));
 }
 
-function rowsOf(view: FrameworkEditorView): FrameworkTableRow[] {
+/** Every element, levels in depth order, then natural code order. The page export uses this list unfiltered. */
+export function rowsOf(view: FrameworkEditorView): FrameworkTableRow[] {
   const levels = [...view.levels].sort((left, right) => left.depth - right.depth);
   const byId = new Map(view.elements.map(element => [element.id, element]));
   const nameOf = new Map(levels.map(level => [level.depth, level.name]));

@@ -1,3 +1,5 @@
+@use '../../../ods-field';
+
 // strategy-framework T-15 / T-17 — design §6.5, §6.7. Tokens only.
 // One chip row: identity truncates, the three actions stay on that line, aligned right.
 // Reorder controls are 44px so the chip actions meet the touch target.

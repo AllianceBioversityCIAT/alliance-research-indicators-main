@@ -11,43 +11,6 @@
         </div>
 
         <div class="flex flex-wrap items-end gap-3">
-          <div class="flex flex-col gap-1">
-            <label for="frameworkPortfolio" class="text-sm font-medium atc-grey-800">Portfolio</label>
-            <p-select
-              inputId="frameworkPortfolio"
-              [options]="portfolioOptions()"
-              optionLabel="label"
-              optionValue="id"
-              [ngModel]="portfolioId()"
-              (onChange)="onPortfolioChange($event.value)"
-              [disabled]="portfolioOptions().length === 0"
-              styleClass="min-w-[240px]"
-              ariaLabel="Portfolio"
-              data-testid="portfolio-select">
-            </p-select>
-          </div>
-
-          <div class="flex items-center gap-2" role="group" aria-label="View" data-testid="view-toggle">
-            <button
-              type="button"
-              class="view-toggle__button cursor-pointer rounded-[9px] px-3 py-1.5 text-[13px]"
-              [class.view-toggle__button--active]="view() === 'editor'"
-              [attr.aria-pressed]="view() === 'editor'"
-              (click)="setView('editor')"
-              data-testid="view-tree">
-              Tree
-            </button>
-            <button
-              type="button"
-              class="view-toggle__button cursor-pointer rounded-[9px] px-3 py-1.5 text-[13px]"
-              [class.view-toggle__button--active]="view() === 'table'"
-              [attr.aria-pressed]="view() === 'table'"
-              (click)="setView('table')"
-              data-testid="view-table">
-              Table
-            </button>
-          </div>
-
           @if (!loading() && !loadError() && editor()) {
             <p-button
               [label]="newLabel()"
@@ -73,60 +36,93 @@
         </div>
       </div>
 
-      @if (loading()) {
-        <app-custom-progress-bar></app-custom-progress-bar>
-      } @else if (loadError()) {
-        <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
-          <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
-          <p-button
-            label="Retry"
-            icon="pi pi-refresh !text-[12px]"
-            severity="secondary"
-            size="small"
-            styleClass="!rounded-[9px] !text-[13px]"
-            (onClick)="load()"
-            data-testid="retry-button">
-          </p-button>
-        </div>
-      } @else if (editor()) {
-        <app-side-panel-layout [hasSelection]="selectedId() !== null" [creating]="createRequest() !== null" panelLabel="Element details">
+      @if (context()) {
+        <app-side-panel-layout
+          [hasSelection]="selectedId() !== null"
+          [creating]="createRequest() !== null"
+          [panelVisible]="!loading() && !loadError() && editor() !== null"
+          panelLabel="Element details">
           <app-ods-empty-panel
             circleIcon="pi pi-sitemap"
             title="Explore the performance framework"
             subtitle="Select an item from the hierarchy to see its details and actions."
             [rows]="emptyRows()" />
-          <div list data-testid="framework-list">
-            @if (!empty()) {
-              <p class="mt-0 mb-3 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ summary() }}</p>
-            }
-            @if (empty()) {
-              <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
-                <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
-                <p class="m-0 text-sm atc-grey-700">This portfolio has no framework yet</p>
-                <p-button
-                  [label]="addRootLabel()"
-                  severity="info"
-                  size="small"
-                  styleClass="!rounded-[9px] !text-[13px]"
-                  (onClick)="onNew($event)"
-                  data-testid="add-root-button">
-                </p-button>
+          <div list class="list-frame" data-testid="framework-list">
+            <div class="list-scroll" data-testid="list-scroll">
+              <div class="list-band" data-testid="list-band">
+                @if (!loading() && editor() && !empty()) {
+                  <ul class="count-chips" aria-label="Counts" data-testid="count-chips">
+                    @for (level of countChips(); track level.depth) {
+                      <li class="level-chip" data-testid="count-chip">{{ level.count === 1 ? level.name : level.pluralName }} · {{ level.count }}</li>
+                    }
+                  </ul>
+                }
+                <app-ods-find-field
+                  label="Find by code or name"
+                  placeholder="Find by code or name"
+                  [inputId]="view() === 'table' ? 'framework-table-search' : 'framework-tree-search'"
+                  [inputTestId]="view() === 'table' ? 'framework-table-search' : 'framework-tree-search'"
+                  [clearTestId]="view() === 'table' ? 'framework-table-search-clear' : 'framework-tree-search-clear'"
+                  [value]="view() === 'table' ? tableQuery() : treeQuery()"
+                  (queryChange)="onListQuery($event)">
+                  <ng-container *ngTemplateOutlet="cardTools" />
+                </app-ods-find-field>
               </div>
-            } @else if (view() === 'editor') {
-              <app-framework-tree
-                data-testid="framework-tree-slot"
-                [nodes]="treeNodes()"
-                [selectedId]="highlightedId()"
-                [collapsedIds]="collapsedIds()"
-                (elementSelected)="selectElement($event)"
-                (childRequested)="onChildRequested($event)"
-                (expansionChanged)="onExpansion($event)">
-              </app-framework-tree>
-            } @else {
-              <div data-testid="framework-tables-slot">
-                <app-framework-tables [view]="editor()!" [selectedKey]="selectedKey()" (rowSelected)="selectElement($event)"> </app-framework-tables>
+              <div class="list-scroll__body">
+                @if (loading()) {
+                  <app-custom-progress-bar></app-custom-progress-bar>
+                } @else if (loadError()) {
+                  <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+                    <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
+                    <p-button
+                      label="Retry"
+                      icon="pi pi-refresh !text-[12px]"
+                      severity="secondary"
+                      size="small"
+                      styleClass="!rounded-[9px] !text-[13px]"
+                      (onClick)="load()"
+                      data-testid="retry-button">
+                    </p-button>
+                  </div>
+                } @else if (empty()) {
+                  <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
+                    <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                    <p class="m-0 text-sm atc-grey-700">This portfolio has no framework yet</p>
+                    <p-button
+                      [label]="addRootLabel()"
+                      severity="info"
+                      size="small"
+                      styleClass="!rounded-[9px] !text-[13px]"
+                      (onClick)="onNew($event)"
+                      data-testid="add-root-button">
+                    </p-button>
+                  </div>
+                } @else {
+                  @if (editor(); as current) {
+                    @if (view() === 'editor') {
+                      <app-framework-tree
+                        data-testid="framework-tree-slot"
+                        [queryOverride]="treeQuery()"
+                        [nodes]="treeNodes()"
+                        [selectedId]="highlightedId()"
+                        [collapsedIds]="collapsedIds()"
+                        (elementSelected)="selectElement($event)"
+                        (childRequested)="onChildRequested($event)"
+                        (expansionChanged)="onExpansion($event)">
+                      </app-framework-tree>
+                    } @else {
+                      <app-framework-tables
+                        data-testid="framework-tables-slot"
+                        [queryOverride]="tableQuery()"
+                        [view]="current"
+                        [selectedKey]="selectedKey()"
+                        (rowSelected)="selectElement($event)">
+                      </app-framework-tables>
+                    }
+                  }
+                }
               </div>
-            }
+            </div>
           </div>
           <div panel data-testid="element-panel-slot">
             @if (selectedId() !== null || createRequest() !== null) {
@@ -144,7 +140,72 @@
             }
           </div>
         </app-side-panel-layout>
+      } @else if (loading()) {
+        <app-custom-progress-bar></app-custom-progress-bar>
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+          <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
+          <p-button
+            label="Retry"
+            icon="pi pi-refresh !text-[12px]"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="load()"
+            data-testid="retry-button">
+          </p-button>
+        </div>
       }
     </section>
   </div>
 </div>
+
+<ng-template #cardTools>
+  <div class="card-tools">
+    <div class="ods-field">
+      <label for="frameworkPortfolio" class="label">Portfolio</label>
+      <p-select
+        inputId="frameworkPortfolio"
+        [options]="portfolioOptions()"
+        optionLabel="label"
+        optionValue="id"
+        [ngModel]="portfolioId()"
+        (onChange)="onPortfolioChange($event.value)"
+        [disabled]="portfolioOptions().length === 0"
+        appendTo="body"
+        styleClass="min-w-[240px]"
+        ariaLabel="Portfolio"
+        data-testid="portfolio-select">
+      </p-select>
+    </div>
+
+    <div class="card-tools__toggle" role="group" aria-label="View" data-testid="view-toggle">
+      <p-button
+        type="button"
+        styleClass="!rounded-[4px] !text-[12px] !p-0 view-toggle-btn"
+        icon="pi pi-bars"
+        size="small"
+        severity="secondary"
+        [text]="view() !== 'table'"
+        [outlined]="view() === 'table'"
+        ariaLabel="Table view"
+        [appOdsPressed]="view() === 'table' ? 'true' : 'false'"
+        (onClick)="setView('table')"
+        data-testid="view-table">
+      </p-button>
+      <p-button
+        type="button"
+        styleClass="!rounded-[4px] !text-[12px] !p-0 view-toggle-btn"
+        icon="pi pi-sitemap"
+        size="small"
+        severity="secondary"
+        [text]="view() !== 'editor'"
+        [outlined]="view() === 'editor'"
+        ariaLabel="Tree view"
+        [appOdsPressed]="view() === 'editor' ? 'true' : 'false'"
+        (onClick)="setView('editor')"
+        data-testid="view-tree">
+      </p-button>
+    </div>
+  </div>
+</ng-template>

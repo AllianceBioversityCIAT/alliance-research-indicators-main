@@ -1,0 +1,73 @@
+@use './ods-field-focus' as fieldFocus;
+
+// #4c5158 and #a2a9af are the STAR field colours in src/styles/custom-fields.scss
+// (.input-container input / .p-select-label, .p-placeholder). Inputs and placeholders
+// already take them from .app-page-wrapper and styles.scss. Select labels do not.
+
+.ods-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ods-field__hint,
+.ods-field__message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ods-field__hint {
+  color: var(--ac-grey-600);
+}
+
+.ods-field__message {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ac-warning-1);
+  line-height: 1.25rem;
+}
+
+:host ::ng-deep .ods-field {
+  input.p-inputtext,
+  textarea.p-textarea,
+  .p-autocomplete {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  input.p-inputtext,
+  .p-select,
+  .p-multiselect,
+  .p-autocomplete-input-multiple {
+    min-height: 39px;
+    box-sizing: border-box;
+  }
+
+  .p-select-label,
+  .p-multiselect-label {
+    padding: 8px 12px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #4c5158;
+  }
+
+  // Readonly stays focusable. Fill is Aura disabled background (surface.200).
+  // Text stays #4c5158, the colour styles.scss forces on .app-page-wrapper input.
+  input.p-inputtext[readonly] {
+    background: var(--p-inputtext-disabled-background);
+    color: #4c5158;
+  }
+}
+
+@include fieldFocus.ods-panel-field-focus;
+
+:host ::ng-deep .ods-field :is(.p-inputtext, .p-textarea, .p-select, .p-multiselect).ods-field--invalid,
+:host ::ng-deep .ods-field :is(.p-inputtext, .p-textarea).ods-field--invalid:is(:hover, :focus, :focus-visible),
+:host ::ng-deep .ods-field :is(.p-select, .p-multiselect).ods-field--invalid:is(:hover, .p-focus) {
+  border: 2px solid var(--ac-warning-1);
+  outline: none;
+}

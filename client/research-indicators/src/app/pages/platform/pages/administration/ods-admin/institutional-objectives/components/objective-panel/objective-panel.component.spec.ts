@@ -85,7 +85,10 @@ describe('ObjectivePanelComponent', () => {
 
   const form = () => document.querySelector('[data-testid="objective-form"]') as HTMLElement | null;
   const deleteTip = (button: HTMLElement) =>
-    fixture.debugElement.queryAll(By.directive(Tooltip)).find(node => node.nativeElement === button)?.injector.get(Tooltip);
+    fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .find(node => node.nativeElement === button)
+      ?.injector.get(Tooltip);
 
   const typeInto = async (selector: string, value: string) => {
     const field = document.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement;
@@ -175,7 +178,31 @@ describe('ObjectivePanelComponent', () => {
     expect(remove.getAttribute('aria-disabled')).toBe('true');
     expect(remove.hasAttribute('disabled')).toBe(false);
     expect(remove.getAttribute('aria-describedby')).toBe('objective-delete-reason');
-    expect(remove.classList.contains('p-button-outlined')).toBe(true);
+    expect(remove.className).toContain('border-2');
+    expect(remove.className).toContain('border-[var(--ac-red-1)]');
+    expect(remove.className).toContain('text-[var(--ac-red-1)]');
+    expect(remove.className).toContain('px-4');
+    expect(remove.className).toContain('py-2');
+    expect(remove.className).toContain('rounded-[13px]');
+    expect(remove.className).toContain('text-[15px]');
+    const cancel = order[1]!.querySelector('button') as HTMLButtonElement;
+    const save = order[2]!.querySelector('button') as HTMLButtonElement;
+    expect(cancel.classList.contains('ods-cancel')).toBe(true);
+    expect(cancel.className).toContain('border-[var(--ac-light-blue-400)]');
+    expect(cancel.className).toContain('text-[var(--ac-light-blue-400)]');
+    expect(cancel.querySelector('i')).toBeNull();
+    expect(save.classList.contains('ods-save')).toBe(true);
+    const saveTokens = save.className.split(/\s+/);
+    expect(saveTokens).toContain('border-2');
+    expect(saveTokens).toContain('border-transparent');
+    expect(save.className).toContain('disabled:border-transparent');
+    expect(save.className).toContain('bg-[var(--ac-green-400)]');
+    expect(save.className).toContain('px-5');
+    expect(save.className).toContain('disabled:bg-[var(--ac-grey-200)]');
+    expect(save.className).toContain('disabled:text-[var(--ac-grey-500)]');
+    expect(save.type).toBe('submit');
+    expect(save.querySelector('.pi-save')).not.toBeNull();
+    expect(save.disabled).toBe(false);
     const reason = document.querySelector('[data-testid="objective-delete-reason"]');
     expect(reason?.id).toBe('objective-delete-reason');
     expect(reason?.classList.contains('sr-only')).toBe(true);
@@ -185,6 +212,29 @@ describe('ObjectivePanelComponent', () => {
     expect(tip?.tooltipPosition).toBe('top');
     expect(tip?.tooltipEvent).toBe('both');
     expect(document.activeElement).not.toBe(code);
+  });
+
+  it('disables Save and swaps in a spinner while the save is in flight', async () => {
+    fixture.componentRef.setInput('objectiveId', 10);
+    fixture.detectChanges();
+    await settle();
+    await typeInto('#objectiveStatement', 'Updated incomes');
+    let resolvePatch: (value: MainResponse<FrameworkObjective>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkObjective.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
+
+    const save = document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement;
+    save.click();
+    fixture.detectChanges();
+
+    expect(save.disabled).toBe(true);
+    expect(save.getAttribute('aria-busy')).toBe('true');
+    expect(save.querySelector('.pi-spinner')).not.toBeNull();
+    expect(save.querySelector('.pi-save')).toBeNull();
+    expect(api.PATCH_StrategyFrameworkObjective).toHaveBeenCalledTimes(1);
+
+    resolvePatch(ok({ ...OBJECTIVE, statement: 'Updated incomes' }));
+    await settle();
+    expect((document.querySelector('[data-testid="objective-save"] button') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('shows a 409 inline and does not toast', async () => {
@@ -272,5 +322,38 @@ describe('ObjectivePanelComponent', () => {
 
     expect((document.querySelector('#objectiveStatement') as HTMLTextAreaElement).value).toBe('Updated incomes');
     expect(fixture.componentInstance.isDirty()).toBe(false);
+  });
+
+  it('paints required labels, Aura controls, and the warning row when Statement is left empty', async () => {
+    fixture.componentRef.setInput('creating', true);
+    fixture.componentRef.setInput('createToken', 1);
+    fixture.detectChanges();
+    await settle();
+
+    const codeLabel = document.querySelector('label[for="objectiveCode"]') as HTMLLabelElement;
+    const statementLabel = document.querySelector('label[for="objectiveStatement"]') as HTMLLabelElement;
+    const yearLabel = document.querySelector('label[for="objectiveYear"]') as HTMLLabelElement;
+    expect(codeLabel.classList.contains('label')).toBe(true);
+    expect(statementLabel.classList.contains('label')).toBe(true);
+    expect(yearLabel.classList.contains('label')).toBe(true);
+    expect(document.querySelector('label[for="objectiveIndicators"]')?.classList.contains('label')).toBe(true);
+    expect(codeLabel.querySelector('.text-red-500')?.getAttribute('aria-hidden')).toBe('true');
+    expect(statementLabel.querySelector('.text-red-500')?.textContent?.trim()).toBe('*');
+    expect(yearLabel.querySelector('.text-red-500')?.classList.contains('text-red-500')).toBe(true);
+
+    const code = document.querySelector('#objectiveCode') as HTMLInputElement;
+    const statement = document.querySelector('#objectiveStatement') as HTMLTextAreaElement;
+    expect(code.classList.contains('p-inputtext')).toBe(true);
+    expect(statement.classList.contains('p-textarea')).toBe(true);
+
+    statement.value = '';
+    statement.dispatchEvent(new Event('input'));
+    statement.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(statement.classList.contains('ods-field--invalid')).toBe(true);
+    const error = document.querySelector('[data-testid="statement-error"]');
+    expect(error?.querySelector('.material-symbols-rounded')?.textContent?.trim()).toBe('warning');
+    expect(error?.textContent).toContain('Statement is required');
   });
 });

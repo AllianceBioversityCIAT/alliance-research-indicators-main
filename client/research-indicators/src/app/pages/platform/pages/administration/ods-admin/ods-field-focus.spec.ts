@@ -10,13 +10,14 @@ const odsAdmin = __dirname;
 const partial = readFileSync(join(odsAdmin, 'ods-field-focus.scss'), 'utf8');
 const mixinBody = partial.slice(partial.indexOf('@mixin ods-field-focus'), partial.indexOf('@mixin ods-panel-field-focus'));
 
-const consumers = [
-  { file: 'ods-find-field/ods-find-field.component.scss', use: "@use '../ods-field-focus' as fieldFocus" },
-  { file: 'framework/components/element-panel/element-panel.component.scss', use: "@use '../../../ods-field-focus' as fieldFocus" },
-  {
-    file: 'institutional-objectives/components/objective-panel/objective-panel.component.scss',
-    use: "@use '../../../ods-field-focus' as fieldFocus"
-  }
+const fieldHosts = [
+  'ods-field.scss',
+  'ods-find-field/ods-find-field.component.scss',
+  'framework/components/element-panel/element-panel.component.scss',
+  'framework/components/staff-picker/staff-picker.component.scss',
+  'framework/framework.component.scss',
+  'institutional-objectives/components/objective-panel/objective-panel.component.scss',
+  'institutional-objectives/institutional-objectives.component.scss'
 ];
 
 describe('ods-field-focus', () => {
@@ -27,11 +28,13 @@ describe('ods-field-focus', () => {
     expect(mixinBody).not.toMatch(/outline-offset:\s*[1-9]/);
   });
 
-  it('is included by the find field and both detail panels', () => {
-    for (const consumer of consumers) {
-      const source = readFileSync(join(odsAdmin, consumer.file), 'utf8');
-      expect(source).toContain(consumer.use);
-      expect(source).toMatch(/@include fieldFocus\.ods-(field-focus|panel-field-focus)/);
+  it('is included by the shared field sheet, which every ODS field host uses', () => {
+    const sheet = readFileSync(join(odsAdmin, 'ods-field.scss'), 'utf8');
+    expect(sheet).toContain("@use './ods-field-focus' as fieldFocus");
+    expect(sheet).toMatch(/@include fieldFocus\.ods-panel-field-focus/);
+    for (const file of fieldHosts) {
+      const source = readFileSync(join(odsAdmin, file), 'utf8');
+      expect(source).toContain('ods-field');
     }
   });
 });

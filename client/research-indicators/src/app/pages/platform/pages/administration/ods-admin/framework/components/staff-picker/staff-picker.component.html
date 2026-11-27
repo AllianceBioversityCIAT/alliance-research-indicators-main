@@ -1,8 +1,5 @@
-<div class="staff-picker flex flex-col gap-1" data-testid="staff-picker">
-  <label id="staffPickerLabel" for="staffPickerInput" class="text-sm font-medium atc-grey-800">Responsibles</label>
-  <p id="staffPickerHint" class="m-0 text-sm leading-[1.5] atc-grey-700" data-testid="staff-hint">
-    Search by name or email. At least 2 characters. Active staff only, up to 20.
-  </p>
+<div class="staff-picker ods-field" data-testid="staff-picker">
+  <label id="staffPickerLabel" for="staffPickerInput" class="label">Responsibles</label>
   <p-autoComplete
     inputId="staffPickerInput"
     [suggestions]="suggestions()"
@@ -29,6 +26,9 @@
       </span>
     </ng-template>
   </p-autoComplete>
+  <p id="staffPickerHint" class="ods-field__hint" data-testid="staff-hint">
+    Search by name or email. At least 2 characters. Active staff only, up to 20.
+  </p>
   <ul class="staff-picker__chips m-0 flex list-none flex-col gap-1 p-0" role="list" aria-label="Selected responsibles">
     @for (person of shown(); track person.carnet) {
       <li class="staff-picker__chip" role="listitem" data-testid="staff-chip">

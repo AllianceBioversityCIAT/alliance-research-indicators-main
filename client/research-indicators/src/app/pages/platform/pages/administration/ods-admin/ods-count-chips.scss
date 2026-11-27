@@ -1,0 +1,20 @@
+// D-STF-45. Count chips in the list band. They are not controls.
+// The 12px bottom margin is the old summary line's mb-3, so the find row stays put.
+
+.count-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.level-chip {
+  border-radius: 999px;
+  background: var(--ac-grey-100);
+  color: var(--ac-grey-800);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 4px 12px;
+}

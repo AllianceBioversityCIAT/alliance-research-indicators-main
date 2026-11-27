@@ -1,6 +1,6 @@
 /**
- * Flat A1e read → nested outline, tree-table nodes, summary counts,
- * flattened table rows and export sheets (design §2.1, §6.2, §6.3, §6.4).
+ * Flat A1e read → nested outline, tree-table nodes, summary counts
+ * and flattened table rows (design §2.1, §6.2, §6.3, §6.4).
  * Sibling order is natural (`1.2` before `1.10`). Counts of descendants
  * are computed here so a fourth level needs no change (R-STF-002 AC.1).
  * The tree carries the depth-1 ancestor's index so every descendant
@@ -11,7 +11,6 @@
 
 import type { TreeNode } from 'primeng/api';
 import { naturalCompare } from '@shared/utils/natural-compare.util';
-import { XlsxExportColumn } from '@shared/utils/xlsx-export.util';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, UsageLabel } from '@shared/interfaces/strategy-framework.interface';
 
 export interface FrameworkOutlineNode {
@@ -42,12 +41,6 @@ export interface FrameworkLevelCount {
   shortLabel: string;
   isIndicatorLevel: boolean;
   count: number;
-}
-
-export interface FrameworkExportSheet {
-  name: string;
-  columns: XlsxExportColumn<FrameworkTableRow>[];
-  rows: FrameworkTableRow[];
 }
 
 /**
@@ -200,46 +193,6 @@ export function tableRowsForLevel(view: FrameworkEditorView, depth: number): Fra
     .map(element => toRow(element, byId, indicatorDepth));
 }
 
-const sheetName = (level: FrameworkLevel): string => {
-  const raw = level.pluralName.trim();
-  return raw.length > 0 ? raw : `Level ${level.depth}`;
-};
-
-/**
- * Columns the level table shows. Each ancestor is `<code> · <name>`.
- * The parent is already the nearest of those columns, so Parent code is not repeated.
- * The workbook does not use this — it stays on `columnsForLevel`.
- */
-export function tableColumnsForLevel(level: FrameworkLevel, levels: readonly FrameworkLevel[]): XlsxExportColumn<FrameworkTableRow>[] {
-  const columns: XlsxExportColumn<FrameworkTableRow>[] = [
-    { field: 'code', header: 'Code' },
-    { field: 'name', header: 'Name' }
-  ];
-  if (level.depth > 1) {
-    for (const higher of levels.filter(item => item.depth < level.depth).sort(byDepth)) {
-      columns.push({ field: `${higher.depth}Ancestor`, header: higher.name });
-    }
-  }
-  if (level.isIndicatorLevel) columns.push({ field: 'responsiblesText', header: 'Responsibles' });
-  return columns;
-}
-
-/** Workbook columns: code, name, parent code, each higher level's code, and responsibles on the indicator level. */
-export function columnsForLevel(level: FrameworkLevel, levels: readonly FrameworkLevel[]): XlsxExportColumn<FrameworkTableRow>[] {
-  const columns: XlsxExportColumn<FrameworkTableRow>[] = [
-    { field: 'code', header: 'Code' },
-    { field: 'name', header: 'Name' }
-  ];
-  if (level.depth > 1) {
-    columns.push({ field: 'parentCode', header: 'Parent code' });
-    for (const higher of levels.filter(item => item.depth < level.depth).sort(byDepth)) {
-      columns.push({ field: `${higher.depth}Code`, header: `${higher.name} code` });
-    }
-  }
-  if (level.isIndicatorLevel) columns.push({ field: 'responsiblesText', header: 'Responsibles' });
-  return columns;
-}
-
 /**
  * `p-treeTable` nodes, roots in natural order, each subtree stamped with
  * its depth-1 ancestor's index. Expanded by default; the page collapses
@@ -269,14 +222,4 @@ export function frameworkTreeNodes(view: FrameworkEditorView): TreeNode<Framewor
     };
   };
   return nestFramework(view).map((node, index) => toNode(node, index));
-}
-
-/** One sheet per level, in depth order. Rows are sorted by code. */
-export function buildExportSheets(view: FrameworkEditorView): FrameworkExportSheet[] {
-  const levels = [...view.levels].sort(byDepth);
-  return levels.map(level => ({
-    name: sheetName(level),
-    columns: columnsForLevel(level, levels),
-    rows: tableRowsForLevel(view, level.depth)
-  }));
 }

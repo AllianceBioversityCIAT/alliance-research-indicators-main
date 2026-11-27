@@ -1,4 +1,4 @@
-@use '../../../ods-field-focus' as fieldFocus;
+@use '../../../ods-field';
 
 // strategy-framework T-20 — design §6.6, §6.7. Tokens only.
 // The form lives in the page's side panel. The panel slot scrolls, not this host.
@@ -17,11 +17,11 @@
   min-width: 0;
 }
 
-button.p-button.objective-panel__delete-button[aria-disabled='true'],
-button.p-button.objective-panel__delete-button[aria-disabled='true']:hover,
-button.p-button.objective-panel__delete-button[aria-disabled='true']:focus,
-button.p-button.objective-panel__delete-button[aria-disabled='true']:focus-visible,
-button.p-button.objective-panel__delete-button[aria-disabled='true']:active {
+button.objective-panel__delete-button[aria-disabled='true'],
+button.objective-panel__delete-button[aria-disabled='true']:hover,
+button.objective-panel__delete-button[aria-disabled='true']:focus,
+button.objective-panel__delete-button[aria-disabled='true']:focus-visible,
+button.objective-panel__delete-button[aria-disabled='true']:active {
   color: var(--ac-grey-700);
   background: transparent;
   border-color: var(--ac-grey-200);
@@ -30,8 +30,8 @@ button.p-button.objective-panel__delete-button[aria-disabled='true']:active {
   cursor: not-allowed;
 }
 
-button.p-button.objective-panel__delete-button[aria-disabled='true']:focus,
-button.p-button.objective-panel__delete-button[aria-disabled='true']:focus-visible {
+button.objective-panel__delete-button[aria-disabled='true']:focus,
+button.objective-panel__delete-button[aria-disabled='true']:focus-visible {
   outline-color: var(--ac-grey-700);
 }
 
@@ -53,24 +53,3 @@ button.p-button.objective-panel__delete-button[aria-disabled='true']:focus-visib
   gap: 0.5rem;
   margin-left: auto;
 }
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.field__control {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--ac-grey-200);
-  border-radius: 8px;
-  background: var(--ac-white-1);
-  color: var(--ac-grey-800);
-  padding: 6px 8px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-@include fieldFocus.ods-panel-field-focus;

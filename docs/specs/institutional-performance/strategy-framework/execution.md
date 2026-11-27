@@ -1058,3 +1058,108 @@ Read-only session on `ARI_MYSQL_*` (`SET SESSION TRANSACTION READ ONLY; START TR
 - **Reviewer** (`akili-reviewer`, opus, round **21/22**): **`STATUS: PASS`**. Advisory: the IOB spec's year change uses `triggerEventHandler`. This is pre-existing (it is a context line in the diff), not new.
 - **Pending:** Leader Chrome measurement. Leader's Chrome tab renders a blank app (`app-root` empty), so the owner was asked to check.
 - **Owner (2026-11-26): commit authorized** ("haz commit"); no push. The Leader's Chrome scroll measurement was not run, because the Leader's tab rendered a blank app. The owner's own view stands as the visual check.
+
+### T-23 follow-up 7 — STAR field look on every ODS field (B-9 / D-STF-43)
+- **Owner (2026-11-26, screenshots of General Information's Title vs the Framework panel):** the panel fields are not STAR's field and the asterisk is not red; align every field component. Decisions (AskUserQuestion): reproduce STAR's look on the existing reactive forms, do not reuse `app-input`/`app-textarea`/`app-select`; re-base to ≈ 6,400 LOC / 28 rounds. Same pass: "1 linked indicator" singular, IOB find label "code or statement", Responsibles one line + tooltip ("listo" to the Leader's proposal; the empty-year "Carry forward to" state stays).
+- **Leader Chrome measurement (read-only, `localhost:4200`):** STAR — label Space Grotesk 14/450 `#153c71`, asterisk red, gap 10 px, control 1 px rgb(203,213,225) / radius 6 / padding 8×12 / 39 px / Barlow 14 `#4c5158`, focus border `#035ba9`, helper 14 px `#8d9299`. Framework panel — label Barlow 14/500 `#4c5158`, asterisk same grey, gap 4 px, control 1 px `--ac-grey-200` / radius 8 / padding 6×8 / 35 px, p-select text 16 px rgb(51,65,85) / 42 px, hint 12 px.
+- **Spec:** requirements §0b B-9; design D-STF-43, §14 re-base row.
+- **Implementer attempt 1** (Grok `grok-4.7-high`, dispatch `ctx_f4d1a6ce1d3b`): one partial `ods-field.scss` (`.ods-field` wrapper, gap 10 px), `.label` + `text-red-500` asterisk, `pInputText`/`pTextarea`, helper under the control, warning icon + amber border on touched-empty required, read-only ancestor with the Aura disabled look; singular count strings, IOB find label "code or statement", tree Responsibles one line + tooltip. **Table view Responsibles not changed** (shared `app-data-table` has no cell template; `shared/` out of scope). K-004: asterisk assertion seen red, reverted.
+- **Leader re-run (non-author): VERIFIED.** jest ods-admin 16/16 suites (= every spec file under ods-admin), 142 tests; lint clean; build OK, no ods-admin budget warning; spec tsc 0 ods-admin errors. Diff: 29 client files, +362 / −162.
+- **Leader Chrome (1728×906, read-only):** Framework panel Code/Name/derived/find/Portfolio/staff search all 39 px, radius 6, padding 8×12, Barlow 14 `#4c5158`, border rgb(203,213,225); labels Space Grotesk `#153c71`, asterisk red, gap 10 px; helper 14 px `#8d9299` — identical to the General Information measurement. IOB: three red asterisks, "28 objectives · 30 linked indicators", find label "Find by code or statement". **No page scroll on either page** (`scrollHeight` = `innerHeight` = 906): this also closes the handoff's unverified D-STF-31 check.
+
+- **Reviewer** (`akili-reviewer`, opus, round **22/28**): **`STATUS: FAIL`**. (1) medium — the tree Responsibles span had `tabindex="0"` on every row, adding N Tab stops against §6.3 "no tabindex of its own" and P-45; the spec locked it in. (2) low — the `nowrap` spec sliced the SCSS to end of file, so other rules' `nowrap` kept it green (K-004/KZ-017). Advisory: Linked indicators with chips may exceed 39 px; `ods-field.scss` rules emitted more than once (harmless). Sent back to the same worker as attempt 2 (fix both, falsify both).
+
+- **Implementer attempt 2** (same worker, dispatch `ctx_7929a4658c3b`): Responsibles span uses the roving `[attr.tabindex]="row.id === activeRowId() ? 0 : -1"`; spec asserts 0 on the active row and -1 on another row with responsibles; the nowrap slice stops at the rule's closing brace. K-004 red seen on both, restored.
+- **Leader re-run: VERIFIED.** jest ods-admin 16/16, 142 tests; lint clean. Chrome: Linked indicators with one chip is 47 px (Year select 39 px), the Reviewer's advisory, left for the owner's visual call.
+
+- **Reviewer** (`akili-reviewer`, opus, round **23/28**): **`STATUS: PASS`**. The roving binding is identical to the + button's (one Tab stop); both assertions are falsifiable by reading. Gap stated by the Reviewer: no `git diff` in its role, so "nothing else changed" in the two files is the Leader's diff, not its own.
+- **Owner HITL (2026-11-26):** heading glued to the form in both panels. Leader Chrome: eyebrow→title 6 px, title→first label **0 px**. Attempt 3 sent to the same worker: `panel-heading` only, gap 8 px, host margin-bottom 24 px (D-STF-39 rhythm).
+
+- **Implementer attempt 3** (dispatch `ctx_7e5cc072c1a5`): `panel-heading` gap 8 px, `:host` margin-bottom 24 px, new rule-scoped spec; K-004 red seen for both. **Leader re-run: VERIFIED** — jest ods-admin 17/17, 143 tests; lint clean; Chrome on both panels eyebrow→title 8 px, title→first label 24 px, no page scroll at 850 px.
+- **Reviewer** (`akili-reviewer`, opus, round **24/28**): **`STATUS: PASS`** (two usages, no parent gap doubles the 24 px; slices cannot cross rules).
+- **Owner HITL (2026-11-26):** code pill background #e9ebed → token `--ac-grey-200` (#e8ebed) in the shared `ods-code-pill` mixin; attempt 4 sent to the same worker.
+- **Implementer attempt 4** (dispatch `ctx_31b8ec99143a`): one line in `ods-code-pill.scss` plus a brace-scoped assertion; K-004 red seen. **Leader re-run: VERIFIED** — jest 17/17, 144 tests; lint clean; Chrome: tree and panel-heading pills both rgb(232,235,237).
+
+- **Reviewer** (`akili-reviewer`, opus, round **25/28**): **`STATUS: PASS`**. 4 mixin consumers, none overrides background; assertion falsifiable; light contrast 11.1:1. **Pre-existing, open owner call:** in dark mode the pill text `--ac-primary-blue-600` (#0e1620) on `--ac-grey-200` (#3e3e3e) is ≈ 1.70:1 (was ≈ 1.29:1 on grey-100), illegible; needs a text token that lightens in dark mode, outside D-STF-43.
+- **Pending:** owner visual OK, then commit (no push).
+
+### T-23 follow-up 8 — STAR buttons, list-card toolbar, icon toggle, sticky band (B-10 / D-STF-44)
+- **Owner (2026-11-26, screenshots):** Save must be STAR's green save button and the panel buttons STAR's size; Portfolio + Tree/Table into the list card next to the search; toggle as icons (left list, right tree `pi-sitemap`); count + find band sticky on scroll. AskUserQuestion: both pages (IOB moves Portfolio + Year); re-base 34 rounds / ≈ 7,000 LOC. Follow-up 7 is not committed yet (no owner visual OK); both commit together after the OK.
+- **Spec:** requirements §0b B-10; design D-STF-44, §14 re-base row.
+- **Implementer attempt 1** (fresh Grok `grok-4.7-high`, dispatch `ctx_99286ec1d16e`): **stopped by the Leader at the owner's pause before it edited anything** (no file under ods-admin newer than the brief). Not a failure; it does not count as a review round. Re-dispatch a fresh worker with the same brief (B-10 / D-STF-44 + the follow-up 7 tree as the base).
+
+### Session pause (2026-11-26, midday)
+- **Branch** `institutional-kpis`. Committed on top of `742dc4d0b`: only these spec docs. **The UI of follow-up 7 is uncommitted** in the working tree (31 client files, +389 / −164, incl. new `ods-field.scss` [intent-to-add] and `panel-heading.component.spec.ts` [untracked]). It is complete: attempts 1–4 have Reviewer PASS (rounds 22–25 of 34) and Leader Chrome checks. It is waiting for the owner's visual OK; the owner chose to give follow-up 8 first, and both commit together.
+- **Next:** (1) re-dispatch follow-up 8 to a fresh Grok worker with the brief recipe in this entry's spec rows (B-10, D-STF-44); (2) Leader re-run + Reviewer + Chrome (Save green, toolbar in card on both pages, icon toggle Table-left / Tree-right, sticky band, no page scroll); (3) owner visual OK → commit UI (no push).
+- **Open owner calls:** Responsibles column width in the tree (names cut); Linked indicators 47 px with chips vs 39 px; dark-mode code pill text ≈ 1.7:1 (pre-existing); Table view Responsibles wraps (needs shared `app-data-table`).
+
+
+- **Resumed (2026-11-26, afternoon):** Implementer attempt 1 re-dispatched to a fresh Grok `grok-4.7-high` worker, dispatch `ctx_1732bdab6b2d`, same brief (B-10 / D-STF-44 on top of the uncommitted follow-up 7 tree).
+
+- **Implementer attempt 1 report** (`ctx_1732bdab6b2d`): claimed jest 150/150, lint clean, build with no ods-admin warning, spec tsc 0. New partials `ods-action-button.scss`, `ods-list-band.scss` (+ spec). Toggle size copied from My Projects (32 px) because Results Center does not render it.
+- **Leader re-run: FAIL.** jest 18/18 suites, 150 tests; lint clean; spec tsc 0 ods-admin — but **`npm run build` exits 1**: TS-993004 "Unable to import symbol OdsPressedDirective … not exported from framework.component.ts". The worker's build claim was false (K-004: a gate cited without being seen). Diff now 38 client files, +926 / −338. Sent back as attempt 2 (own exported file + spec; paste build tail and exit code verbatim). No review round spent.
+
+- **Implementer attempt 2** (same worker): `OdsPressedDirective` moved to its own exported file + spec. **Leader re-run:** `npm run build` exit 0.
+- **Owner HITL (live, 2026-11-26):** (1) scrolled rows show above the sticky band; (2) the icon toggle is smaller than the 39 px inputs, misaligned; (3) the active toggle must look like My Projects' (darker background, blue icon). Leader Chrome on `/projects`: 32 × 32 px, active bg #d9e1eb, border rgb(226,232,240), radius 4, icon #035ba9 16 px, inactive icon rgb(100,116,139); source `my-projects.component.scss:93-115` (no token for #d9e1eb / #b8d4e8). Attempt 3 sent: band covers from the scroll container top, toggle 39 × 39 bottom-aligned, My Projects active look.
+
+- **Owner (2026-11-26):** buttons must use `navigation-buttons`' styles (AskUserQuestion answer: "usa son los estilos"; the component itself is a fixed result-page bar with Back/Next/Save only). Added to attempt 3: Save = its Save, Cancel = its Back/Next outline, Delete = same geometry in danger.
+
+- **Implementer attempts 3–4** (same worker): sticky band = first child of a paddingless `.list-scroll` (opaque, z-index 5); toggle My Projects colours; panel buttons with `navigation-buttons` styles (Save green + spinner, Cancel blue outline, Delete red outline); `ods-action-button.scss` removed.
+- **Leader re-run: VERIFIED gates** — build exit 0 (no ods-admin warning), jest 19/19 suites, 155 tests, lint clean, spec tsc 0. Diff incl. follow-up 7: 40 files, +1,287 / −496.
+- **Leader Chrome (1728×850):** sticky band OK on Framework Tree and IOB (scrolled 400/500 px: 0 row pixels above the band; band top = card top); one Portfolio, none in the header; IOB Portfolio + Year in the band; toggle active bg rgb(217,225,235) + icon #035ba9, aria-pressed/labels correct; no page scroll. **Defects:** (a) toggle is **39 × 27 px**, not 39 × 39 (`!max-h-[27px]` still wins; the spec only checked width); (b) Save 39 px next to Cancel/Delete 43 px (2 px border on the outlines; same as STAR's own bar, but side by side here they misalign).
+
+- **Reviewer** (`akili-reviewer`, opus, round **26/34**): **`STATUS: FAIL`**. (1) major: Portfolio/Year/toggle render only in the loaded branch → destroyed on change (focus lost) and absent on a failed load (user stranded on Retry); (2) moderate: toggle duplicated per view branch, pressed button destroyed on switch; (3) moderate: `aria-pressed`/`aria-label` also on the `p-button` host (generic role), specs assert the host; (4) minor: inactive icon colour literal; (5) minor: below 1024 px the sticky band resolves to the platform scroller. Reviewer read 39×39 from CSS; Leader Chrome measured 39×27 painted (`!max-h-[27px]`).
+- **Attempt 5 sent** (same worker): all five + Leader (6) toggle 39×39 painted, (7) Save `border-2 border-transparent` so Save/Cancel/Delete are all 43 px. Band rendered once, always; progress/error inside the list body.
+
+- **Transport:** the reopen of the attempt-4 worker failed (`agent_readiness: timeout`, dispatch `ctx_569faab9cdd7`, released). Attempt 5 retried on a fresh Grok worker, dispatch `ctx_db097aeada40`, with a context message (B-10 / D-STF-44, brief path, base tree).
+
+- **Attempt 5 stopped by the Leader at the owner's request** (owner leaving; dispatch `ctx_db097aeada40`, stopped mid-work). It had already edited ~20 files (framework.*, institutional-objectives.*, element/objective panels, framework-tree/-tables, side-panel-layout.*, ods-list-band.*, ods-pressed.directive.ts). **The working tree is PARTIAL**: no gate was run on it, no report was made. Snapshot of the whole uncommitted client diff (follow-ups 7 + 8 + partial attempt 5): `<git-dir>/strategy-framework-fu7-fu8-partial-2026-11-26.patch` (43 files, +1,552 / −551).
+
+### Session pause 2 (2026-11-26, afternoon)
+- **State:** follow-up 7 complete (Reviewer PASS ×4). Follow-up 8: attempts 1–4 done, Reviewer FAIL round 26/34 (5 issues) + 2 Leader Chrome defects; attempt 5 (all seven fixes) **interrupted halfway**.
+- **Resume:** (1) run the gates on the tree as is (build, jest ods-admin, lint, spec tsc) to see where attempt 5 stopped; (2) dispatch a fresh Grok worker with the attempt-5 body (the seven items logged above under "Attempt 5 sent") + the context message, telling it the tree holds a partial attempt 5 to finish, not to restart; (3) Leader re-run + Chrome (toggle 39 × 39 painted, Save/Cancel/Delete 43 px, selectors survive a failed load, focus kept on view switch, no row above the band, no page scroll) → Reviewer round 27/34 → owner visual OK → commit 7 + 8 (no push).
+- **Open owner calls:** unchanged from "Session pause (midday)".
+
+- **Resumed (2026-11-27):** Leader ran the gates on the interrupted tree: build exit 0; jest ods-admin 19/19 suites, 158 tests; lint clean; spec tsc 0 ods-admin. Grep shows all seven attempt-5 items present in code (band inside `@if (context())`, `#cardTools` via one outlet, no host aria, `position: static` < 1024 px, `!max-h-[27px]` gone with a 39 × 39 rule-scoped spec, Save `border-2`, failed-load specs for both pages). Attempt 5 treated as complete-but-unreported; no new worker dispatched. Chrome extension not connected, painted sizes unmeasured. Sent to the Reviewer (round 27/34).
+
+- **Reviewer** (`akili-reviewer`, opus, round **27/34**): **`STATUS: PASS`** on all seven items; no half-finished edits. Advisories: `toContain('height: 39px')` also matches `max-height` (cannot go red for the 39 × 27 defect class); `toContain('border-transparent')` satisfied by `disabled:border-transparent`; dead non-embed branch in framework-tree/-tables; inert `.side-panel-layout__list > [list]` rule. Painted sizes still unmeasured (Chrome).
+- **Attempt 6** (fresh Grok worker, dispatch `ctx_8d0ac09b9f5e`): the four advisories (two falsifiable assertions, dead branch, inert rule if added here). Owner visual review can run in parallel; it changes no rendered output.
+
+- **Attempt 6 report:** both assertions exact (K-004 red seen for each), non-embed branch + `embed` input removed from framework-tree/-tables, inert `> [list]` rules removed (added by this follow-up). **Leader re-run: VERIFIED** — build exit 0; jest 19/19 suites, 158 tests; lint clean; spec tsc 0 ods-admin. Diff incl. follow-up 7: 44 client files, +1,493 / −599.
+- **Reviewer** (`akili-reviewer`, opus, round **28/34**): **`STATUS: PASS`**. Follow-up 8 complete. **Pending:** Leader/owner Chrome check of painted sizes (toggle 39 × 39, Save/Cancel/Delete equal height, no row above the band) and the owner's visual OK, then one commit for follow-ups 7 + 8 (no push).
+
+### T-23 follow-up 9 — count chips in the band, one-sheet Framework export (B-11 / D-STF-45)
+- **Owner + QA (2026-11-27, screenshots):** the Table view shows the counts twice (summary line + level chips); keep only the top one, styled as the chips, on both pages. QA: the Framework workbook should be one sheet with everything as in the Table view, not three sheets. Leader: IOB already exports one sheet with its table columns (`exportRowsToXlsx`), so only Framework's export changes. Follow-ups 7 + 8 still uncommitted (owner keeps reviewing live); 9 lands on top. Budget 28/34 rounds.
+- **Spec:** requirements §0b B-11; design D-STF-45.
+
+- **Implementer attempt 1** (fresh Grok `grok-4.7-high`, dispatch `ctx_322efbdf54d9`): count chips as the band's first row on both pages; Table view chip row removed; Framework export = one `exportRowsToXlsx` call with `FRAMEWORK_TABLE_COLUMNS` + `rowsOf(editor)`, find query ignored; per-level sheet helpers removed (`tableRowsForLevel` kept, `rowsOf` uses it). Sheet named **"Values"**: `exportRowsToXlsx` hardcodes `addWorksheet('Values')` in shared (IOB's sheet is named the same).
+- **Leader re-run: VERIFIED** — build exit 0; jest 20/20 suites, 159 tests; lint clean; spec tsc 0 ods-admin. Diff incl. 7+8: 48 client files, +1,657 / −778. Reviewer round 29/34 running.
+
+- **Reviewer** (`akili-reviewer`, opus, round **29/34**): **`STATUS: PASS`**. Deviation recorded: the sheet is "Values" (the `exportRowsToXlsx` default), not "Framework" as D-STF-45 says; B-11 sets no name. Reviewer correction to the Leader's premise: `exportSheetsToXlsx` with a single sheet named "Framework" needs no shared change. Sheet name put to the owner. Advisories: `summaryLine()` now dead outside its spec; `exportSheetsToXlsx` has no production caller if "Values" stays.
+
+- **Owner HITL (2026-11-27):** chips unstyled and stacked, band layout broken on both pages. **Leader diagnosis:** not the code — the production `dist` contains the `.count-chips` / `.list-band` rules, but the owner's running `ng serve` (pid 8802, this worktree) served the page components with only `ods-table-wrap.scss` and no rule from the main component stylesheet (Chrome: 0 `.list-band` / `.count-chips` rules among 52 `<style>` elements). Most likely a stale incremental Sass compile after new partials (`ods-count-chips.scss`) were added while the server ran. Owner asked to restart `ng serve`; re-check after.
+
+- **Owner (2026-11-27): visual OK after restarting `ng serve`** ("perfecto haz commit"). UI committed `991e2d004` (follow-ups 7, 8 and 9 together; 48 client files), no push. Sheet name not answered by the owner: stays "Values"; D-STF-45 amended to say so. Review rounds 29/34 used.
+- **Open owner calls:** sheet name "Framework" (one-line change, no shared edit); tree Responsibles column width; Linked indicators 47 px with chips; dark-mode code pill text ≈ 1.7:1 (pre-existing); Table view Responsibles wraps (shared `app-data-table`); dead `summaryLine()` and now-unused `exportSheetsToXlsx` (shared) — cleanup candidates. Leader Chrome measurement of painted sizes on this final tree not run (owner's view is the visual check).
+- **Remaining in spec:** owner pushes/merges → T-17 Dev checks → `/akili-validate`.
+
+### Session handoff (2026-11-26)
+The owner is closing this session and will continue in a new one with more UI changes. State at close:
+- **Branch** `institutional-kpis`, HEAD `8e7daaae7`. The working tree is clean, except that this handoff entry is committed on its own. **Nothing is pushed**; the owner pushes.
+- **Done in rev 4:** T-18…T-23 plus T-23 follow-ups 1–6, all with a Reviewer PASS and owner OK. Last commits: `7e19284ca` / `0f46dde5f` (follow-up 5: one page layout, Delete in the footer with a tooltip reason) and `ed247b839` / `8e7daaae7` (follow-up 6: Framework banner removed, count line inside the list card).
+- **Budget:** review rounds **21 of 22** used. Any new change needs an owner re-base first (§14 of `design.md`). LOC cap ≈ 5,400 (not re-measured since follow-up 4).
+- **Not verified:** the Leader's Chrome check that the page does not scroll at ≥ 1024 px (D-STF-31) after follow-ups 5–6. The Leader's tab at `localhost:4200` rendered a blank app (`app-root` empty). The owner's own view was the visual check. Run this first in the next session.
+- **Open owner calls (undecided):**
+  1. "1 linked indicators" should be singular.
+  2. The IOB find label says "code or name", but it searches code and statement.
+  3. The empty-year state shows "Carry forward to …".
+  4. The Responsibles column wraps.
+- **Next steps:** further owner UI changes (new follow-up: re-base, spec amendment, Grok worker, Reviewer, owner OK, commit). Then the owner pushes and merges to dev, T-17 Dev checks run, and `/akili-validate`.
+- **Standing rules:**
+  - No push.
+  - Commit only after the owner's visual OK.
+  - No co-author trailer.
+  - Never write to the shared DB (no Save, Delete or Carry forward clicks).
+  - All code goes to a fresh Grok worker (`orca orchestration worker-start --agent cursor --model grok-4.7-high`), released after Reviewer PASS.
+  - The Reviewer is `akili-reviewer`.
+  - Chat in Spanish; the repo is written in English.

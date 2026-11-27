@@ -11,11 +11,24 @@
   align-items: stretch;
 }
 
+// The card does not scroll. .list-scroll inside the projected slot does, and
+// the band is that scroller's first child. Padding stays off this box so rows
+// cannot show in the card's top inset.
 .side-panel-layout__list {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 60%;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+}
+
+.side-panel-layout__list.side-panel-layout__card {
+  padding: 0;
+}
+
+.side-panel-layout__list--solo {
+  flex: 1 1 100%;
 }
 
 // Column flex so the empty panel can take leftover height with margin-block:
@@ -30,8 +43,8 @@
   overflow-y: auto;
 }
 
-// List and panel share one card: radius, border, white, 16px (D-STF-38).
-// The list keeps min-height 0 and overflow-y auto, so it still scrolls inside the column.
+// List and panel share one card: radius, border, white (D-STF-38).
+// The panel keeps the 16px padding. The list's inset lives on the sticky band.
 .side-panel-layout__card {
   border: 1px solid var(--ac-grey-200);
   border-radius: 0.5rem;

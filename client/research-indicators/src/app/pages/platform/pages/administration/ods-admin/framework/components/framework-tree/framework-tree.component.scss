@@ -6,7 +6,18 @@
 // A `calc(var(--framework-tree-indent-step))` binding is stripped by the style sanitizer.
 
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+    min-height: auto;
+  }
 }
 
 .framework-tree__toggle:focus-visible,
@@ -79,6 +90,25 @@
   color: var(--ac-grey-700);
   font-size: 13px;
   line-height: 1.5;
+}
+
+// One line. max-width: 0 lets this leftover column shrink below the names
+// so the text ellipsizes instead of wrapping. The full list is the tooltip.
+.framework-tree__responsibles {
+  max-width: 0;
+  overflow: hidden;
+}
+
+.framework-tree__responsibles-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.framework-tree__responsibles-text:focus-visible {
+  outline: 2px solid var(--ac-primary-blue-600);
+  outline-offset: 2px;
 }
 
 .framework-tree__counts {

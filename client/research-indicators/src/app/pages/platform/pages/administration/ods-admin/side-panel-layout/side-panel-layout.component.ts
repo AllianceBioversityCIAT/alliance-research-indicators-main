@@ -17,6 +17,8 @@ export class SidePanelLayoutComponent {
   readonly creating = input(false);
   readonly emptyText = input('Select an entry to see its details.');
   readonly panelLabel = input('Element details');
+  /** False while the list is loading or failed, so the list card stays mounted and the panel does not. */
+  readonly panelVisible = input(true);
   /** Present when the page projects `app-ods-empty-panel`. Otherwise emptyText is shown. */
   readonly projectedEmpty = contentChild(OdsEmptyPanelComponent);
 }

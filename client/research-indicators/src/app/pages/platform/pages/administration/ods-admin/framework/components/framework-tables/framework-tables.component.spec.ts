@@ -5,8 +5,9 @@ import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, FrameworkR
 import { FrameworkTablesComponent } from './framework-tables.component';
 
 // @akili-spec institutional-performance/strategy-framework T-23 — R-STF-008 AC.1, design §6.4, D-STF-37.
-// KZ-001: chips, columns and the selected row are read from the DOM.
-// KZ-015: the row is clicked and Enter/Space are dispatched on it. The chip is clicked too.
+// KZ-001: columns and the selected row are read from the DOM.
+// KZ-015: the row is clicked and Enter/Space are dispatched on it.
+// Count chips live on the page band (D-STF-45). This table renders none.
 // KZ-017: jsdom cannot judge the card, the toolbar or column alignment.
 
 const LEVELS: FrameworkLevel[] = [
@@ -91,11 +92,13 @@ describe('FrameworkTablesComponent', () => {
     fixture.componentRef.setInput('selectedKey', null);
     await settle();
   };
-  const chips = () => Array.from(root().querySelectorAll('[data-testid="level-chip"]')) as HTMLElement[];
-  const chip = (depth: number) => root().querySelector(`[data-testid="level-chip"][data-depth="${depth}"]`) as HTMLElement;
   const headers = () => Array.from(root().querySelectorAll('th')).map(cell => cell.textContent?.replace(/\s+/g, ' ').trim());
   const codes = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
   const row = (key: string) => root().querySelector(`[data-testid="data-table-row"][data-row-key="${key}"]`) as HTMLElement;
+  const search = async (term: string) => {
+    fixture.componentRef.setInput('queryOverride', term);
+    await settle();
+  };
   const showAll = async () => {
     const paginator = fixture.debugElement.query(By.css('p-paginator')).componentInstance as {
       rows: number;
@@ -117,30 +120,15 @@ describe('FrameworkTablesComponent', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders one chip per level from the data, including a fourth level', async () => {
+  it('renders no count chips of its own', async () => {
     await mount(fourLevelView());
 
-    expect(chips().map(item => item.textContent?.trim())).toEqual([
-      'Performance Areas · 1',
-      'Dimensions · 1',
-      'Indicators · 1',
-      'Sub-indicators · 1'
-    ]);
-    expect(chips()).toHaveLength(4);
-    const group = root().querySelector('[data-testid="level-chips"]');
-    expect(group?.tagName).toBe('UL');
-    expect(group?.getAttribute('aria-label')).toBe('Levels');
-    expect(chip(1).tagName).toBe('LI');
-    expect(chip(1).getAttribute('aria-pressed')).toBeNull();
-    expect(chip(1).getAttribute('aria-checked')).toBeNull();
-    expect(chip(2).getAttribute('aria-pressed')).toBeNull();
+    expect(root().querySelector('[data-testid="level-chips"]')).toBeNull();
+    expect(root().querySelector('[data-testid="count-chips"]')).toBeNull();
+    expect(root().querySelector('[data-testid="count-chip"]')).toBeNull();
+    expect(root().querySelector('[data-testid="level-chip"]')).toBeNull();
+    expect(root().querySelector('.level-chip')).toBeNull();
     expect(root().querySelectorAll('app-data-table')).toHaveLength(1);
-  });
-
-  it('labels the seeded three levels with their counts', async () => {
-    await mount(seed48());
-
-    expect(chips().map(item => item.textContent?.trim())).toEqual(['Performance Areas · 4', 'Dimensions · 13', 'Indicators · 31']);
   });
 
   it('renders 48 rows from every level in one table', async () => {
@@ -177,23 +165,6 @@ describe('FrameworkTablesComponent', () => {
     expect(root().querySelector('[data-testid="add-level"]')).toBeNull();
     expect(root().textContent).not.toContain('+ Sub-indicator');
     expect(root().textContent).not.toContain('+ Performance Area');
-  });
-
-  it('does nothing when a level chip is clicked', async () => {
-    const selected: number[] = [];
-    await mount(seed48());
-    await showAll();
-    fixture.componentInstance.rowSelected.subscribe(id => selected.push(id));
-    const before = codes();
-
-    chip(1).click();
-    chip(3).click();
-    await settle();
-
-    expect(codes()).toEqual(before);
-    expect(root().querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(48);
-    expect(selected).toEqual([]);
-    expect(chip(3).getAttribute('aria-pressed')).toBeNull();
   });
 
   it('sorts by code naturally, pages 10 rows, and filters by code and by name', async () => {
@@ -238,44 +209,33 @@ describe('FrameworkTablesComponent', () => {
     const selected: number[] = [];
     fixture.componentInstance.rowSelected.subscribe(id => selected.push(id));
 
-    const search = root().querySelector('[data-testid="framework-table-search"]') as HTMLInputElement;
-    expect(root().querySelector('label[for="framework-table-search"]')?.textContent?.trim()).toBe('Find by code or name');
-    search.value = 'Ten';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await settle();
+    await search('Ten');
     expect(codes()).toEqual(['1.10']);
     expect(row('1')).toBeNull();
     expect(selected).toEqual([]);
 
-    (root().querySelector('[data-testid="framework-table-search-clear"]') as HTMLButtonElement).click();
-    await settle();
+    await search('');
     expect(row('1').getAttribute('aria-selected')).toBe('true');
 
-    search.value = '1.12';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await settle();
+    await search('1.12');
     expect(codes()).toEqual(['1.12']);
     expect(root().querySelector('[data-testid="data-table-search"]')).toBeNull();
     expect(root().querySelector('[data-testid="data-table-export"]')).toBeNull();
-    expect(chips().length).toBeGreaterThan(0);
+    expect(root().querySelector('[data-testid="count-chip"]')).toBeNull();
   });
 
   it('says nothing matches instead of the true-empty message, then restores the rows', async () => {
     await mount(fourLevelView());
     const before = codes();
-    const search = root().querySelector('[data-testid="framework-table-search"]') as HTMLInputElement;
 
-    search.value = 'zzz';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await settle();
+    await search('zzz');
 
     expect(root().querySelector('[data-testid="framework-table-search-empty"]')?.textContent?.trim()).toBe('No elements match "zzz"');
     expect(root().querySelector('[data-testid="framework-table-search-empty"]')?.getAttribute('role')).toBe('status');
     expect(root().querySelector('[data-testid="data-table-empty"]')).toBeNull();
     expect(root().textContent).not.toContain('No elements yet.');
 
-    (root().querySelector('[data-testid="framework-table-search-clear"]') as HTMLButtonElement).click();
-    await settle();
+    await search('');
 
     expect(codes()).toEqual(before);
     expect(root().querySelector('[data-testid="framework-table-search-empty"]')).toBeNull();
@@ -283,11 +243,8 @@ describe('FrameworkTablesComponent', () => {
 
   it('shows the true-empty message when a query is typed over no elements', async () => {
     await mount(viewOf([]));
-    const search = root().querySelector('[data-testid="framework-table-search"]') as HTMLInputElement;
 
-    search.value = 'zzz';
-    search.dispatchEvent(new Event('input', { bubbles: true }));
-    await settle();
+    await search('zzz');
 
     expect(root().querySelector('[data-testid="data-table-empty"]')?.textContent?.trim()).toBe('No elements yet.');
     expect(root().querySelector('[data-testid="framework-table-search-empty"]')).toBeNull();

@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
+import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import { CreateInstitutionalObjectivePayload, FrameworkObjective, FrameworkView } from '@shared/interfaces/strategy-framework.interface';
 import { ActionsService } from '@shared/services/actions.service';
@@ -28,7 +29,7 @@ interface OpenedValues {
 @Component({
   selector: 'app-objective-panel',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, SelectModule, MultiSelectModule, TooltipModule, PanelHeadingComponent],
+  imports: [ReactiveFormsModule, InputTextModule, SelectModule, MultiSelectModule, TextareaModule, TooltipModule, PanelHeadingComponent],
   templateUrl: './objective-panel.component.html',
   styleUrl: './objective-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

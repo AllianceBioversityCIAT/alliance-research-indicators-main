@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
+import { TextareaModule } from 'primeng/textarea';
 import { TooltipModule } from 'primeng/tooltip';
 import {
   CreateFrameworkElementPayload,
@@ -37,7 +38,7 @@ interface OpenedValues {
 @Component({
   selector: 'app-element-panel',
   standalone: true,
-  imports: [ReactiveFormsModule, ButtonModule, SelectModule, TooltipModule, StaffPickerComponent, PanelHeadingComponent],
+  imports: [ReactiveFormsModule, InputTextModule, SelectModule, TextareaModule, TooltipModule, StaffPickerComponent, PanelHeadingComponent],
   templateUrl: './element-panel.component.html',
   styleUrl: './element-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
