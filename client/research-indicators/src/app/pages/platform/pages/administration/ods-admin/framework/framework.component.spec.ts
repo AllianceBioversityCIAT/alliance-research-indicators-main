@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NgZone } from '@angular/core';
 import { By } from '@angular/platform-browser';
@@ -13,6 +15,7 @@ import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
 import { ElementPanelComponent } from './components/element-panel/element-panel.component';
+import { FRAMEWORK_TABLE_COLUMNS, rowsOf } from './components/framework-tables/framework-tables.component';
 import FrameworkComponent from './framework.component';
 
 // @akili-spec institutional-performance/strategy-framework T-19 — R-STF-007, R-STF-008, R-STF-016, NFR-STF-004.
@@ -144,6 +147,7 @@ describe('FrameworkComponent', () => {
 
   const root = () => fixture.nativeElement as HTMLElement;
   const q = (testId: string) => root().querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
+  const chipTexts = () => Array.from(root().querySelectorAll('[data-testid="count-chip"]')).map(chip => chip.textContent?.trim());
   const settle = async () => {
     await fixture.whenStable();
     fixture.detectChanges();
@@ -185,6 +189,26 @@ describe('FrameworkComponent', () => {
     const option = (select.options as { id: number }[]).find(item => item.id === id);
     select.onOptionSelect(new Event('click'), option);
     await settle();
+  };
+  const viewButton = (id: string) => q(id)?.querySelector('button') as HTMLButtonElement;
+  const activateView = async (id: string, key?: 'Enter' | ' ') => {
+    const button = viewButton(id);
+    button.focus();
+    if (key) {
+      const event = new KeyboardEvent('keydown', {
+        key,
+        code: key === ' ' ? 'Space' : 'Enter',
+        bubbles: true,
+        cancelable: true
+      });
+      button.dispatchEvent(event);
+      if (!event.defaultPrevented) button.click();
+    } else {
+      button.click();
+    }
+    await settle();
+    expect(viewButton(id)).toBe(button);
+    expect(document.activeElement).toBe(button);
   };
 
   beforeEach(async () => {
@@ -232,26 +256,119 @@ describe('FrameworkComponent', () => {
     await settle();
 
     expect(q('page-title')?.textContent?.trim()).toBe('Strategy 2026–2030 – Monitoring framework');
+    expect(root().querySelector('label[for="frameworkPortfolio"]')?.classList.contains('label')).toBe(true);
     expect(q('page-title')?.textContent).not.toContain('Portfolio 2 –');
     expect(q('eyebrow')?.textContent?.trim()).toBe('ADMIN · ODS');
-    expect(q('summary-line')?.textContent?.trim()).toBe('1 performance area · 0 dimensions · 0 indicators');
-    expect(q('view-tree')?.textContent?.trim()).toBe('Tree');
+    expect(chipTexts()).toEqual(['Performance Area · 1', 'Dimensions · 0', 'Indicators · 0']);
+    expect(q('summary-line')).toBeNull();
+    expect(q('view-tree')?.getAttribute('aria-label')).toBeNull();
+    expect(q('view-tree')?.querySelector('button')?.getAttribute('aria-label')).toBe('Tree view');
     expect(root().querySelector('p-treetable input, p-treetable textarea')).toBeNull();
     expect(treeRow('1').querySelector('[data-testid="framework-tree-name"]')?.textContent?.trim()).toBe('Area');
     // B-8 / D-STF-42: the info banner is gone. The count line is the first row inside the list card.
     expect(q('framework-banner')).toBeNull();
-    expect(q('framework-list')?.contains(q('summary-line'))).toBe(true);
-    expect(q('summary-line')!.compareDocumentPosition(q('framework-tree-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('framework-list')?.contains(q('count-chips'))).toBe(true);
+    expect(q('list-band')?.firstElementChild).toBe(q('count-chips'));
+    expect(q('count-chips')!.compareDocumentPosition(q('framework-tree-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    (q('view-table') as HTMLButtonElement).click();
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
 
     expect(q('framework-banner')).toBeNull();
-    expect(q('framework-list')?.contains(q('summary-line'))).toBe(true);
-    expect(q('summary-line')!.compareDocumentPosition(q('framework-table-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chipTexts()).toEqual(['Performance Area · 1', 'Dimensions · 0', 'Indicators · 0']);
+    expect(q('framework-list')?.contains(q('count-chips'))).toBe(true);
+    expect(q('count-chips')!.compareDocumentPosition(q('framework-table-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(root().querySelectorAll('[data-testid="count-chips"]')).toHaveLength(1);
+    expect(root().querySelector('app-framework-tables')?.querySelector('[data-testid="count-chip"], [data-testid="level-chip"]')).toBeNull();
     expect(q('framework-tree-search')).toBeNull();
     expect(root().querySelector('app-custom-progress-bar')).toBeNull();
     expect(root().querySelector('p-' + 'drawer')).toBeNull();
+  });
+
+  it('shows one non-interactive chip per level in both views, singular at 1', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(FOUR_LEVEL_VIEW));
+    create();
+    await settle();
+
+    const expected = ['Performance Areas · 4', 'Dimensions · 2', 'Indicator · 1', 'Sub-indicator · 1'];
+    const chips = () => Array.from(root().querySelectorAll('[data-testid="count-chip"]')) as HTMLElement[];
+    expect(q('count-chips')?.tagName).toBe('UL');
+    expect(q('count-chips')?.getAttribute('aria-label')).toBe('Counts');
+    expect(chips().map(chip => chip.textContent?.trim())).toEqual(expected);
+    for (const chip of chips()) {
+      expect(chip.tagName).toBe('LI');
+      expect(chip.classList.contains('level-chip')).toBe(true);
+      expect(chip.getAttribute('aria-pressed')).toBeNull();
+      expect(chip.querySelector('button')).toBeNull();
+    }
+
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
+    await settle();
+
+    expect(chips().map(chip => chip.textContent?.trim())).toEqual(expected);
+    expect(root().querySelectorAll('[data-testid="count-chips"]')).toHaveLength(1);
+    expect(root().querySelector('app-framework-tables')?.querySelector('[data-testid="count-chip"]')).toBeNull();
+  });
+
+  it('puts one portfolio select and one icon toggle in the list card in both views', async () => {
+    create();
+    await settle();
+
+    const header = q('page-header');
+    const list = q('framework-list');
+    const inList = (id: string) => list?.querySelectorAll(`[data-testid="${id}"]`) ?? [];
+    expect(header?.querySelector('[data-testid="portfolio-select"]')).toBeNull();
+    expect(header?.querySelector('[data-testid="view-toggle"]')).toBeNull();
+    expect(inList('portfolio-select')).toHaveLength(1);
+    expect(inList('view-toggle')).toHaveLength(1);
+    expect(root().querySelectorAll('[data-testid="portfolio-select"]')).toHaveLength(1);
+    expect(root().querySelectorAll('[data-testid="view-toggle"]')).toHaveLength(1);
+    expect(q('framework-tree-search')!.compareDocumentPosition(q('portfolio-select')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('portfolio-select')!.compareDocumentPosition(q('view-toggle')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const table = q('view-table')!;
+    const tree = q('view-tree')!;
+    expect(table.compareDocumentPosition(tree) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(table.querySelector('.pi-bars')).not.toBeNull();
+    expect(tree.querySelector('.pi-sitemap')).not.toBeNull();
+    expect(table.getAttribute('aria-label')).toBeNull();
+    expect(tree.getAttribute('aria-label')).toBeNull();
+    expect(table.getAttribute('aria-pressed')).toBeNull();
+    expect(tree.getAttribute('aria-pressed')).toBeNull();
+    expect(table.querySelector('button')?.getAttribute('aria-label')).toBe('Table view');
+    expect(tree.querySelector('button')?.getAttribute('aria-label')).toBe('Tree view');
+    expect(table.querySelector('button')?.getAttribute('aria-pressed')).toBe('false');
+    expect(tree.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(table.querySelector('button')?.className).toContain('view-toggle-btn');
+    expect(tree.querySelector('button')?.className).toContain('p-button-outlined');
+    expect(table.querySelector('button')?.className).toContain('p-button-text');
+
+    await activateView('view-table', 'Enter');
+    expect(component.view()).toBe('table');
+    expect(viewButton('view-table').getAttribute('aria-pressed')).toBe('true');
+    expect(viewButton('view-tree').getAttribute('aria-pressed')).toBe('false');
+    expect(q('framework-tables-slot')).not.toBeNull();
+    expect(q('page-header')?.querySelector('[data-testid="view-toggle"]')).toBeNull();
+    expect(q('framework-list')?.querySelectorAll('[data-testid="portfolio-select"]')).toHaveLength(1);
+    expect(q('framework-list')?.querySelectorAll('[data-testid="view-toggle"]')).toHaveLength(1);
+    expect(q('framework-table-search')!.compareDocumentPosition(q('view-table')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await activateView('view-tree', ' ');
+    expect(component.view()).toBe('editor');
+    expect(q('framework-tree-slot')).not.toBeNull();
+
+    await activateView('view-table');
+    expect(component.view()).toBe('table');
+  });
+
+  it('keeps the band as the first child of the scroller in both views', async () => {
+    create();
+    await settle();
+    expect(q('list-scroll')?.firstElementChild?.getAttribute('data-testid')).toBe('list-band');
+
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
+    await settle();
+    expect(q('list-scroll')?.firstElementChild?.getAttribute('data-testid')).toBe('list-band');
   });
 
   it('binds the column height from the navbar and header signals', async () => {
@@ -383,18 +500,36 @@ describe('FrameworkComponent', () => {
     expect(q('framework-tree-slot')).not.toBeNull();
   });
 
+  it('keeps the portfolio select when the next portfolio load fails', async () => {
+    api.GET_StrategyFrameworkEditor.mockImplementation((id: number) =>
+      id === 1 ? Promise.resolve(failed(500, 'The framework read failed')) : Promise.resolve(ok(WITH_ELEMENTS))
+    );
+    create();
+    await settle();
+
+    const select = q('portfolio-select');
+    expect(select).not.toBeNull();
+    await pickPortfolio(1);
+
+    expect(q('error-state')?.textContent).toContain('The framework read failed');
+    expect(q('retry-button')).not.toBeNull();
+    expect(q('portfolio-select')).toBe(select);
+    expect(q('framework-list')?.contains(select)).toBe(true);
+  });
+
   it('opens Table from an old level param and does not write level', async () => {
     query = { view: 'table', level: 'depth-3' };
     create();
     await settle();
     expect(component.view()).toBe('table');
-    expect(q('view-table')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('view-table')?.getAttribute('aria-pressed')).toBeNull();
+    expect(q('view-table')?.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('framework-tables-slot')).not.toBeNull();
     expect(q('framework-tree-slot')).toBeNull();
     expect(root().querySelector('[data-testid="cell-code"]')?.textContent?.trim()).toBe('1');
     expect(root().querySelector('[data-testid="cell-levelName"]')?.textContent?.trim()).toBe('Performance Area');
 
-    (q('view-tree') as HTMLButtonElement).click();
+    (q('view-tree')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
     expect(component.view()).toBe('editor');
     expect(q('framework-tree-slot')).not.toBeNull();
@@ -435,18 +570,36 @@ describe('FrameworkComponent', () => {
     expect(ready.disabled).toBe(false);
   });
 
-  it('exports one sheet per level for the selected portfolio', async () => {
-    const exportSpy = jest.spyOn(xlsxExportUtil, 'exportSheetsToXlsx').mockResolvedValue(undefined);
+  it('exports every table row in table order and ignores the find field', async () => {
+    api.GET_StrategyFrameworkEditor.mockResolvedValue(ok(SEEDED));
+    const exportSpy = jest.spyOn(xlsxExportUtil, 'exportRowsToXlsx').mockResolvedValue(undefined);
+    const sheetsSpy = jest.spyOn(xlsxExportUtil, 'exportSheetsToXlsx').mockResolvedValue(undefined);
     create();
     await settle();
+
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
+    await settle();
+    const search = q('framework-table-search') as HTMLInputElement;
+    search.value = 'Quality';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle();
+    expect(Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim())).toEqual(['1.1.2']);
 
     (q('export-button')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
 
     expect(exportSpy).toHaveBeenCalledTimes(1);
-    const input = exportSpy.mock.calls[0][0];
+    expect(sheetsSpy).not.toHaveBeenCalled();
+    const input = exportSpy.mock.calls[0][0] as {
+      fileName: string;
+      columns: typeof FRAMEWORK_TABLE_COLUMNS;
+      rows: ReturnType<typeof rowsOf>;
+    };
     expect(input.fileName).toBe('strategy-framework_2026-2030.xlsx');
-    expect(input.sheets.map(sheet => sheet.name)).toEqual(['Performance Areas', 'Dimensions', 'Indicators']);
+    expect(input.columns).toBe(FRAMEWORK_TABLE_COLUMNS);
+    expect(input.columns.map(column => column.header)).toEqual(['Code', 'Level', 'Name', 'Parent', 'Responsibles']);
+    expect(input.rows).toEqual(rowsOf(SEEDED));
+    expect(input.rows.map(row => row.code)).toEqual(['1', '1.1', '1.1.1', '1.1.2', '1.2']);
   });
 
   it('fills the panel from a tree row and from a level-table row, and shows the empty state first', async () => {
@@ -466,11 +619,11 @@ describe('FrameworkComponent', () => {
     expect(code.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(treeRow('1.1.1').getAttribute('aria-selected')).toBe('true');
 
-    (q('view-table') as HTMLButtonElement).click();
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
     expect(actions.showGlobalAlert).not.toHaveBeenCalled();
     expect(root().querySelector('[data-row-key="31"]')?.getAttribute('aria-selected')).toBe('true');
-    expect(root().querySelector('[data-testid="level-chip"]')?.getAttribute('aria-pressed')).toBeNull();
+    expect(root().querySelector('[data-testid="count-chip"]')?.getAttribute('aria-pressed')).toBeNull();
     expect(router.navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'table', level: null } }));
     expect(document.querySelector('#elementCode')?.getAttribute('value') ?? (document.querySelector('#elementCode') as HTMLInputElement).value).toBe(
       '1.1.1'
@@ -700,12 +853,12 @@ describe('FrameworkComponent', () => {
     create();
     await settle();
     await clickTree('1.1.1');
-    (q('view-table') as HTMLButtonElement).click();
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
     await typeInto('#elementDescription', 'edited text');
     const writes = router.navigate.mock.calls.length;
 
-    (root().querySelector('[data-testid="level-chip"][data-depth="1"]') as HTMLElement).click();
+    (root().querySelector('[data-testid="count-chip"]') as HTMLElement).click();
     await settle();
 
     expect(actions.showGlobalAlert).not.toHaveBeenCalled();
@@ -736,19 +889,21 @@ describe('FrameworkComponent', () => {
     expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('edited text');
     expect(document.querySelector('[data-testid="panel-title"]')?.textContent?.trim()).toBe('Process efficiency');
 
-    (q('view-table') as HTMLButtonElement).click();
+    (q('view-table')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
     await answer('Keep editing');
-    expect(q('view-tree')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('view-tree')?.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('view-tree')?.getAttribute('aria-pressed')).toBeNull();
 
     await answer('Discard');
-    expect(q('view-table')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('view-table')?.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('view-table')?.getAttribute('aria-pressed')).toBeNull();
     expect(root().querySelector('[data-row-key="31"]')?.getAttribute('aria-selected')).toBe('true');
     expect((document.querySelector('#elementDescription') as HTMLTextAreaElement).value).toBe('Stored text');
     expect(actions.showGlobalAlert).toHaveBeenCalledTimes(2);
     expect(router.navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { view: 'table', level: null } }));
 
-    (q('view-tree') as HTMLButtonElement).click();
+    (q('view-tree')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
     await clickTree('1.1.1');
     await typeInto('#elementDescription', 'portfolio edit');
@@ -919,5 +1074,56 @@ describe('FrameworkComponent', () => {
     (document.body as HTMLElement).focus();
     lastAlert().confirmCallback?.event?.();
     expect(document.activeElement).toBe(button);
+  });
+});
+
+describe('framework view toggle rules', () => {
+  const source = readFileSync(join(__dirname, 'framework.component.scss'), 'utf8');
+  const rule = (selector: string): string => {
+    const start = source.indexOf(selector);
+    return source.slice(start, source.indexOf('}', start) + 1);
+  };
+
+  it('sizes each toggle to 39px wide and 39px tall', () => {
+    const size = rule('button.p-button.view-toggle-btn {');
+    const group = rule('.card-tools__toggle {');
+    const html = readFileSync(join(__dirname, 'framework.component.html'), 'utf8');
+    const toggles = html.match(/styleClass="[^"]*view-toggle-btn[^"]*"/g) ?? [];
+
+    expect(size).toContain('width: 39px');
+    expect(size).toMatch(/(^|[\s;{])height: 39px/);
+    expect(size).toContain('max-height: 39px');
+    expect(size.endsWith('}')).toBe(true);
+    expect(toggles).toHaveLength(2);
+    for (const styleClass of toggles) {
+      expect(styleClass).not.toContain('max-h-');
+    }
+    expect(group).toContain('align-items: flex-end');
+    expect(group).toContain('gap: 8px');
+    expect(group.endsWith('}')).toBe(true);
+  });
+
+  it('paints the active toggle like My Projects', () => {
+    const active = rule('button.p-button.view-toggle-btn.p-button-outlined {');
+    const hover = rule('button.p-button.view-toggle-btn.p-button-outlined:hover {');
+    const icon = rule('button.p-button.view-toggle-btn.p-button-outlined .p-button-icon {');
+    const inactive = rule('button.p-button.view-toggle-btn.p-button-text {');
+    const muted = rule('button.p-button.view-toggle-btn .p-button-icon {');
+
+    expect(active).toContain('background: #d9e1eb');
+    expect(active).toContain('border: 1px solid var(--p-content-border-color)');
+    expect(active).toContain('border-radius: 4px');
+    expect(active).toContain('color: var(--ac-light-blue-400)');
+    expect(active.endsWith('}')).toBe(true);
+    expect(hover).toContain('background: #b8d4e8');
+    expect(hover.endsWith('}')).toBe(true);
+    expect(icon).toContain('font-size: 16px');
+    expect(icon).toContain('color: var(--ac-light-blue-400)');
+    expect(icon.endsWith('}')).toBe(true);
+    expect(inactive).toContain('background: transparent');
+    expect(inactive.endsWith('}')).toBe(true);
+    expect(muted).toContain('color: var(--p-text-muted-color)');
+    expect(muted).not.toContain('rgb(');
+    expect(muted.endsWith('}')).toBe(true);
   });
 });

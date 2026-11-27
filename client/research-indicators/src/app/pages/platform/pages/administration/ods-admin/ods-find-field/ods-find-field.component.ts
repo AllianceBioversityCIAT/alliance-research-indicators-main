@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { InputTextModule } from 'primeng/inputtext';
 
 // @akili-spec institutional-performance/strategy-framework T-23 — design §6.3, §6.6, D-STF-40.
 // The labelled find field. The parent owns the query and binds it back, so a re-created field shows the same term.
@@ -6,6 +7,7 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 @Component({
   selector: 'app-ods-find-field',
   standalone: true,
+  imports: [InputTextModule],
   templateUrl: './ods-find-field.component.html',
   styleUrl: './ods-find-field.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

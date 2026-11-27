@@ -89,7 +89,10 @@ describe('ElementPanelComponent', () => {
   };
   const form = () => fixture.nativeElement.querySelector('[data-testid="element-form"]') as HTMLElement | null;
   const deleteTip = (button: HTMLElement) =>
-    fixture.debugElement.queryAll(By.directive(Tooltip)).find(node => node.nativeElement === button)?.injector.get(Tooltip);
+    fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .find(node => node.nativeElement === button)
+      ?.injector.get(Tooltip);
   const open = async (elementId: number | null, create: { depth: number; parentRequired: boolean; parentId?: number } | null = null) => {
     token += 1;
     fixture.componentRef.setInput('elementId', elementId);
@@ -142,12 +145,65 @@ describe('ElementPanelComponent', () => {
     expect(document.querySelector('[data-testid="element-panel"]')?.querySelector('[data-testid="element-delete"]')).toBe(order[0]);
     expect(code.compareDocumentPosition(order[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const remove = order[0]!.querySelector('button') as HTMLButtonElement;
-    expect(remove.classList.contains('p-button-outlined')).toBe(true);
-    expect(remove.classList.contains('p-button-danger')).toBe(true);
+    expect(remove.className).toContain('border-2');
+    expect(remove.className).toContain('border-[var(--ac-red-1)]');
+    expect(remove.className).toContain('text-[var(--ac-red-1)]');
+    expect(remove.className).toContain('px-4');
+    expect(remove.className).toContain('py-2');
+    expect(remove.className).toContain('rounded-[13px]');
+    expect(remove.className).toContain('text-[15px]');
+    const cancel = order[1]!.querySelector('button') as HTMLButtonElement;
+    const save = order[2]!.querySelector('button') as HTMLButtonElement;
+    expect(cancel.classList.contains('ods-cancel')).toBe(true);
+    expect(cancel.className).toContain('border-2');
+    expect(cancel.className).toContain('border-[var(--ac-light-blue-400)]');
+    expect(cancel.className).toContain('text-[var(--ac-light-blue-400)]');
+    expect(cancel.querySelector('i')).toBeNull();
+    expect(cancel.type).toBe('button');
+    expect(save.classList.contains('ods-save')).toBe(true);
+    const saveTokens = save.className.split(/\s+/);
+    expect(saveTokens).toContain('border-2');
+    expect(saveTokens).toContain('border-transparent');
+    expect(save.className).toContain('disabled:border-transparent');
+    expect(save.className).toContain('bg-[var(--ac-green-400)]');
+    expect(save.className).toContain('text-[var(--ac-white-1)]');
+    expect(save.className).toContain('px-5');
+    expect(save.className).toContain('disabled:bg-[var(--ac-grey-200)]');
+    expect(save.className).toContain('disabled:text-[var(--ac-grey-500)]');
+    expect(save.type).toBe('submit');
+    expect(save.querySelector('.pi-save')).not.toBeNull();
+    expect(save.disabled).toBe(false);
     expect(remove.getAttribute('aria-disabled')).toBeNull();
     expect(deleteTip(remove)?.content ?? null).toBeNull();
     expect(document.querySelector('[data-testid="element-delete-reason"]')).toBeNull();
     expect(fixture.componentInstance.isDirty()).toBe(false);
+  });
+
+  it('disables Save and swaps in a spinner while the save is in flight', async () => {
+    let resolvePatch: (value: MainResponse<FrameworkEditorElement>) => void = () => undefined;
+    api.PATCH_StrategyFrameworkElement.mockReturnValue(new Promise(resolve => (resolvePatch = resolve)));
+    await open(1);
+    const name = document.querySelector('#elementName') as HTMLInputElement;
+    name.value = 'Area one edited';
+    name.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const save = document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement;
+    save.click();
+    fixture.detectChanges();
+
+    expect(save.disabled).toBe(true);
+    expect(save.getAttribute('aria-busy')).toBe('true');
+    expect(save.querySelector('.pi-spinner')).not.toBeNull();
+    expect(save.querySelector('.pi-save')).toBeNull();
+    expect(api.PATCH_StrategyFrameworkElement).toHaveBeenCalledTimes(1);
+
+    save.click();
+    expect(api.PATCH_StrategyFrameworkElement).toHaveBeenCalledTimes(1);
+
+    resolvePatch(ok({ ...VIEW.elements[0], name: 'Area one edited' }));
+    await settle();
+    expect((document.querySelector('[data-testid="element-save"] button') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('hides Delete in create mode and does not mark an untouched proposal dirty', async () => {
@@ -227,6 +283,8 @@ describe('ElementPanelComponent', () => {
     expect(document.querySelector('[data-testid="derived-label"]')?.textContent?.trim()).toBe('Performance Area (derived from the Dimension)');
     expect(field().value).toBe('1 · Area one');
     expect(field().readOnly).toBe(true);
+    expect(field().disabled).toBe(false);
+    expect(field().classList.contains('p-inputtext')).toBe(true);
 
     api.GET_StrategyFrameworkCodeProposal.mockClear();
     fixture.debugElement.query(By.directive(Select)).triggerEventHandler('onChange', { value: 22 });
@@ -351,5 +409,34 @@ describe('ElementPanelComponent', () => {
     expect(kinds).toEqual(['edit']);
     expect(description.value).toBe('');
     expect(fixture.componentInstance.isDirty()).toBe(false);
+  });
+
+  it('paints required labels, Aura controls, and the warning row when Code is left empty', async () => {
+    await open(null, { depth: 1, parentRequired: false });
+
+    const codeLabel = document.querySelector('label[for="elementCode"]') as HTMLLabelElement;
+    const nameLabel = document.querySelector('label[for="elementName"]') as HTMLLabelElement;
+    expect(codeLabel.classList.contains('label')).toBe(true);
+    expect(nameLabel.classList.contains('label')).toBe(true);
+    expect(document.querySelector('label[for="elementDescription"]')?.classList.contains('label')).toBe(true);
+    expect(codeLabel.querySelector('.text-red-500')?.getAttribute('aria-hidden')).toBe('true');
+    expect(codeLabel.querySelector('.text-red-500')?.textContent?.trim()).toBe('*');
+    expect(nameLabel.querySelector('.text-red-500')?.classList.contains('text-red-500')).toBe(true);
+
+    const code = document.querySelector('#elementCode') as HTMLInputElement;
+    const description = document.querySelector('#elementDescription') as HTMLTextAreaElement;
+    expect(code.classList.contains('p-inputtext')).toBe(true);
+    expect(description.classList.contains('p-textarea')).toBe(true);
+    expect(document.querySelector('[data-testid="code-hint"]')?.classList.contains('ods-field__hint')).toBe(true);
+
+    code.value = '';
+    code.dispatchEvent(new Event('input'));
+    code.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(code.classList.contains('ods-field--invalid')).toBe(true);
+    const error = document.querySelector('[data-testid="code-error"]');
+    expect(error?.querySelector('.material-symbols-rounded')?.textContent?.trim()).toBe('warning');
+    expect(error?.textContent).toContain('Code is required');
   });
 });

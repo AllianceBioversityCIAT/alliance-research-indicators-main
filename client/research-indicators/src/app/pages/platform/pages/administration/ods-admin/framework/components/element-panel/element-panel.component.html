@@ -3,30 +3,37 @@
 
   <form class="element-panel__form flex flex-col gap-4" [formGroup]="form" data-testid="element-form" (ngSubmit)="save()" [attr.aria-busy]="saving()">
     <div class="element-panel__pair" [class.element-panel__pair--split]="showParent()">
-      <div class="field">
-        <label for="elementCode" class="text-sm font-medium atc-grey-800">Code <span aria-hidden="true">*</span></label>
+      <div class="ods-field">
+        <label for="elementCode" class="label">Code <span class="text-red-500" aria-hidden="true">*</span></label>
         <input
           #codeField
+          pInputText
           id="elementCode"
           type="text"
-          class="field__control"
           formControlName="code"
           maxlength="30"
           required
           autocomplete="off"
+          [class.ods-field--invalid]="form.controls.code.touched && form.controls.code.invalid"
           data-testid="element-code" />
-        <p class="field__hint" data-testid="code-hint">{{ codeHint() }}</p>
+        <p class="ods-field__hint" data-testid="code-hint">{{ codeHint() }}</p>
         @if (form.controls.code.touched && form.controls.code.hasError('required')) {
-          <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="code-error">Code is required</p>
+          <p class="ods-field__message" data-testid="code-error">
+            <i class="material-symbols-rounded !text-base" aria-hidden="true">warning</i>
+            Code is required
+          </p>
         }
         @if (form.controls.code.hasError('maxlength')) {
-          <p class="m-0 text-sm leading-[1.5] atc-red-1">Code must be 30 characters or fewer</p>
+          <p class="ods-field__message">
+            <i class="material-symbols-rounded !text-base" aria-hidden="true">warning</i>
+            Code must be 30 characters or fewer
+          </p>
         }
       </div>
 
       @if (showParent()) {
-        <div class="field">
-          <label for="elementParent" class="text-sm font-medium atc-grey-800">{{ parentLevelName() }} <span aria-hidden="true">*</span></label>
+        <div class="ods-field">
+          <label for="elementParent" class="label">{{ parentLevelName() }} <span class="text-red-500" aria-hidden="true">*</span></label>
           <p-select
             inputId="elementParent"
             [options]="parentOptions()"
@@ -36,27 +43,28 @@
             (onChange)="onParentPicked($event.value)"
             [filter]="true"
             appendTo="body"
-            styleClass="w-full"
+            [styleClass]="form.controls.parentId.touched && form.controls.parentId.invalid ? 'w-full ods-field--invalid' : 'w-full'"
             [ariaLabel]="parentLevelName()"
             [placeholder]="'Select a ' + parentLevelName()"
             data-testid="element-parent">
           </p-select>
           @if (form.controls.parentId.touched && form.controls.parentId.invalid) {
-            <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="parent-error">{{ parentLevelName() }} is required</p>
+            <p class="ods-field__message" data-testid="parent-error">
+              <i class="material-symbols-rounded !text-base" aria-hidden="true">warning</i>
+              {{ parentLevelName() }} is required
+            </p>
           }
         </div>
       }
     </div>
 
     @for (ancestor of derivedAncestors(); track ancestor.depth) {
-      <div class="field">
-        <label class="text-sm font-medium atc-grey-800" [attr.for]="'derived-' + ancestor.depth" data-testid="derived-label">{{
-          ancestor.label
-        }}</label>
+      <div class="ods-field">
+        <label class="label" [attr.for]="'derived-' + ancestor.depth" data-testid="derived-label">{{ ancestor.label }}</label>
         <input
+          pInputText
           [id]="'derived-' + ancestor.depth"
           type="text"
-          class="field__control"
           readonly
           [value]="ancestor.value"
           [attr.data-depth]="ancestor.depth"
@@ -64,25 +72,29 @@
       </div>
     }
 
-    <div class="field">
-      <label for="elementName" class="text-sm font-medium atc-grey-800">Name <span aria-hidden="true">*</span></label>
+    <div class="ods-field">
+      <label for="elementName" class="label">Name <span class="text-red-500" aria-hidden="true">*</span></label>
       <input
+        pInputText
         id="elementName"
         type="text"
-        class="field__control"
         formControlName="name"
         maxlength="255"
         required
         autocomplete="off"
+        [class.ods-field--invalid]="form.controls.name.touched && form.controls.name.invalid"
         data-testid="element-name" />
       @if (form.controls.name.touched && form.controls.name.hasError('required')) {
-        <p class="m-0 text-sm leading-[1.5] atc-red-1" data-testid="name-error">Name is required</p>
+        <p class="ods-field__message" data-testid="name-error">
+          <i class="material-symbols-rounded !text-base" aria-hidden="true">warning</i>
+          Name is required
+        </p>
       }
     </div>
 
-    <div class="field">
-      <label for="elementDescription" class="text-sm font-medium atc-grey-800">Description</label>
-      <textarea id="elementDescription" class="field__control" formControlName="description" rows="4" data-testid="element-description"></textarea>
+    <div class="ods-field">
+      <label for="elementDescription" class="label">Description</label>
+      <textarea pTextarea id="elementDescription" formControlName="description" rows="4" data-testid="element-description"></textarea>
     </div>
 
     @if (indicatorLevel()) {
@@ -98,11 +110,7 @@
         <div class="element-panel__delete" data-testid="element-delete">
           <button
             type="button"
-            pButton
-            severity="danger"
-            [outlined]="true"
-            size="small"
-            class="element-panel__delete-button !rounded-[9px] !text-[13px]"
+            class="element-panel__delete-button flex cursor-pointer items-center gap-2 border-2 font-medium border-[var(--ac-red-1)] text-[var(--ac-red-1)] px-4 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[var(--ac-grey-200)] disabled:border-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
             [attr.aria-disabled]="current.deletable ? null : 'true'"
             [attr.aria-describedby]="current.deletable ? null : 'element-delete-reason'"
             [pTooltip]="current.deletable ? undefined : blockerText(current)"
@@ -118,25 +126,28 @@
         </div>
       }
       <div class="element-panel__commit">
-        <p-button
-          type="button"
-          label="Cancel"
-          severity="secondary"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          (onClick)="cancel()"
-          data-testid="element-cancel">
-        </p-button>
-        <p-button
-          type="submit"
-          label="Save"
-          severity="info"
-          size="small"
-          styleClass="!rounded-[9px] !text-[13px]"
-          [disabled]="saving()"
-          [loading]="saving()"
-          data-testid="element-save">
-        </p-button>
+        <span data-testid="element-cancel">
+          <button
+            type="button"
+            class="ods-cancel flex cursor-pointer items-center gap-2 border-2 font-medium border-[var(--ac-light-blue-400)] text-[var(--ac-light-blue-400)] px-4 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[var(--ac-grey-200)] disabled:border-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
+            (click)="cancel()">
+            Cancel
+          </button>
+        </span>
+        <span data-testid="element-save">
+          <button
+            type="submit"
+            class="ods-save flex cursor-pointer items-center gap-2 border-2 border-transparent bg-[var(--ac-green-400)] text-[var(--ac-white-1)] px-5 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:border-transparent disabled:bg-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
+            [disabled]="saving()"
+            [attr.aria-busy]="saving() ? 'true' : null">
+            @if (saving()) {
+              <i class="pi pi-spinner pi-spin !text-[12px]" aria-hidden="true"></i>
+            } @else {
+              <i class="pi pi-save !text-[12px] -scale-x-100" aria-hidden="true"></i>
+            }
+            Save
+          </button>
+        </span>
       </div>
     </div>
   </form>

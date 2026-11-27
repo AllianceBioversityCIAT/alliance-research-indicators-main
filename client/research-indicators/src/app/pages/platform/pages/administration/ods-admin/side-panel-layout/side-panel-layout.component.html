@@ -1,6 +1,7 @@
-<div class="side-panel-layout__list side-panel-layout__card">
+<div class="side-panel-layout__list side-panel-layout__card" [class.side-panel-layout__list--solo]="!panelVisible()">
   <ng-content select="[list]" />
 </div>
+@if (panelVisible()) {
 <aside class="side-panel-layout__panel side-panel-layout__card" [attr.aria-label]="panelLabel()" data-testid="side-panel">
   @if (!hasSelection() && !creating()) {
     <ng-content select="app-ods-empty-panel" />
@@ -10,3 +11,4 @@
   }
   <ng-content select="[panel]" />
 </aside>
+}

@@ -13,40 +13,6 @@
         </div>
 
         <div class="flex flex-wrap items-end gap-3" data-testid="header-actions">
-          <div class="flex flex-col gap-1">
-            <label for="objectivePortfolio" class="text-sm font-medium atc-grey-800">Portfolio</label>
-            <p-select
-              #portfolioSelect
-              inputId="objectivePortfolio"
-              [options]="portfolioOptions()"
-              optionLabel="label"
-              optionValue="id"
-              [ngModel]="portfolioId()"
-              (onChange)="onPortfolioChange($event.value)"
-              [disabled]="portfolioOptions().length === 0"
-              styleClass="min-w-[240px]"
-              ariaLabel="Portfolio"
-              data-testid="portfolio-select">
-            </p-select>
-          </div>
-
-          <div class="flex flex-col gap-1">
-            <label for="objectivePageYear" class="text-sm font-medium atc-grey-800">Year</label>
-            <p-select
-              #yearSelect
-              inputId="objectivePageYear"
-              [options]="yearOptions()"
-              optionLabel="label"
-              optionValue="year"
-              [ngModel]="year()"
-              (onChange)="onYearChange($event.value)"
-              [disabled]="yearOptions().length === 0 || loading()"
-              styleClass="min-w-[220px]"
-              ariaLabel="Year"
-              data-testid="year-select">
-            </p-select>
-          </div>
-
           <p-button
             [label]="carryLabel()"
             icon="pi pi-copy !text-[12px]"
@@ -89,56 +55,110 @@
         <p class="m-0 text-sm leading-[1.5] atc-red-1" role="alert" data-testid="delete-error">{{ message }}</p>
       }
 
-      @if (loading()) {
-        <app-custom-progress-bar></app-custom-progress-bar>
-      } @else if (loadError()) {
-        <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
-          <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
-          <p-button
-            label="Retry"
-            icon="pi pi-refresh !text-[12px]"
-            severity="secondary"
-            size="small"
-            styleClass="!rounded-[9px] !text-[13px]"
-            (onClick)="load()"
-            data-testid="retry-button">
-          </p-button>
-        </div>
-      } @else {
-        <app-side-panel-layout [hasSelection]="selectedId() !== null" [creating]="creating()" panelLabel="Objective details">
+      @if (context()) {
+        <app-side-panel-layout
+          [hasSelection]="selectedId() !== null"
+          [creating]="creating()"
+          [panelVisible]="!loading() && !loadError()"
+          panelLabel="Objective details">
           <app-ods-empty-panel
             circleIcon="pi pi-flag"
             title="Explore the institutional objectives"
             subtitle="Select an objective to see its statement, year and linked indicators."
             [rows]="emptyRows()" />
-          <div list data-testid="objectives-list">
-            @if (objectiveCounts().objectives > 0) {
-              <p class="mt-0 mb-3 text-sm leading-[1.5] atc-grey-800" data-testid="summary-line">{{ objectiveSummary() }}</p>
-            }
-            <app-ods-find-field
-              label="Find by code or name"
-              placeholder="Find by code or name"
-              inputId="objectives-search"
-              inputTestId="objectives-search"
-              clearTestId="objectives-search-clear"
-              [value]="query()"
-              (queryChange)="onQuery($event)" />
-            @if (noMatches()) {
-              <p class="objectives-search-empty" role="status" data-testid="objectives-search-empty">No objectives match "{{ trimmedQuery() }}"</p>
-            } @else {
-              <div data-testid="objectives-table">
-                <app-data-table
-                  [columns]="columns"
-                  [rows]="visibleRows()"
-                  [showToolbar]="false"
-                  [selectable]="true"
-                  [keyboardSelectable]="true"
-                  [selectedKey]="selectedKey()"
-                  (rowSelected)="onRowSelected($event)"
-                  emptyMessage="No institutional objectives for this year yet.">
-                </app-data-table>
+          <div list class="list-frame" data-testid="objectives-list">
+            <div class="list-scroll" data-testid="list-scroll">
+              <div class="list-band" data-testid="list-band">
+                @if (!loading() && objectiveCounts().objectives > 0) {
+                  <ul class="count-chips" aria-label="Counts" data-testid="count-chips">
+                    @for (text of countChips(); track text) {
+                      <li class="level-chip" data-testid="count-chip">{{ text }}</li>
+                    }
+                  </ul>
+                }
+                <app-ods-find-field
+                  label="Find by code or statement"
+                  placeholder="Find by code or statement"
+                  inputId="objectives-search"
+                  inputTestId="objectives-search"
+                  clearTestId="objectives-search-clear"
+                  [value]="query()"
+                  (queryChange)="onQuery($event)">
+                  <div class="card-tools">
+                    <div class="ods-field">
+                      <label for="objectivePortfolio" class="label">Portfolio</label>
+                      <p-select
+                        #portfolioSelect
+                        inputId="objectivePortfolio"
+                        [options]="portfolioOptions()"
+                        optionLabel="label"
+                        optionValue="id"
+                        [ngModel]="portfolioId()"
+                        (onChange)="onPortfolioChange($event.value)"
+                        [disabled]="portfolioOptions().length === 0"
+                        appendTo="body"
+                        styleClass="min-w-[240px]"
+                        ariaLabel="Portfolio"
+                        data-testid="portfolio-select">
+                      </p-select>
+                    </div>
+
+                    <div class="ods-field">
+                      <label for="objectivePageYear" class="label">Year</label>
+                      <p-select
+                        #yearSelect
+                        inputId="objectivePageYear"
+                        [options]="yearOptions()"
+                        optionLabel="label"
+                        optionValue="year"
+                        [ngModel]="year()"
+                        (onChange)="onYearChange($event.value)"
+                        [disabled]="yearOptions().length === 0"
+                        appendTo="body"
+                        styleClass="min-w-[220px]"
+                        ariaLabel="Year"
+                        data-testid="year-select">
+                      </p-select>
+                    </div>
+                  </div>
+                </app-ods-find-field>
               </div>
-            }
+              <div class="list-scroll__body">
+                @if (loading()) {
+                  <app-custom-progress-bar></app-custom-progress-bar>
+                } @else if (loadError()) {
+                  <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+                    <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
+                    <p-button
+                      label="Retry"
+                      icon="pi pi-refresh !text-[12px]"
+                      severity="secondary"
+                      size="small"
+                      styleClass="!rounded-[9px] !text-[13px]"
+                      (onClick)="load()"
+                      data-testid="retry-button">
+                    </p-button>
+                  </div>
+                } @else if (noMatches()) {
+                  <p class="objectives-search-empty" role="status" data-testid="objectives-search-empty">
+                    No objectives match "{{ trimmedQuery() }}"
+                  </p>
+                } @else {
+                  <div data-testid="objectives-table">
+                    <app-data-table
+                      [columns]="columns"
+                      [rows]="visibleRows()"
+                      [showToolbar]="false"
+                      [selectable]="true"
+                      [keyboardSelectable]="true"
+                      [selectedKey]="selectedKey()"
+                      (rowSelected)="onRowSelected($event)"
+                      emptyMessage="No institutional objectives for this year yet.">
+                    </app-data-table>
+                  </div>
+                }
+              </div>
+            </div>
           </div>
           <div panel data-testid="objective-panel-slot">
             @if (selectedId() !== null || creating()) {
@@ -159,6 +179,21 @@
             }
           </div>
         </app-side-panel-layout>
+      } @else if (loading()) {
+        <app-custom-progress-bar></app-custom-progress-bar>
+      } @else if (loadError()) {
+        <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+          <p class="m-0 text-sm atc-red-1">{{ loadError() }}</p>
+          <p-button
+            label="Retry"
+            icon="pi pi-refresh !text-[12px]"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="load()"
+            data-testid="retry-button">
+          </p-button>
+        </div>
       }
     </section>
   </div>

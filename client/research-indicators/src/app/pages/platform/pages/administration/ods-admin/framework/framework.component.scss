@@ -1,3 +1,6 @@
+@use '../ods-count-chips';
+@use '../ods-field';
+@use '../ods-list-band';
 @use '../ods-page-column' as column;
 
 // strategy-framework T-19 — design §6.2, §6.9, P-46, D-STF-31. Tokens only.
@@ -48,19 +51,48 @@
   }
 }
 
-.view-toggle__button {
-  border: 1px solid var(--ac-grey-200);
-  background: var(--ac-white-1);
-  color: var(--ac-grey-700);
+.card-tools__toggle {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
 }
 
-.view-toggle__button:focus-visible {
-  outline: 2px solid var(--ac-primary-blue-600);
-  outline-offset: 2px;
+// Results Center's toggle is not rendered (showViewToggleButtons is false).
+// 39×39 matches the find field and the selects. The copied !max-h-[27px]
+// utility is omitted: it won over this rule and painted the buttons 27px tall.
+// Bottoms line up with those inputs (align-items: flex-end).
+:host ::ng-deep button.p-button.view-toggle-btn {
+  width: 39px !important;
+  height: 39px !important;
+  max-height: 39px !important;
 }
 
-.view-toggle__button--active {
-  background: var(--ac-grey-100);
-  color: var(--ac-primary-blue-600);
-  font-weight: 600;
+:host ::ng-deep button.p-button.view-toggle-btn .p-button-icon {
+  margin: 0 !important;
+  font-size: 16px !important;
+  color: var(--p-text-muted-color) !important;
+}
+
+// Active look measured from my-projects.component.scss (.view-toggle-btn.p-button-outlined).
+// #d9e1eb and #b8d4e8 have no token; the border is Aura content.borderColor (surface.200).
+:host ::ng-deep button.p-button.view-toggle-btn.p-button-outlined {
+  background: #d9e1eb !important;
+  border: 1px solid var(--p-content-border-color) !important;
+  border-radius: 4px !important;
+  color: var(--ac-light-blue-400) !important;
+}
+
+:host ::ng-deep button.p-button.view-toggle-btn.p-button-outlined .p-button-icon {
+  margin: 0 !important;
+  font-size: 16px !important;
+  color: var(--ac-light-blue-400) !important;
+}
+
+:host ::ng-deep button.p-button.view-toggle-btn.p-button-outlined:hover {
+  background: #b8d4e8 !important;
+}
+
+:host ::ng-deep button.p-button.view-toggle-btn.p-button-text {
+  background: transparent !important;
+  border-color: transparent !important;
 }

@@ -115,9 +115,7 @@ export default class InstitutionalObjectivesComponent implements OnInit {
   readonly trimmedQuery = computed(() => this.query().trim());
   readonly visibleRows = computed(() => filterObjectives(this.objectiveRows(), this.query()));
   /** A search over a year that has objectives and hits nothing is not the true-empty state (R-CTL-008). */
-  readonly noMatches = computed(
-    () => this.trimmedQuery() !== '' && this.objectiveRows().length > 0 && this.visibleRows().length === 0
-  );
+  readonly noMatches = computed(() => this.trimmedQuery() !== '' && this.objectiveRows().length > 0 && this.visibleRows().length === 0);
 
   /** Null during create, so no row stays highlighted. */
   readonly selectedKey = computed(() => {
@@ -129,7 +127,7 @@ export default class InstitutionalObjectivesComponent implements OnInit {
   readonly exportFileName = computed(() => `institutional-objectives_${this.year() ?? 'year'}.xlsx`);
 
   /**
-   * Counts shared by the empty panel and the summary line. `objectives` is the
+   * Counts shared by the empty panel and the count chips. `objectives` is the
    * selected year's count, the same number the year select shows. `linkedIndicators`
    * is distinct linked indicator ids.
    */
@@ -146,9 +144,11 @@ export default class InstitutionalObjectivesComponent implements OnInit {
     };
   });
 
-  readonly objectiveSummary = computed(() => {
+  /** Same counts as `objectiveCounts`. Singular only when the count is 1. */
+  readonly countChips = computed(() => {
     const counts = this.objectiveCounts();
-    return `${counts.objectives} objectives · ${counts.linkedIndicators} linked indicators`;
+    const label = (count: number, singular: string, plural: string) => `${count === 1 ? singular : plural} · ${count}`;
+    return [label(counts.objectives, 'Objective', 'Objectives'), label(counts.linkedIndicators, 'Linked indicator', 'Linked indicators')];
   });
 
   /** Informational rows for the empty panel. The counts are `objectiveCounts`. */

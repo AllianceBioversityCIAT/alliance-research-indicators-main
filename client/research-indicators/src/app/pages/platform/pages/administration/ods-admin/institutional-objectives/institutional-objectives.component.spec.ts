@@ -117,6 +117,7 @@ describe('InstitutionalObjectivesComponent', () => {
 
   const root = () => fixture.nativeElement as HTMLElement;
   const q = (testId: string) => root().querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
+  const chipTexts = () => Array.from(root().querySelectorAll('[data-testid="count-chip"]')).map(chip => chip.textContent?.trim());
   const button = (testId: string) => {
     const inner = q(testId)?.querySelector('button');
     if (!(inner instanceof HTMLButtonElement)) throw new Error(`missing button ${testId}`);
@@ -201,7 +202,7 @@ describe('InstitutionalObjectivesComponent', () => {
     create();
 
     expect(root().querySelector('app-custom-progress-bar')).not.toBeNull();
-    expect(q('year-select')?.textContent).not.toContain('2026 · 28 objectives');
+    expect(q('year-select')).toBeNull();
 
     resolveContext(ok(CONTEXT));
     await settle();
@@ -259,11 +260,11 @@ describe('InstitutionalObjectivesComponent', () => {
   it('disables carry forward on an empty year', async () => {
     create();
     await settle();
-    expect(q('objectives-list')?.contains(q('summary-line'))).toBe(true);
+    expect(q('objectives-list')?.contains(q('count-chips'))).toBe(true);
     fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: 2027 });
     await settle();
 
-    expect(q('summary-line')).toBeNull();
+    expect(q('count-chips')).toBeNull();
     expect(q('objectives-search')).not.toBeNull();
     const carry = button('carry-forward');
     expect(carry.textContent).toContain('Carry forward to 2028');
@@ -659,6 +660,27 @@ describe('InstitutionalObjectivesComponent', () => {
     await settle();
   });
 
+  it('keeps the portfolio and year selects when the next portfolio load fails', async () => {
+    create();
+    await settle();
+    const portfolio = q('portfolio-select');
+    const year = q('year-select');
+    expect(portfolio).not.toBeNull();
+    expect(year).not.toBeNull();
+
+    api.GET_StrategyFrameworkObjectiveYears.mockImplementation((id: number) =>
+      id === 1 ? Promise.resolve(failed(500, 'The objectives read failed')) : Promise.resolve(ok({ years: YEAR_ROWS, defaultYear }))
+    );
+    await pickOption('portfolio-select', option => option.id === 1);
+
+    expect(q('error-state')?.textContent).toContain('The objectives read failed');
+    expect(q('retry-button')).not.toBeNull();
+    expect(q('portfolio-select')).toBe(portfolio);
+    expect(q('year-select')).toBe(year);
+    expect(q('objectives-list')?.contains(portfolio)).toBe(true);
+    expect(q('objectives-list')?.contains(year)).toBe(true);
+  });
+
   it('asks before a year change, and Keep editing leaves the year label and the form', async () => {
     create();
     await settle();
@@ -906,17 +928,38 @@ describe('InstitutionalObjectivesComponent', () => {
     const actions = q('header-actions');
     expect(header?.contains(q('page-subtitle'))).toBe(true);
     expect(q('page-subtitle')?.textContent?.trim()).toBe("Define each year's institutional objectives and link them to framework indicators.");
-    const order = ['portfolio-select', 'year-select', 'carry-forward', 'add-objective', 'export-button'].map(id =>
-      actions?.querySelector(`[data-testid="${id}"]`)
-    );
+    const order = ['carry-forward', 'add-objective', 'export-button'].map(id => actions?.querySelector(`[data-testid="${id}"]`));
     expect(order.every(element => element !== null)).toBe(true);
     for (let index = 1; index < order.length; index += 1) {
       expect(order[index - 1]!.compareDocumentPosition(order[index]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
-    expect(q('summary-line')?.textContent?.trim()).toBe('28 objectives · 1 linked indicators');
-    expect(q('summary-line')?.className).toContain('atc-grey-800');
-    expect(q('objectives-list')?.contains(q('summary-line'))).toBe(true);
-    expect(q('summary-line')!.compareDocumentPosition(q('objectives-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(header?.querySelector('[data-testid="portfolio-select"]')).toBeNull();
+    expect(header?.querySelector('[data-testid="year-select"]')).toBeNull();
+    expect(q('objectives-list')?.querySelectorAll('[data-testid="portfolio-select"]')).toHaveLength(1);
+    expect(q('objectives-list')?.querySelectorAll('[data-testid="year-select"]')).toHaveLength(1);
+    expect(q('objectives-search')!.compareDocumentPosition(q('portfolio-select')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('portfolio-select')!.compareDocumentPosition(q('year-select')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chipTexts()).toEqual(['Objectives · 28', 'Linked indicator · 1']);
+    expect(q('count-chips')?.tagName).toBe('UL');
+    expect(q('count-chips')?.getAttribute('aria-label')).toBe('Counts');
+    expect(q('count-chip')?.tagName).toBe('LI');
+    expect(q('count-chip')?.classList.contains('level-chip')).toBe(true);
+    expect(q('summary-line')).toBeNull();
+    expect(q('objectives-list')?.contains(q('count-chips'))).toBe(true);
+    expect(q('list-band')?.firstElementChild).toBe(q('count-chips'));
+    expect(q('list-scroll')?.firstElementChild?.getAttribute('data-testid')).toBe('list-band');
+    expect(q('count-chips')!.compareDocumentPosition(q('objectives-search')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(root().querySelector('label[for="objectivePortfolio"]')?.classList.contains('label')).toBe(true);
+    expect(root().querySelector('label[for="objectivePageYear"]')?.classList.contains('label')).toBe(true);
+  });
+
+  it('uses the singular for one objective and one linked indicator', async () => {
+    create();
+    await settle();
+    expect(chipTexts()).toEqual(['Objectives · 28', 'Linked indicator · 1']);
+
+    await pickOption('year-select', option => option.year === 2028);
+    expect(chipTexts()).toEqual(['Objective · 1', 'Linked indicators · 0']);
   });
 
   it('filters the list by code and by statement and keeps a hidden selection', async () => {
@@ -926,7 +969,11 @@ describe('InstitutionalObjectivesComponent', () => {
 
     const codes = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(cell => cell.textContent?.trim());
     const search = q('objectives-search') as HTMLInputElement;
-    expect(root().querySelector('label[for="objectives-search"]')?.textContent?.trim()).toBe('Find by code or name');
+    const findLabel = root().querySelector('label[for="objectives-search"]');
+    expect(findLabel?.classList.contains('label')).toBe(true);
+    expect(findLabel?.textContent?.trim()).toBe('Find by code or statement');
+    expect((q('objectives-search') as HTMLInputElement).classList.contains('p-inputtext')).toBe(true);
+    expect((q('objectives-search') as HTMLInputElement).getAttribute('placeholder')).toBe('Find by code or statement');
     search.value = 'IOB-2';
     search.dispatchEvent(new Event('input', { bubbles: true }));
     await settle();
@@ -988,12 +1035,15 @@ describe('InstitutionalObjectivesComponent', () => {
     api.GET_StrategyFrameworkObjectives.mockReturnValue(new Promise(resolve => (resolveYear = resolve)));
     fixture.debugElement.query(By.css('[data-testid="year-select"]')).triggerEventHandler('onChange', { value: 2028 });
     fixture.detectChanges();
-    expect(q('objectives-search')).toBeNull();
+    expect(q('objectives-search')).toBe(search);
+    expect(q('year-select')).not.toBeNull();
+    expect(q('portfolio-select')).not.toBeNull();
 
     resolveYear(ok(OBJECTIVES));
     await settle();
 
     const kept = q('objectives-search') as HTMLInputElement;
+    expect(kept).toBe(search);
     expect(component.year()).toBe(2028);
     expect(actions.showGlobalAlert).not.toHaveBeenCalled();
     expect(kept.value).toBe('zzz');

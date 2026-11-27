@@ -15,17 +15,24 @@ import {
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
-import { exportSheetsToXlsx } from '@shared/utils/xlsx-export.util';
+import { exportRowsToXlsx } from '@shared/utils/xlsx-export.util';
 import { OdsEmptyPanelComponent, OdsEmptyRow } from '../ods-empty-panel/ods-empty-panel.component';
+import { OdsFindFieldComponent } from '../ods-find-field/ods-find-field.component';
+import { OdsPressedDirective } from '../ods-pressed.directive';
 import { SidePanelLayoutComponent } from '../side-panel-layout/side-panel-layout.component';
 import { guardDiscard } from '../unsaved-changes.util';
 import { FrameworkViewSlug, parseFrameworkUrl, serializeFrameworkUrl } from './url/framework-url.codec';
 import { ElementPanelComponent } from './components/element-panel/element-panel.component';
 import { FrameworkTreeComponent } from './components/framework-tree/framework-tree.component';
-import { FrameworkTableCreate, FrameworkTablesComponent } from './components/framework-tables/framework-tables.component';
+import {
+  FRAMEWORK_TABLE_COLUMNS,
+  FrameworkTableCreate,
+  FrameworkTablesComponent,
+  rowsOf
+} from './components/framework-tables/framework-tables.component';
 import { FrameworkDeleteHandler } from './framework-delete.handler';
 import { frameworkErrorOf } from './utils/framework-error.util';
-import { buildExportSheets, frameworkTreeNodes, levelCounts, summaryLine } from './utils/framework-view.util';
+import { frameworkTreeNodes, levelCounts } from './utils/framework-view.util';
 
 interface PortfolioOption extends FrameworkContextPortfolio {
   label: string;
@@ -46,9 +53,11 @@ interface PortfolioOption extends FrameworkContextPortfolio {
     CustomProgressBarComponent,
     SidePanelLayoutComponent,
     OdsEmptyPanelComponent,
+    OdsFindFieldComponent,
     FrameworkTreeComponent,
     FrameworkTablesComponent,
-    ElementPanelComponent
+    ElementPanelComponent,
+    OdsPressedDirective
   ],
   providers: [FrameworkDeleteHandler],
   templateUrl: './framework.component.html',
@@ -69,6 +78,9 @@ export default class FrameworkComponent implements OnInit {
   readonly portfolioId = signal<number | null>(null);
   readonly editor = signal<FrameworkEditorView | null>(null);
   readonly view = signal<FrameworkViewSlug>('editor');
+  /** Find terms live on the page so the one band is not rebuilt when the view changes. */
+  readonly treeQuery = signal('');
+  readonly tableQuery = signal('');
   readonly loading = signal(true);
   readonly loadError = signal<string | null>(null);
   readonly exporting = signal(false);
@@ -106,9 +118,10 @@ export default class FrameworkComponent implements OnInit {
     return `Strategy ${portfolio.startYear}–${portfolio.endYear} – Monitoring framework`;
   });
 
-  readonly summary = computed(() => {
+  /** One chip per level. `name` is the singular on the level model; count 0 and 2+ keep `pluralName`. */
+  readonly countChips = computed(() => {
     const editor = this.editor();
-    return editor ? summaryLine(editor) : '';
+    return editor ? levelCounts(editor) : [];
   });
 
   readonly empty = computed(() => {
@@ -116,7 +129,7 @@ export default class FrameworkComponent implements OnInit {
     return editor !== null && editor.elements.length === 0;
   });
 
-  /** Same counts as the chips and the summary line, one row per level, in depth order. */
+  /** Same counts as the chips, one row per level, in depth order. */
   readonly emptyRows = computed<OdsEmptyRow[]>(() => {
     const editor = this.editor();
     if (!editor) return [];
@@ -229,6 +242,11 @@ export default class FrameworkComponent implements OnInit {
     );
   }
 
+  onListQuery(value: string): void {
+    if (this.view() === 'table') this.tableQuery.set(value);
+    else this.treeQuery.set(value);
+  }
+
   setView(view: FrameworkViewSlug): void {
     if (view === this.view()) return;
     this.discard(() => {
@@ -284,6 +302,10 @@ export default class FrameworkComponent implements OnInit {
     });
   }
 
+  /**
+   * Every element, in the table's default order. The find field does not narrow this workbook.
+   * `exportRowsToXlsx` has no sheet-name argument; the only sheet stays named "Values".
+   */
   async exportWorkbook(): Promise<void> {
     const editor = this.editor();
     if (!editor || this.exporting()) return;
@@ -291,8 +313,9 @@ export default class FrameworkComponent implements OnInit {
     try {
       const portfolio = this.selectedPortfolio();
       const years = portfolio ? `${portfolio.startYear}-${portfolio.endYear}` : 'framework';
-      await exportSheetsToXlsx({
-        sheets: buildExportSheets(editor),
+      await exportRowsToXlsx({
+        columns: FRAMEWORK_TABLE_COLUMNS,
+        rows: rowsOf(editor),
         fileName: `strategy-framework_${years}.xlsx`
       });
     } finally {

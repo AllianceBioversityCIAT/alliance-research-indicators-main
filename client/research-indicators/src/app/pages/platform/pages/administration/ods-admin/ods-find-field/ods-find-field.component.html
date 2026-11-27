@@ -1,19 +1,23 @@
-<div class="ods-find">
-  <label class="ods-find__label" [attr.for]="inputId()">{{ label() }}</label>
-  <div class="ods-find__field">
-    <input
-      [id]="inputId()"
-      type="text"
-      class="ods-find__input"
-      [attr.data-testid]="inputTestId()"
-      [attr.placeholder]="placeholder()"
-      autocomplete="off"
-      [value]="value()"
-      (input)="onInput($event)" />
-    @if (value()) {
-      <button type="button" class="ods-find__clear" [attr.data-testid]="clearTestId()" aria-label="Clear search" (click)="clear()">
-        <i class="pi pi-times" aria-hidden="true"></i>
-      </button>
-    }
+<div class="ods-find-line">
+  <div class="ods-find ods-field ods-find-line__search">
+    <label class="label" [attr.for]="inputId()">{{ label() }}</label>
+    <div class="ods-find__field">
+      <input
+        pInputText
+        [id]="inputId()"
+        type="text"
+        class="ods-find__input"
+        [attr.data-testid]="inputTestId()"
+        [attr.placeholder]="placeholder()"
+        autocomplete="off"
+        [value]="value()"
+        (input)="onInput($event)" />
+      @if (value()) {
+        <button type="button" class="ods-find__clear" [attr.data-testid]="clearTestId()" aria-label="Clear search" (click)="clear()">
+          <i class="pi pi-times" aria-hidden="true"></i>
+        </button>
+      }
+    </div>
   </div>
+  <div class="ods-find-line__tools"><ng-content /></div>
 </div>

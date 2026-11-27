@@ -1,24 +1,37 @@
-@use '../ods-field-focus' as fieldFocus;
+@use '../ods-field';
 
-// strategy-framework T-23 — D-STF-40. The tree's find field, moved so both pages share it.
-// Tokens only. The border recolour is the shared ods-field-focus mixin.
+// strategy-framework T-23 — D-STF-40. The labelled find field, shared by both pages.
+// The box is PrimeNG pInputText (ods-field.scss). Right padding keeps the clear button clear of the text.
 
 :host {
   display: block;
 }
 
-.ods-find {
+// Search grows. Projected toolbar (Portfolio, Year, view toggle) sits on the right
+// and wraps under the search when the card is narrow (D-STF-44).
+.ods-find-line {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  width: 100%;
 }
 
-.ods-find__label {
-  color: var(--ac-grey-800);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.5;
+.ods-find-line__search {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.ods-find-line__tools {
+  margin-left: auto;
+}
+
+.ods-find-line__tools:not(:has(*)) {
+  display: none;
+}
+
+.ods-find {
+  margin-bottom: 0;
 }
 
 .ods-find__field {
@@ -26,21 +39,7 @@
 }
 
 .ods-find__input {
-  width: 100%;
-  min-height: 2rem;
-  padding: 0.25rem 2rem 0.25rem 0.5rem;
-  border: 1px solid var(--ac-grey-200);
-  border-radius: 0.5rem;
-  background: var(--ac-white-1);
-  color: var(--ac-grey-800);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.ods-find__input:focus,
-.ods-find__input:focus-visible {
-  @include fieldFocus.ods-field-focus;
+  padding-inline-end: 2rem;
 }
 
 .ods-find__clear:focus-visible {

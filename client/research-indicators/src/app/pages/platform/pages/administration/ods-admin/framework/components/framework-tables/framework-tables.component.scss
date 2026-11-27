@@ -1,17 +1,20 @@
 @use '../../../ods-code-pill' as pill;
 
 // strategy-framework T-23 — design §6.4, §6.7. Tokens only.
-// Chips are counts. They are not controls.
 
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
 }
 
-.level-chip {
-  border-radius: 999px;
-  background: var(--ac-grey-100);
-  color: var(--ac-grey-800);
-  font-weight: 600;
+@media (max-width: 1023px) {
+  :host {
+    flex: none;
+    min-height: auto;
+  }
 }
 
 // The shared table paints `type: 'code'` as plain text. This is the outline pill.

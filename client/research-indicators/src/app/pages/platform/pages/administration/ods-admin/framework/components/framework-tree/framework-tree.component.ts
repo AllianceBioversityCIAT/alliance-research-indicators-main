@@ -1,4 +1,3 @@
-import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -6,15 +5,17 @@ import {
   Directive,
   ElementRef,
   computed,
+  effect,
   inject,
   input,
   linkedSignal,
   output,
-  signal
+  signal,
+  untracked
 } from '@angular/core';
 import type { TreeNode } from 'primeng/api';
+import { TooltipModule } from 'primeng/tooltip';
 import { TreeTableModule, type TreeTableNodeCollapseEvent } from 'primeng/treetable';
-import { OdsFindFieldComponent } from '../../../ods-find-field/ods-find-field.component';
 import { FrameworkTreeRow } from '../../utils/framework-view.util';
 import { matchesCodeOrName, normalizedTerm } from './tree-filter.util';
 
@@ -48,7 +49,7 @@ export class TreeRowKeysDirective {
 @Component({
   selector: 'app-framework-tree',
   standalone: true,
-  imports: [CommonModule, TreeTableModule, TreeRowKeysDirective, OdsFindFieldComponent],
+  imports: [TreeTableModule, TooltipModule, TreeRowKeysDirective],
   templateUrl: './framework-tree.component.html',
   styleUrl: './framework-tree.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -62,6 +63,8 @@ export class FrameworkTreeComponent {
   readonly indentStep = 28;
   readonly nodes = input.required<TreeNode<FrameworkTreeRow>[]>();
   readonly selectedId = input<number | null>(null);
+  /** The page's find field. Null leaves the list unfiltered. */
+  readonly queryOverride = input<string | null>(null);
   /** Element ids the page keeps collapsed. All expanded when the set is empty. */
   readonly collapsedIds = input<ReadonlySet<number>>(new Set());
 
@@ -70,6 +73,16 @@ export class FrameworkTreeComponent {
   readonly expansionChanged = output<ReadonlySet<number>>();
 
   readonly query = signal('');
+
+  constructor() {
+    effect(() => {
+      const override = this.queryOverride();
+      if (override === null) return;
+      untracked(() => {
+        if (override !== this.query()) this.setQuery(override);
+      });
+    });
+  }
   /** Collapse set from before the current search. Clearing the search puts it back. */
   private collapseSnapshot: ReadonlySet<number> | null = null;
   private readonly collapsed = linkedSignal(() => this.collapsedIds());
@@ -117,10 +130,6 @@ export class FrameworkTreeComponent {
     const id = Number(next.getAttribute('data-row-key'));
     if (Number.isNaN(id)) return;
     this.rovingId.set(id);
-  }
-
-  onQuery(value: string): void {
-    this.setQuery(value);
   }
 
   toggle(row: FrameworkTreeRow, event: Event): void {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { OdsFindFieldComponent } from './ods-find-field.component';
@@ -32,7 +34,10 @@ describe('OdsFindFieldComponent', () => {
 
   it('emits the typed query, then an empty string when cleared', () => {
     const input = root().querySelector('[data-testid="ods-find-field"]') as HTMLInputElement;
-    expect(root().querySelector('label')?.textContent?.trim()).toBe('Find by code or name');
+    const label = root().querySelector('label');
+    expect(label?.classList.contains('label')).toBe(true);
+    expect(label?.textContent?.trim()).toBe('Find by code or name');
+    expect(input.classList.contains('p-inputtext')).toBe(true);
     expect(root().querySelector('[data-testid="ods-find-clear"]')).toBeNull();
 
     input.value = 'IOB-1';
@@ -50,6 +55,20 @@ describe('OdsFindFieldComponent', () => {
     expect(fixture.componentInstance.query()).toBe('');
     expect((root().querySelector('[data-testid="ods-find-field"]') as HTMLInputElement).value).toBe('');
     expect(root().querySelector('[data-testid="ods-find-clear"]')).toBeNull();
+  });
+
+  it('lets the search grow and wraps a projected toolbar under it', () => {
+    const scss = readFileSync(join(__dirname, 'ods-find-field.component.scss'), 'utf8');
+    const start = scss.indexOf('.ods-find-line {');
+    const line = scss.slice(start, scss.indexOf('}', start) + 1);
+    const searchStart = scss.indexOf('.ods-find-line__search {');
+    const search = scss.slice(searchStart, scss.indexOf('}', searchStart) + 1);
+
+    expect(line).toContain('flex-wrap: wrap');
+    expect(line).toContain('align-items: flex-end');
+    expect(line).not.toContain('position: sticky');
+    expect(search).toContain('flex: 1 1 16rem');
+    expect(search.endsWith('}')).toBe(true);
   });
 
   it('shows a value the parent already holds, with the clear button', () => {

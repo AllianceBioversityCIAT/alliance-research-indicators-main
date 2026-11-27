@@ -1,11 +1,9 @@
-import { writeExportSheets } from '@shared/utils/xlsx-export.util';
 import { FrameworkEditorElement, FrameworkEditorView, FrameworkLevel, FrameworkResponsible } from '@shared/interfaces/strategy-framework.interface';
-import { buildExportSheets, descendantCountText, frameworkTreeNodes, nestFramework, summaryLine, tableRowsForLevel } from './framework-view.util';
+import { descendantCountText, frameworkTreeNodes, nestFramework, summaryLine, tableRowsForLevel } from './framework-view.util';
 
 // @akili-spec institutional-performance/strategy-framework T-12 — design §6.2, §6.4, R-STF-007 AC.1,
 // R-STF-008 AC.3. The seeded shape is 4 / 13 / 31. `1.10` is inserted before `1.2` so a lexical
-// sort would fail. The workbook assertion reads `workbook.worksheets` (names and count) — row
-// arrays alone cannot show "one sheet per level".
+// sort would fail. The workbook is the page's export (D-STF-45), not a helper in this file.
 
 const SEEDED_LEVELS: FrameworkLevel[] = [
   { id: 1, depth: 1, name: 'Performance Area', pluralName: 'Performance Areas', shortLabel: 'AREA', isIndicatorLevel: false },
@@ -89,19 +87,6 @@ const fourLevelView = (): FrameworkEditorView => ({
   ]
 });
 
-type WorkbookLike = import('exceljs').Workbook;
-
-const codesOf = (sheetName: string, workbook: WorkbookLike): string[] => {
-  const sheet = workbook.getWorksheet(sheetName);
-  if (!sheet) throw new Error(`missing sheet ${sheetName}`);
-  const codes: string[] = [];
-  sheet.eachRow((row, index) => {
-    if (index === 1) return;
-    codes.push(String(row.getCell(1).value ?? ''));
-  });
-  return codes;
-};
-
 describe('framework-view.util', () => {
   it('nests the seeded shape in natural order with the seeded counts', async () => {
     const view = seededView();
@@ -129,26 +114,9 @@ describe('framework-view.util', () => {
     expect(row?.['1Code']).toBe('1');
     expect(row?.['2Code']).toBe('1.1');
     expect(row?.responsiblesText).toBe('Idris Jones; Philippe Attey (inactive)');
-
-    const ExcelJS = await import('exceljs');
-    const workbook = new ExcelJS.Workbook();
-    const sheets = buildExportSheets(view);
-    writeExportSheets(workbook, sheets);
-
-    expect(workbook.worksheets).toHaveLength(view.levels.length);
-    expect(workbook.worksheets.map(worksheet => worksheet.name)).toEqual(['Performance Areas', 'Dimensions', 'Indicators']);
-    const dimensionCodes = codesOf('Dimensions', workbook);
-    expect(dimensionCodes).toHaveLength(13);
-    expect(dimensionCodes.indexOf('1.2')).toBeLessThan(dimensionCodes.indexOf('1.10'));
-    expect(codesOf('Performance Areas', workbook)).toEqual(['1', '2', '3', '4']);
-    expect(codesOf('Indicators', workbook)).toHaveLength(31);
-    const indicatorSheet = workbook.getWorksheet('Indicators');
-    const header: unknown[] = [];
-    indicatorSheet?.getRow(1).eachCell(cell => header.push(cell.value));
-    expect(header).toContain('Responsibles');
   });
 
-  it('shows a fourth level on the tree, the flattened row and the workbook', async () => {
+  it('shows a fourth level on the tree and the flattened row', () => {
     const view = fourLevelView();
     expect(summaryLine(view)).toBe('1 performance area · 1 dimension · 1 indicator · 1 sub-indicator');
 
@@ -170,25 +138,6 @@ describe('framework-view.util', () => {
 
     const indicatorRow = tableRowsForLevel(view, 3)[0];
     expect(indicatorRow.responsiblesText).toBe('Idris Jones; Philippe Attey (inactive)');
-
-    const sheets = buildExportSheets(view);
-    expect(sheets.map(sheet => sheet.name)).toEqual(['Performance Areas', 'Dimensions', 'Indicators', 'Sub-indicators']);
-    expect(sheets.find(sheet => sheet.name === 'Sub-indicators')?.columns.map(column => column.field)).not.toContain('responsiblesText');
-    expect(sheets.find(sheet => sheet.name === 'Indicators')?.columns.map(column => column.header)).toEqual([
-      'Code',
-      'Name',
-      'Parent code',
-      'Performance Area code',
-      'Dimension code',
-      'Responsibles'
-    ]);
-
-    const ExcelJS = await import('exceljs');
-    const workbook = new ExcelJS.Workbook();
-    writeExportSheets(workbook, sheets);
-    expect(workbook.worksheets).toHaveLength(4);
-    expect(workbook.worksheets.map(worksheet => worksheet.name)).toEqual(['Performance Areas', 'Dimensions', 'Indicators', 'Sub-indicators']);
-    expect(codesOf('Sub-indicators', workbook)).toEqual(['1.1.1.1']);
   });
 
   it('stamps every tree node with its depth-1 ancestor index', () => {

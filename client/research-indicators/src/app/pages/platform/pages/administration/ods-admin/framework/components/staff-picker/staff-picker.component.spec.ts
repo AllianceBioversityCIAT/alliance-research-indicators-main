@@ -71,7 +71,9 @@ describe('StaffPickerComponent', () => {
     mount();
     const field = input();
     expect(field.getAttribute('role')).toBe('combobox');
+    expect(fixture.nativeElement.querySelector('label[for="staffPickerInput"]')?.classList.contains('label')).toBe(true);
     expect(fixture.nativeElement.querySelector('label[for="staffPickerInput"]')?.textContent?.trim()).toBe('Responsibles');
+    expect(fixture.nativeElement.querySelector('[data-testid="staff-hint"]')?.classList.contains('ods-field__hint')).toBe(true);
     expect(fixture.nativeElement.querySelector('[data-testid="staff-hint"]')?.textContent).toContain('At least 2 characters');
 
     field.value = 'I';

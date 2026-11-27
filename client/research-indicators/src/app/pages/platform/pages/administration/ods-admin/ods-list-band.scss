@@ -1,0 +1,56 @@
+// D-STF-44. The element that scrolls is .list-scroll (padding 0). The band is
+// its first child and owns the card's 16px top inset, so that inset is part of
+// the sticky box. Rows and the column header paint underneath it.
+// jsdom cannot judge the stick (KZ-017).
+
+.list-frame {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.list-scroll__body {
+  padding: 0 16px 16px;
+}
+
+.list-band {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0;
+  background: var(--ac-white-1);
+  padding: 16px 16px 12px;
+}
+
+@media (max-width: 1023px) {
+  .list-frame,
+  .list-scroll {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  // .list-scroll is overflow:visible here, so a sticky band would stick to the
+  // platform .content scroller instead of the list. The page itself scrolls.
+  .list-band {
+    position: static;
+  }
+}
+
+.card-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+}

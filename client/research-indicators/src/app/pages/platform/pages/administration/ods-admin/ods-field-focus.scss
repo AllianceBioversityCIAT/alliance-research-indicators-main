@@ -11,8 +11,10 @@
 }
 
 @mixin ods-panel-field-focus {
-  .field__control:focus,
-  .field__control:focus-visible,
+  .ods-field .p-inputtext:focus,
+  .ods-field .p-inputtext:focus-visible,
+  .ods-field .p-textarea:focus,
+  .ods-field .p-textarea:focus-visible,
   :host ::ng-deep .p-select:not(.p-disabled).p-focus,
   :host ::ng-deep .p-multiselect:not(.p-disabled).p-focus,
   :host ::ng-deep .p-autocomplete:not(.p-disabled).p-focus .p-autocomplete-input,
