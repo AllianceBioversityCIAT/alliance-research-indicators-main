@@ -16,7 +16,7 @@ export interface QuantificationItemData {
 }
 
 export const OTHER_UNIT_MACRO = 'Other';
-const PERCENT_TEXT_PATTERN = /%|percent|\brate\b|\bshare\b|proportion/i;
+export const PERCENT_TEXT_PATTERN = /%|percent|\brate\b|\bshare\b|proportion/i;
 
 @Component({
   selector: 'app-quantification-item',

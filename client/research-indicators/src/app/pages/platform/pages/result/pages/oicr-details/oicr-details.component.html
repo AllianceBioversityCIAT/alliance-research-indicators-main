@@ -54,7 +54,7 @@
 
           @if (is2026()) {
           <div class="pt-4">
-            <app-short-outcome-2026 [body]="body" [quantifications]="quantifications()"
+            <app-short-outcome-2026 [body]="body" [quantifications]="quantifications()" [unitCategories]="unitCategories()"
               [disabled]="cache.isExternalResult() || !submission.isEditableStatus()"></app-short-outcome-2026>
           </div>
           }

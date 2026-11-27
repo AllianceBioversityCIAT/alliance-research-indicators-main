@@ -5,6 +5,7 @@ import { ShortOutcome2026Component } from './short-outcome-2026.component';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { QuantificationItemData } from '@components/quantification-item/quantification-item.component';
+import { QuantificationUnitCategory } from '@shared/interfaces/oicr-catalogs.interface';
 
 const baseBody = (extra: Partial<PatchOicr> = {}): PatchOicr =>
   ({
@@ -80,73 +81,76 @@ describe('ShortOutcome2026Component', () => {
     expect(text('[data-testid="q4-required"]')).toContain('This field is required');
   });
 
-  describe('Q4 follows the Actual count narratives', () => {
-    const quants: QuantificationItemData[] = [
-      { number: 1, unit: 'Farmers', comments: 'Trained 200 farmers', unit_macro_category: 'Individuals' },
-      { number: 2, unit: '', comments: '   ' },
-      { number: 3, unit: 'Yield', comments: 'Yield went up' }
+  describe('Q4 is written from the Actual count rows', () => {
+    const categories: QuantificationUnitCategory[] = [
+      { id: 1, macro_category: 'Individuals', name: 'Community Members', is_percentage: false },
+      { id: 2, macro_category: 'Organizations', name: 'Cooperatives', is_percentage: false },
+      { id: 3, macro_category: 'Performance Metrics & Indicators', name: 'Adoption Rate', is_percentage: true }
     ];
+    const quants: QuantificationItemData[] = [
+      { number: 20, unit: 'Community Members', unit_macro_category: 'Individuals', comments: 'Trained in seed saving' },
+      { number: null, unit: '', comments: '   ' },
+      { number: 1500, unit: 'Cooperatives', unit_macro_category: 'Organizations', comments: '' },
+      { number: 45, unit: 'Adoption Rate', unit_macro_category: 'Performance Metrics & Indicators', comments: 'Adopted the new variety' },
+      { number: 15, unit: 'hectares restored', unit_macro_category: 'Other', comments: 'Degraded land recovered' }
+    ];
+    const expected = [
+      '20 Individuals (Community Members): Trained in seed saving',
+      '1,500 Organizations (Cooperatives)',
+      '45% Adoption Rate: Adopted the new variety',
+      '15 hectares restored: Degraded land recovered'
+    ].join('\n');
 
-    it('prefills `<unit>: <comment>` per line, only rows with a comment, and shows the Taken from chips', () => {
-      setup({}, quants);
-      expect(body().outcome_achieved).toBe('Farmers: Trained 200 farmers\nYield: Yield went up');
-      expect(body().outcome_achieved_edited).toBeFalsy();
-      expect(q4().value).toBe('Farmers: Trained 200 farmers\nYield: Yield went up');
-      expect(text('[data-testid="q4-sources"]')).toContain('ACTUAL COUNT # 1 · Farmers');
+    const setupQ4 = (initial: Partial<PatchOicr> = {}, rows = quants, disabled = false) => {
+      setup(initial, rows, disabled);
+      fixture.componentRef.setInput('unitCategories', categories);
+      flush();
+    };
+
+    it('writes one line per measure: number, unit, category, then the narrative; empty rows are skipped', () => {
+      setupQ4();
+      expect(body().outcome_achieved).toBe(expected);
+      expect(body().outcome_achieved_edited).toBe(false);
+      expect(q4().value).toBe(expected);
       expect(text('[data-testid="q4-sources"]')).toContain('Taken from:');
-      expect(text('[data-testid="q4-sources"]')).toContain('ACTUAL COUNT # 3 · Yield');
-      expect(text('[data-testid="q4-note"]')).toContain('Prefilled with the narratives from Quantification [Actual count]');
+      expect(text('[data-testid="q4-sources"]')).toContain('ACTUAL COUNT # 1 · Community Members');
+      expect(text('[data-testid="q4-sources"]')).not.toContain('ACTUAL COUNT # 2');
+      expect(text('[data-testid="q4-note"]')).toContain('Written from Quantification [Actual count]');
+    });
+
+    it('the field is disabled, so the user cannot type in it, and there is no Restore', () => {
+      setupQ4();
+      expect(q4().disabled).toBe(true);
       expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="q4-restore"]')).toBeNull();
     });
 
-    it('keeps following while the user has not edited (transition: starts empty, then narratives arrive)', () => {
-      setup({}, []);
+    it('keeps following the rows (transition: starts empty, then measures arrive and change)', () => {
+      setupQ4({}, []);
       expect(body().outcome_achieved ?? '').toBe('');
       expect(text('[data-testid="q4-note"]')).toContain('This answer fills in by itself');
       fixture.componentRef.setInput('quantifications', quants);
       flush();
-      expect(body().outcome_achieved).toBe('Farmers: Trained 200 farmers\nYield: Yield went up');
-      fixture.componentRef.setInput('quantifications', [{ number: 1, unit: '', comments: 'Only a comment' }]);
+      expect(body().outcome_achieved).toBe(expected);
+      fixture.componentRef.setInput('quantifications', [{ number: 3, unit: '', comments: 'Only a number and a comment' }]);
       flush();
-      expect(body().outcome_achieved).toBe('Only a comment');
+      expect(body().outcome_achieved).toBe('3: Only a number and a comment');
     });
 
-    it('typing in Q4 marks it edited, stops following, hides the chips and offers Restore', () => {
-      setup({}, quants);
-      q4().value = 'My own words';
-      q4().dispatchEvent(new Event('input'));
-      flush();
-      expect(body().outcome_achieved).toBe('My own words');
-      expect(body().outcome_achieved_edited).toBe(true);
-      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="q4-sources"]')).toBeNull();
-      expect(text('[data-testid="q4-note"]')).toContain('Edited by hand');
-
-      fixture.componentRef.setInput('quantifications', [{ number: 1, unit: 'Farmers', comments: 'Changed narrative' }]);
-      flush();
-      expect(body().outcome_achieved).toBe('My own words');
-    });
-
-    it('Restore from Quantification brings the narratives back and clears the edited flag', () => {
-      setup({ outcome_achieved: 'My own words', outcome_achieved_edited: true }, quants);
-      expect(body().outcome_achieved).toBe('My own words');
-      (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-testid="q4-restore"]')!.click();
-      flush();
+    it('a saved hand-edited answer is replaced by the rows and the edited flag cleared', () => {
+      setupQ4({ outcome_achieved: 'My own words', outcome_achieved_edited: true });
+      expect(body().outcome_achieved).toBe(expected);
       expect(body().outcome_achieved_edited).toBe(false);
-      expect(body().outcome_achieved).toBe('Farmers: Trained 200 farmers\nYield: Yield went up');
-      expect(text('[data-testid="q4-sources"]')).toContain('ACTUAL COUNT # 1 · Farmers');
     });
 
-    it('a saved result with edited=false is brought back in line with the narratives on load', () => {
-      setup({ outcome_achieved: 'stale server text', outcome_achieved_edited: false }, quants);
-      expect(body().outcome_achieved).toBe('Farmers: Trained 200 farmers\nYield: Yield went up');
+    it('without the catalog a percentage category is written like any other', () => {
+      setup({}, [quants[3]]);
+      expect(body().outcome_achieved).toBe('45 Performance Metrics & Indicators (Adoption Rate): Adopted the new variety');
     });
 
     it('does not touch the body when disabled (external result / non-editable status)', () => {
-      setup({ outcome_achieved: 'saved' }, quants, true);
+      setupQ4({ outcome_achieved: 'saved' }, quants, true);
       expect(body().outcome_achieved).toBe('saved');
-      q4().dispatchEvent(new Event('input'));
-      expect(body().outcome_achieved_edited).toBeFalsy();
-      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="q4-restore"]')).toBeNull();
+      expect(q4().value).toBe('saved');
     });
   });
 });

@@ -3,16 +3,39 @@ import { TextareaModule } from 'primeng/textarea';
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 import { WordCounterComponent } from '@shared/components/custom-fields/word-counter/word-counter.component';
 import { PatchOicr } from '@shared/interfaces/oicr-creation.interface';
-import { QuantificationItemData } from '@components/quantification-item/quantification-item.component';
+import { QuantificationUnitCategory } from '@shared/interfaces/oicr-catalogs.interface';
+import { OTHER_UNIT_MACRO, PERCENT_TEXT_PATTERN, QuantificationItemData } from '@components/quantification-item/quantification-item.component';
 
 export interface Q4SourceChip {
   label: string;
 }
 
 /**
+ * The measure part of one Actual count row: number, then unit and category.
+ * `20 Individuals (Community Members)`, `45% Adoption Rate`, `15 hectares restored` (macro Other).
+ */
+export const describeMeasure = (q: QuantificationItemData, categories: QuantificationUnitCategory[] = []): string => {
+  const unit = (q.unit ?? '').trim();
+  const macro = (q.unit_macro_category ?? '').trim();
+  const isOther = macro === OTHER_UNIT_MACRO;
+  const percentCategory = categories.some(c => c.macro_category === macro && c.name === unit && c.is_percentage);
+  const isPercentage = !!unit && (isOther ? PERCENT_TEXT_PATTERN.test(unit) : percentCategory);
+
+  const hasNumber = q.number !== null && q.number !== undefined && `${q.number}` !== '';
+  const suffix = isPercentage ? '%' : '';
+  const amount = hasNumber ? `${Number(q.number).toLocaleString('en-US')}${suffix}` : '';
+
+  let unitText = unit;
+  if (unit && macro && !isOther && !isPercentage) unitText = `${macro} (${unit})`;
+  else if (!unit && macro && !isOther) unitText = macro;
+
+  return [amount, unitText].filter(Boolean).join(' ');
+};
+
+/**
  * OICR Details 2026 — Short Outcome/Impact Statement as four questions.
- * "What outcome or impact was achieved?" follows the Actual count narratives until the user
- * types their own text (`outcome_achieved_edited = true`); Restore hands it back to them.
+ * "What outcome or impact was achieved?" is read-only: it is written from the Actual count rows,
+ * one line per measure (`<number> <unit> (<category>): <narrative>`), and always follows them.
  */
 @Component({
   selector: 'app-short-outcome-2026',
@@ -24,51 +47,48 @@ export class ShortOutcome2026Component {
   readonly wordLimit = 25;
   body = input.required<WritableSignal<PatchOicr>>();
   quantifications = input<QuantificationItemData[]>([]);
+  /** Unit category catalog, to tell percentage categories apart. */
+  unitCategories = input<QuantificationUnitCategory[]>([]);
   disabled = input(false);
 
-  /** Actual count rows that carry a narrative, in order, with their 1-based position. */
-  private readonly narrativeRows = computed(() =>
+  /** Actual count rows with anything filled in, in order, with their 1-based position. */
+  private readonly measureRows = computed(() =>
     this.quantifications()
-      .map((q, i) => ({ no: i + 1, unit: (q.unit ?? '').trim(), comment: (q.comments ?? '').trim() }))
-      .filter(r => r.comment)
+      .map((q, i) => ({
+        no: i + 1,
+        unit: (q.unit ?? '').trim(),
+        measure: describeMeasure(q, this.unitCategories()),
+        comment: (q.comments ?? '').trim()
+      }))
+      .filter(r => r.measure || r.comment)
   );
 
-  /** `<unit>: <comment>` one per line (the comment alone when the row has no unit yet). */
-  readonly autoText = computed(() => this.narrativeRows().map(r => (r.unit ? `${r.unit}: ${r.comment}` : r.comment)).join('\n'));
+  /** One line per measure: `<number> <unit> (<category>): <narrative>`. */
+  readonly autoText = computed(() =>
+    this.measureRows()
+      .map(r => (r.measure && r.comment ? `${r.measure}: ${r.comment}` : r.measure || r.comment))
+      .join('\n')
+  );
 
   readonly sourceChips = computed<Q4SourceChip[]>(() =>
-    this.narrativeRows().map(r => ({ label: `ACTUAL COUNT # ${r.no}${r.unit ? ' · ' + r.unit : ''}` }))
+    this.measureRows().map(r => ({ label: `ACTUAL COUNT # ${r.no}${r.unit ? ' · ' + r.unit : ''}` }))
   );
 
-  readonly edited = computed(() => !!this.body()().outcome_achieved_edited);
   readonly q4Value = computed(() => this.body()().outcome_achieved ?? '');
   readonly q4Invalid = computed(() => this.q4Value().trim().length === 0);
 
-  readonly q4Note = computed(() => {
-    if (this.edited()) {
-      return 'Edited by hand, so it no longer follows the Quantification narratives. Use Restore from Quantification to bring them back.';
-    }
-    return this.autoText()
-      ? 'Prefilled with the narratives from Quantification [Actual count] and kept up to date as you write them. Edit it to write your own.'
-      : 'This answer fills in by itself with the narratives you write for each measure in Quantification [Actual count], below.';
-  });
+  readonly q4Note = computed(() =>
+    this.autoText()
+      ? 'Written from Quantification [Actual count]: the number, unit, category and narrative of each measure. To change it, edit those measures below.'
+      : 'This answer fills in by itself with each measure you report in Quantification [Actual count], below: its number, unit, category and narrative.'
+  );
 
+  /** Q4 always follows the Actual count rows; a hand-edited answer saved earlier is replaced too. */
   private readonly followQuantification = effect(() => {
     const auto = this.autoText();
     const current = this.body()();
-    if (this.disabled() || current.outcome_achieved_edited) return;
-    if ((current.outcome_achieved ?? '') === auto) return;
-    this.body().update(b => ({ ...b, outcome_achieved: auto }));
+    if (this.disabled()) return;
+    if ((current.outcome_achieved ?? '') === auto && !current.outcome_achieved_edited) return;
+    this.body().update(b => ({ ...b, outcome_achieved: auto, outcome_achieved_edited: false }));
   });
-
-  onQ4Input(event: Event) {
-    if (this.disabled()) return;
-    const value = (event.target as HTMLTextAreaElement).value;
-    this.body().update(b => ({ ...b, outcome_achieved: value, outcome_achieved_edited: true }));
-  }
-
-  restore() {
-    if (this.disabled()) return;
-    this.body().update(b => ({ ...b, outcome_achieved: this.autoText(), outcome_achieved_edited: false }));
-  }
 }
